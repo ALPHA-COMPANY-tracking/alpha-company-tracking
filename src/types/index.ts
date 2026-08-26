@@ -1,0 +1,69 @@
+// ─────────────────────────────────────────────────────────────
+// Tipos do domínio. Valores monetários "de entrada" (vindos do
+// banco / Afterpay) chegam em REAIS (numeric(12,2)). O motor de
+// cálculo converte tudo para CENTAVOS inteiros internamente.
+// ─────────────────────────────────────────────────────────────
+
+/** Data no formato ISO date-only: 'YYYY-MM-DD'. */
+export type IsoDate = string;
+
+/** Snapshot diário vindo do Afterpay. Valores em reais. */
+export interface AfterpayDaily {
+  data: IsoDate;
+
+  // Receita
+  receita_aprovada: number;
+  qtd_pagamentos: number;
+
+  // Deduções
+  taxas_plataforma: number;
+
+  // Custos operacionais
+  custo_produtos: number;
+  frete: number;
+  comissoes_vendedor: number;
+  comissoes_cobranca: number;
+
+  // Marketing
+  investimento_ads: number;
+  taxas_investimento: number;
+
+  // Perdas
+  valor_frustrado: number;
+  qtd_frustrados: number;
+
+  // Funil
+  valor_agendado: number;
+  qtd_agendados: number;
+}
+
+export type Recorrencia = 'unico' | 'mensal';
+
+/** Categoria de custo variável (editável pelo usuário). */
+export interface CategoriaCusto {
+  id: string;
+  nome: string;
+  icone?: string | null;
+  cor?: string | null;
+  ativo: boolean;
+  ordem: number;
+}
+
+/** Custo variável — o que o Afterpay NÃO conhece. Valor em reais. */
+export interface CustoVariavel {
+  id: string;
+  data: IsoDate; // data de competência
+  categoria_id: string | null;
+  descricao: string;
+  valor: number;
+  recorrencia: Recorrencia;
+  recorrencia_fim: IsoDate | null; // null = indefinido
+  ratear_por_dias: boolean;
+  observacao?: string | null;
+}
+
+/** Período fechado e inclusivo [inicio, fim]. */
+export interface Periodo {
+  inicio: IsoDate;
+  fim: IsoDate;
+}
