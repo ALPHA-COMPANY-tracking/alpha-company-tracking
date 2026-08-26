@@ -56,6 +56,44 @@ export function ultimoDiaMes(y: number, m: number): IsoDate {
   return `${y}-${String(m).padStart(2, '0')}-${String(diasNoMes(y, m)).padStart(2, '0')}`;
 }
 
+/** Soma (ou subtrai) dias a uma data ISO, preservando 'YYYY-MM-DD'. */
+export function addDias(iso: IsoDate, n: number): IsoDate {
+  const base = utc(iso) + n * MS_DIA;
+  const d = new Date(base);
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth() + 1;
+  const day = d.getUTCDate();
+  return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/** Data de hoje no fuso America/Sao_Paulo, como 'YYYY-MM-DD'. */
+export function hojeIso(): IsoDate {
+  // en-CA formata como 'YYYY-MM-DD'
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+/** Formata 'YYYY-MM-DD' para 'DD/MM'. */
+export function formatDiaMes(iso: IsoDate): string {
+  const { m, d } = parseYmd(iso);
+  return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
+}
+
+/** Lista de todos os dias (ISO) entre inicio e fim, inclusivo. */
+export function diasDoPeriodo(inicio: IsoDate, fim: IsoDate): IsoDate[] {
+  const out: IsoDate[] = [];
+  let cur = inicio;
+  while (cur <= fim) {
+    out.push(cur);
+    cur = addDias(cur, 1);
+  }
+  return out;
+}
+
 /**
  * Lista dos meses (como {y,m}) que têm qualquer interseção com
  * o período [inicio, fim].

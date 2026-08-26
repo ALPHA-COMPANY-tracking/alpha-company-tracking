@@ -4,9 +4,10 @@
 // (0..1) para percentuais. Regras vindas da spec, sem improviso.
 // ─────────────────────────────────────────────────────────────
 
-import type { AfterpayDaily, CustoVariavel, Periodo } from '@/types';
+import type { AfterpayDaily, CustoVariavel, IsoDate, Periodo } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
 import {
+  diasDoPeriodo,
   diasInclusivos,
   diasNoMes,
   isDentro,
@@ -61,6 +62,14 @@ export interface CategoriaAgregada {
   categoria_id: string | null;
   total: Cents;
   qtd: number;
+}
+
+/** Ponto da série diária (para gráficos). Valores em centavos. */
+export interface PontoDiario {
+  data: IsoDate;
+  receita: Cents;
+  custos: Cents;
+  lucro: Cents;
 }
 
 export interface PnlOptions {
@@ -118,6 +127,22 @@ export interface PnlResult {
   roas: number;
   roi_real: number;
   custo_por_real: number;
+}
+
+/**
+ * Série diária de receita, custos totais reais e lucro real.
+ * Reusa calcularPnl por dia (o rateio de mensais vira parcela diária).
+ */
+export function serieDiaria(
+  dailies: AfterpayDaily[],
+  custos: CustoVariavel[],
+  periodo: Periodo,
+  opts: PnlOptions = {},
+): PontoDiario[] {
+  return diasDoPeriodo(periodo.inicio, periodo.fim).map((dia) => {
+    const p = calcularPnl(dailies, custos, { inicio: dia, fim: dia }, opts);
+    return { data: dia, receita: p.receita_aprovada, custos: p.custos_totais_reais, lucro: p.lucro_real };
+  });
 }
 
 /** Calcula o P&L completo de um período. */

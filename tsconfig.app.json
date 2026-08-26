@@ -18,7 +18,6 @@
 
     /* Strictness + path alias */
     "strict": true,
-    "baseUrl": ".",
     "paths": { "@/*": ["./src/*"] },
 
     /* Linting */
