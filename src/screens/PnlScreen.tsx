@@ -3,6 +3,7 @@ import {
   BadgeCheck,
   BarChart3,
   Banknote,
+  CalendarClock,
   Megaphone,
   ShoppingCart,
   Target,
@@ -40,14 +41,27 @@ export function PnlScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Herói */}
-      <div className="max-w-[560px] mx-auto w-full bg-card border border-line rounded-card px-[22px] py-[18px] flex items-center gap-4 justify-center">
-        <div className="w-[42px] h-[42px] rounded-[12px] grid place-items-center bg-grn/[0.13] text-grn">
-          <TrendingUp size={20} strokeWidth={1.9} />
+      {/* Herói — Faturamento Agendado (esquerda) · Lucro Real (direita) */}
+      <div className="max-w-[720px] mx-auto w-full bg-card border border-line rounded-card px-[22px] py-[18px] grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-line">
+        <div className="flex items-center gap-4 justify-center pb-4 sm:pb-0 sm:pr-6">
+          <div className="w-[42px] h-[42px] rounded-[12px] grid place-items-center bg-pur/[0.13] text-pur2 shrink-0">
+            <CalendarClock size={20} strokeWidth={1.9} />
+          </div>
+          <div>
+            <div className="text-[12px] text-dim font-medium">Faturamento Agendado</div>
+            <div className="mono text-[30px] font-extrabold text-pur2 tracking-tight leading-tight">{formatBRL(pnl.valor_agendado)}</div>
+            <div className="text-[10.5px] text-dim2 mt-0.5">{pnl.qtd_agendados} pedidos no período</div>
+          </div>
         </div>
-        <div>
-          <div className="text-[12px] text-dim font-medium">Lucro Real (período)</div>
-          <div className="mono text-[30px] font-extrabold text-grn tracking-tight leading-tight">{formatBRL(pnl.lucro_real)}</div>
+        <div className="flex items-center gap-4 justify-center pt-4 sm:pt-0 sm:pl-6">
+          <div className="w-[42px] h-[42px] rounded-[12px] grid place-items-center bg-grn/[0.13] text-grn shrink-0">
+            <TrendingUp size={20} strokeWidth={1.9} />
+          </div>
+          <div>
+            <div className="text-[12px] text-dim font-medium">Lucro Real (período)</div>
+            <div className="mono text-[30px] font-extrabold text-grn tracking-tight leading-tight">{formatBRL(pnl.lucro_real)}</div>
+            <div className="text-[10.5px] text-dim2 mt-0.5">Margem {formatPercent(pnl.margem_real)}</div>
+          </div>
         </div>
       </div>
 
