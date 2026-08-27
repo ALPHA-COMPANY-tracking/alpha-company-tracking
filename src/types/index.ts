@@ -84,3 +84,18 @@ export interface PlataformaStat {
   nome: string;
   pedidos: number;
 }
+
+/** Pedido espelhado do BlueSales (sem PII do cliente). Valor em reais. */
+export interface Pedido {
+  id: string;
+  internal_id?: number | null;
+  status: string | null;
+  data: IsoDate;
+  valor: number;
+  produto_nome?: string | null;
+  produto_plano?: string | null;
+  codigo_plano?: string | null;
+  metodo_pagamento?: string | null;
+  vendedor?: string | null;
+  rastreamento?: string | null;
+}

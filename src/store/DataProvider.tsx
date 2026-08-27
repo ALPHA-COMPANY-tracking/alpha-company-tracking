@@ -7,7 +7,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
-import type { AfterpayDaily, AtendenteStat, CategoriaCusto, CustoVariavel, PlataformaStat } from '@/types';
+import type { AfterpayDaily, AtendenteStat, CategoriaCusto, CustoVariavel, Pedido, PlataformaStat } from '@/types';
 import { type Dataset, novoId } from '@/data/db';
 import { type Backend, LocalBackend } from '@/data/backend';
 
@@ -17,6 +17,7 @@ interface DataContextValue {
   custos: CustoVariavel[];
   atendentes: AtendenteStat[];
   plataformas: PlataformaStat[];
+  pedidos: Pedido[];
   ultimoSync: string | null;
 
   addCusto: (input: Omit<CustoVariavel, 'id'>) => CustoVariavel;
@@ -181,6 +182,7 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
       custos: data.custos,
       atendentes: data.atendentes,
       plataformas: data.plataformas,
+      pedidos: data.pedidos,
       ultimoSync: data.ultimoSync,
       addCusto,
       updateCusto,

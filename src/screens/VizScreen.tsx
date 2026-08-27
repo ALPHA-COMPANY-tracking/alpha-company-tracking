@@ -3,6 +3,7 @@ import type { Periodo } from '@/types';
 import { formatBRL, formatBRLCompact, formatMultiplier, formatPercent, reaisToCents, safeDiv } from '@/lib/money';
 import { formatDiaMes } from '@/lib/dates';
 import { calcularPnl } from '@/lib/pnl';
+import { agregarPedidos } from '@/lib/pedidos';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
 import { EvolucaoChart } from '@/components/pnl/EvolucaoChart';
@@ -11,20 +12,30 @@ import { DonutCategorias } from '@/components/viz/DonutCategorias';
 import { Funil } from '@/components/viz/Funil';
 
 export function VizScreen({ periodo }: { periodo: Periodo }) {
-  const { dailies, custos, categorias, atendentes, plataformas } = useData();
+  const { dailies, custos, categorias, atendentes, plataformas, pedidos } = useData();
   const catMap = new Map(categorias.map((c) => [c.id, c]));
 
-  const pnl = useMemo(() => calcularPnl(dailies, custos, periodo), [dailies, custos, periodo]);
+  const pnl = useMemo(() => calcularPnl(dailies, custos, periodo, {}, pedidos), [dailies, custos, periodo, pedidos]);
+  const agg = useMemo(() => agregarPedidos(pedidos, periodo), [pedidos, periodo]);
+  const temPedidos = agg.qtd_agendados > 0;
 
-  const barrasAgendado = [...atendentes]
+  // Com pedidos reais do BlueSales, usa-os; senão, dados de exemplo.
+  const atendentesFonte = temPedidos
+    ? agg.porAtendente.map((a) => ({ nome: a.nome, valor_agendado: a.valor_agendado, pedidos: a.pedidos }))
+    : atendentes;
+
+  const barrasAgendado = [...atendentesFonte]
     .sort((a, b) => b.valor_agendado - a.valor_agendado)
     .map((a) => ({ label: a.nome, value: a.valor_agendado, display: formatBRLCompact(reaisToCents(a.valor_agendado)) }));
 
-  const barrasPedidos = [...atendentes]
+  const barrasPedidos = [...atendentesFonte]
     .sort((a, b) => b.pedidos - a.pedidos)
     .map((a) => ({ label: a.nome, value: a.pedidos, display: String(a.pedidos) }));
 
-  const barrasPlataforma = [...plataformas]
+  const plataformaFonte = temPedidos
+    ? agg.porMetodo.map((m) => ({ nome: m.nome, pedidos: m.pedidos }))
+    : plataformas;
+  const barrasPlataforma = [...plataformaFonte]
     .sort((a, b) => b.pedidos - a.pedidos)
     .map((p) => ({ label: p.nome, value: p.pedidos, display: String(p.pedidos) }));
 

@@ -41,14 +41,18 @@ export class SupabaseBackend implements Backend {
   }
 
   async load(): Promise<Dataset> {
-    const [cats, custos, dailies] = await Promise.all([
+    const [cats, custos, dailies, pedidos] = await Promise.all([
       this.db.from('categorias_custo').select('*').order('ordem'),
       this.db.from('custos_variaveis').select('*').order('data', { ascending: false }),
       this.db.from('afterpay_daily').select('*').order('data'),
+      this.db.from('bluesales_pedidos').select('*').order('data', { ascending: false }),
     ]);
     if (cats.error) throw cats.error;
     if (custos.error) throw custos.error;
     if (dailies.error) throw dailies.error;
+    // Tolerante: se a tabela de pedidos ainda não foi criada (migration
+    // 0002 não rodada), segue com pedidos vazios em vez de quebrar o app.
+    if (pedidos.error) console.warn('bluesales_pedidos indisponível:', pedidos.error.message);
 
     let categorias: CategoriaCusto[] = (cats.data ?? []).map((r) => ({
       id: String(r.id),
@@ -85,12 +89,27 @@ export class SupabaseBackend implements Backend {
         ? (dailies.data[dailies.data.length - 1].sincronizado_em ?? null)
         : null;
 
+    const pedidosMap = (pedidos.data ?? []).map((r) => ({
+      id: String(r.id),
+      internal_id: r.internal_id ?? null,
+      status: r.status ?? null,
+      data: String(r.data),
+      valor: N(r.valor),
+      produto_nome: r.produto_nome ?? null,
+      produto_plano: r.produto_plano ?? null,
+      codigo_plano: r.codigo_plano ?? null,
+      metodo_pagamento: r.metodo_pagamento ?? null,
+      vendedor: r.vendedor ?? null,
+      rastreamento: r.rastreamento ?? null,
+    }));
+
     return {
       categorias,
       dailies: dailiesMap,
       custos: custosMap,
       atendentes: SEED_ATENDENTES,
       plataformas: SEED_PLATAFORMAS,
+      pedidos: pedidosMap,
       ultimoSync,
     };
   }

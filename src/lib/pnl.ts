@@ -4,8 +4,9 @@
 // (0..1) para percentuais. Regras vindas da spec, sem improviso.
 // ─────────────────────────────────────────────────────────────
 
-import type { AfterpayDaily, CustoVariavel, IsoDate, Periodo } from '@/types';
+import type { AfterpayDaily, CustoVariavel, IsoDate, Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
+import { agregarPedidos } from '@/lib/pedidos';
 import {
   diasDoPeriodo,
   diasInclusivos,
@@ -151,6 +152,7 @@ export function calcularPnl(
   custos: CustoVariavel[],
   periodo: Periodo,
   opts: PnlOptions = {},
+  pedidos: Pedido[] = [],
 ): PnlResult {
   const rows = dailies.filter((r) => isDentro(r.data, periodo.inicio, periodo.fim));
 
@@ -159,9 +161,26 @@ export function calcularPnl(
   const somaI = (sel: (r: AfterpayDaily) => number): number =>
     rows.reduce((acc, r) => acc + sel(r), 0);
 
-  const receita_aprovada = somaC((r) => r.receita_aprovada);
-  const qtd_pagamentos = somaI((r) => r.qtd_pagamentos);
+  // Receita/funil: por padrão vem do afterpay_daily (lançamento manual);
+  // se houver pedidos do BlueSales no período, eles são a fonte da verdade.
+  let receita_aprovada = somaC((r) => r.receita_aprovada);
+  let qtd_pagamentos = somaI((r) => r.qtd_pagamentos);
+  let valor_frustrado = somaC((r) => r.valor_frustrado);
+  let qtd_frustrados = somaI((r) => r.qtd_frustrados);
+  let valor_agendado = somaC((r) => r.valor_agendado);
+  let qtd_agendados = somaI((r) => r.qtd_agendados);
 
+  const agg = pedidos.length ? agregarPedidos(pedidos, periodo) : null;
+  if (agg && agg.qtd_agendados > 0) {
+    receita_aprovada = reaisToCents(agg.receita_aprovada);
+    qtd_pagamentos = agg.qtd_pagamentos;
+    valor_frustrado = reaisToCents(agg.valor_frustrado);
+    qtd_frustrados = agg.qtd_frustrados;
+    valor_agendado = reaisToCents(agg.valor_agendado);
+    qtd_agendados = agg.qtd_agendados;
+  }
+
+  // Custos: sempre do afterpay_daily (lançamento manual / futura config).
   const taxas_plataforma = somaC((r) => r.taxas_plataforma);
   const custo_produtos = somaC((r) => r.custo_produtos);
   const frete = somaC((r) => r.frete);
@@ -169,11 +188,6 @@ export function calcularPnl(
   const comissoes_cobranca = somaC((r) => r.comissoes_cobranca);
   const investimento_ads = somaC((r) => r.investimento_ads);
   const taxas_investimento = somaC((r) => r.taxas_investimento);
-
-  const valor_frustrado = somaC((r) => r.valor_frustrado);
-  const qtd_frustrados = somaI((r) => r.qtd_frustrados);
-  const valor_agendado = somaC((r) => r.valor_agendado);
-  const qtd_agendados = somaI((r) => r.qtd_agendados);
 
   const custos_afterpay =
     taxas_plataforma +

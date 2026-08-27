@@ -3,7 +3,7 @@
 // trocamos esta implementação pelo Supabase mantendo a mesma API.
 // ─────────────────────────────────────────────────────────────
 
-import type { AfterpayDaily, AtendenteStat, CategoriaCusto, CustoVariavel, PlataformaStat } from '@/types';
+import type { AfterpayDaily, AtendenteStat, CategoriaCusto, CustoVariavel, Pedido, PlataformaStat } from '@/types';
 import {
   SEED_ATENDENTES,
   SEED_CATEGORIAS,
@@ -20,6 +20,7 @@ export interface Dataset {
   custos: CustoVariavel[];
   atendentes: AtendenteStat[];
   plataformas: PlataformaStat[];
+  pedidos: Pedido[];
   ultimoSync: string | null;
 }
 
@@ -30,6 +31,7 @@ function seedInicial(): Dataset {
     custos: gerarCustos(),
     atendentes: SEED_ATENDENTES,
     plataformas: SEED_PLATAFORMAS,
+    pedidos: [],
     ultimoSync: null,
   };
 }
@@ -49,6 +51,7 @@ export function carregar(): Dataset {
       custos: parsed.custos ?? [],
       atendentes: parsed.atendentes ?? SEED_ATENDENTES,
       plataformas: parsed.plataformas ?? SEED_PLATAFORMAS,
+      pedidos: parsed.pedidos ?? [],
       ultimoSync: parsed.ultimoSync ?? null,
     };
   } catch {
