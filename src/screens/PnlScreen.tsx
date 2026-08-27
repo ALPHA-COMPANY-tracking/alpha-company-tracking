@@ -64,7 +64,7 @@ export function PnlScreen({
                   onClick={onLancarManual}
                   className="px-4 py-[9px] rounded-[10px] text-[13px] font-semibold text-white bg-gradient-to-br from-pur3 to-pur"
                 >
-                  Lançar período manualmente
+                  Lançar Ads (Meta)
                 </button>
               )}
               <button
