@@ -7,6 +7,7 @@
 import type { AfterpayDaily, CustoVariavel, IsoDate, Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
 import { agregarPedidos } from '@/lib/pedidos';
+import { COMISSAO_COBRANCA, COMISSAO_VENDEDOR, custosDePedidos } from '@/lib/custosConfig';
 import {
   diasDoPeriodo,
   diasInclusivos,
@@ -180,14 +181,24 @@ export function calcularPnl(
     qtd_agendados = agg.qtd_agendados;
   }
 
-  // Custos: sempre do afterpay_daily (lançamento manual / futura config).
+  // Custos base do afterpay_daily (lançamento manual).
   const taxas_plataforma = somaC((r) => r.taxas_plataforma);
-  const custo_produtos = somaC((r) => r.custo_produtos);
-  const frete = somaC((r) => r.frete);
-  const comissoes_vendedor = somaC((r) => r.comissoes_vendedor);
-  const comissoes_cobranca = somaC((r) => r.comissoes_cobranca);
+  let custo_produtos = somaC((r) => r.custo_produtos);
+  let frete = somaC((r) => r.frete);
+  let comissoes_vendedor = somaC((r) => r.comissoes_vendedor);
+  let comissoes_cobranca = somaC((r) => r.comissoes_cobranca);
   const investimento_ads = somaC((r) => r.investimento_ads);
   const taxas_investimento = somaC((r) => r.taxas_investimento);
+
+  // Com pedidos do BlueSales: custo de produto/frete/comissões vêm da config.
+  // (Ads e taxas seguem manuais, via afterpay_daily.)
+  if (agg && agg.qtd_agendados > 0) {
+    const cc = custosDePedidos(pedidos, periodo);
+    custo_produtos = cc.custo_produtos;
+    frete = cc.frete;
+    comissoes_vendedor = Math.round(receita_aprovada * COMISSAO_VENDEDOR);
+    comissoes_cobranca = Math.round(receita_aprovada * COMISSAO_COBRANCA);
+  }
 
   const custos_afterpay =
     taxas_plataforma +
