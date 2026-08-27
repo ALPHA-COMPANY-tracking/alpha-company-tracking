@@ -7,7 +7,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AfterpayDaily, CategoriaCusto, CustoVariavel } from '@/types';
 import type { Dataset } from '@/data/db';
-import { SEED_ATENDENTES, SEED_PLATAFORMAS } from '@/data/seed';
+import { SEED_ATENDENTES, SEED_CATEGORIAS, SEED_PLATAFORMAS } from '@/data/seed';
 import type { Backend } from '@/data/backend';
 
 const N = (v: unknown) => Number(v ?? 0);
@@ -50,7 +50,7 @@ export class SupabaseBackend implements Backend {
     if (custos.error) throw custos.error;
     if (dailies.error) throw dailies.error;
 
-    const categorias: CategoriaCusto[] = (cats.data ?? []).map((r) => ({
+    let categorias: CategoriaCusto[] = (cats.data ?? []).map((r) => ({
       id: String(r.id),
       nome: String(r.nome),
       icone: r.icone ?? null,
@@ -58,6 +58,16 @@ export class SupabaseBackend implements Backend {
       ativo: Boolean(r.ativo),
       ordem: N(r.ordem),
     }));
+
+    // Primeiro acesso sem categorias (ex.: conta antiga num projeto já
+    // existente, onde o gatilho do banco não rodou): semeia as 14.
+    if (categorias.length === 0) {
+      const novas: CategoriaCusto[] = SEED_CATEGORIAS.map((c) => ({ ...c, id: crypto.randomUUID() }));
+      const { error } = await this.db
+        .from('categorias_custo')
+        .insert(novas.map((c) => ({ ...c, user_id: this.userId })));
+      if (!error) categorias = novas;
+    }
     const custosMap: CustoVariavel[] = (custos.data ?? []).map((r) => ({
       id: String(r.id),
       data: String(r.data),
