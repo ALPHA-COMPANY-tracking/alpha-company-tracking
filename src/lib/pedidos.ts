@@ -62,10 +62,11 @@ export function agregarPedidos(pedidos: Pedido[], periodo: Periodo): RevenuePedi
 
   for (const p of noPeriodo) {
     const bucket = statusBucket(p.status);
-    const valor = Number(p.valor) || 0;
+    const valor = Number(p.valor) || 0; // líquido → receita
+    const bruto = Number(p.valor_bruto ?? p.valor) || 0; // cheio → agendado
 
-    // Todos os pedidos entram no "agendado" (pipeline total).
-    valor_agendado += valor;
+    // Todos os pedidos entram no "agendado" (faturamento total, valor cheio).
+    valor_agendado += bruto;
     qtd_agendados += 1;
 
     if (bucket === 'aprovado') {
@@ -78,7 +79,7 @@ export function agregarPedidos(pedidos: Pedido[], periodo: Periodo): RevenuePedi
 
     const nome = p.vendedor?.trim() || 'Sem atendente';
     const a = atendentes.get(nome) ?? { nome, valor_agendado: 0, pedidos: 0, receita: 0, aprovados: 0 };
-    a.valor_agendado += valor;
+    a.valor_agendado += bruto;
     a.pedidos += 1;
     if (bucket === 'aprovado') {
       a.receita += valor;

@@ -91,7 +91,8 @@ export interface Pedido {
   internal_id?: number | null;
   status: string | null;
   data: IsoDate;
-  valor: number;
+  valor: number; // líquido (com desconto %) — base da receita aprovada
+  valor_bruto?: number | null; // valor cheio do pedido — base do agendado
   produto_nome?: string | null;
   produto_plano?: string | null;
   codigo_plano?: string | null;

@@ -81,6 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     status: order.status ?? null,
     data: dataSP(order.created_at),
     valor: num(pagamento.valor ?? produto['preço']),
+    valor_bruto: num(pagamento.valor_bruto ?? pagamento.valor ?? produto['preço']),
     produto_nome: produto.nome ?? null,
     produto_plano: produto.plano ?? null,
     codigo_plano: produto['código_do_plano'] ?? null,
