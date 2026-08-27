@@ -10,7 +10,7 @@ function ped(id: string, status: string, plano: string): Pedido {
 
 describe('custoProdutoDoPlano', () => {
   it('detecta 6 potes e 3 potes pelo texto do plano', () => {
-    expect(custoProdutoDoPlano('DERMAX PREMIUM - 6 POTE + 1 GOTA + 1 SÉRUM + 1 CREME')).toBe(58);
+    expect(custoProdutoDoPlano('DERMAX PREMIUM - 6 POTE + 1 GOTA + 1 SÉRUM + 1 CREME')).toBe(83);
     expect(custoProdutoDoPlano('DERMAX PREMIUM - 3 POTE + 1 GOTA')).toBe(32.5);
     expect(custoProdutoDoPlano('desconhecido')).toBe(0);
   });
@@ -24,7 +24,7 @@ describe('custosDePedidos', () => {
       ped('3', 'enviados', 'DERMAX PREMIUM - 6 POTE + 1 GOTA + 1 SÉRUM + 1 CREME'), // pipeline: ignora
     ];
     const r = custosDePedidos(pedidos, periodo);
-    expect(r.custo_produtos).toBe(5800 + 3250); // 58,00 + 32,50
+    expect(r.custo_produtos).toBe(8300 + 3250); // 83,00 + 32,50
     expect(r.frete).toBe(3300 * 2); // R$ 33 × 2 aprovados
   });
 });

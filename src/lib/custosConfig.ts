@@ -9,16 +9,20 @@ import { type Cents, reaisToCents } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
 import { statusBucket } from '@/lib/pedidos';
 
-/** Custo do produto (COGS) por plano — detectado pelo texto do plano. */
+/** Custo do produto (COGS) por plano — detectado pelo texto do plano.
+ *  Valores conferidos contra o P&L real do BlueSales. */
 export const CUSTO_PRODUTO: { match: RegExp; custo: number }[] = [
-  { match: /6\s*pote/i, custo: 58.0 },
+  { match: /6\s*pote/i, custo: 83.0 },
   { match: /3\s*pote/i, custo: 32.5 },
 ];
 
 /** Frete fixo por pedido aprovado. */
 export const FRETE_POR_PEDIDO = 33.0;
 
-/** Comissões como % da receita aprovada. */
+/** Taxa de plataforma (fixa por período com vendas). */
+export const TAXA_PLATAFORMA = 22.5;
+
+/** Comissões: vendedor 5% da (receita − taxas); cobrança 1% da receita. */
 export const COMISSAO_VENDEDOR = 0.05;
 export const COMISSAO_COBRANCA = 0.01;
 
