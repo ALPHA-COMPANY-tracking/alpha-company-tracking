@@ -1,0 +1,56 @@
+// ─────────────────────────────────────────────────────────────
+// Abstração de persistência. O DataProvider fala só com esta
+// interface; trocar Local ↔ Supabase não toca nas telas.
+// ─────────────────────────────────────────────────────────────
+
+import type { AfterpayDaily, CategoriaCusto, CustoVariavel } from '@/types';
+import { type Dataset, carregar, salvar } from '@/data/db';
+
+export interface Backend {
+  load(): Promise<Dataset>;
+  addCusto(c: CustoVariavel): Promise<void>;
+  updateCusto(id: string, patch: Partial<CustoVariavel>): Promise<void>;
+  deleteCusto(id: string): Promise<void>;
+  importarCustos(cs: CustoVariavel[]): Promise<void>;
+  addCategoria(c: CategoriaCusto): Promise<void>;
+  updateCategoria(id: string, patch: Partial<CategoriaCusto>): Promise<void>;
+  lancarDaily(d: AfterpayDaily): Promise<void>;
+  marcarSync(iso: string): Promise<void>;
+}
+
+/** Backend local: localStorage. Fonte da verdade é o próprio storage. */
+export class LocalBackend implements Backend {
+  async load(): Promise<Dataset> {
+    return carregar();
+  }
+  private mut(fn: (ds: Dataset) => Dataset) {
+    salvar(fn(carregar()));
+  }
+  async addCusto(c: CustoVariavel) {
+    this.mut((ds) => ({ ...ds, custos: [c, ...ds.custos] }));
+  }
+  async updateCusto(id: string, patch: Partial<CustoVariavel>) {
+    this.mut((ds) => ({ ...ds, custos: ds.custos.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
+  }
+  async deleteCusto(id: string) {
+    this.mut((ds) => ({ ...ds, custos: ds.custos.filter((x) => x.id !== id) }));
+  }
+  async importarCustos(cs: CustoVariavel[]) {
+    this.mut((ds) => ({ ...ds, custos: [...cs, ...ds.custos] }));
+  }
+  async addCategoria(c: CategoriaCusto) {
+    this.mut((ds) => ({ ...ds, categorias: [...ds.categorias, c] }));
+  }
+  async updateCategoria(id: string, patch: Partial<CategoriaCusto>) {
+    this.mut((ds) => ({ ...ds, categorias: ds.categorias.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
+  }
+  async lancarDaily(d: AfterpayDaily) {
+    this.mut((ds) => {
+      const outros = ds.dailies.filter((x) => x.data !== d.data);
+      return { ...ds, dailies: [...outros, d].sort((a, b) => a.data.localeCompare(b.data)) };
+    });
+  }
+  async marcarSync(iso: string) {
+    this.mut((ds) => ({ ...ds, ultimoSync: iso }));
+  }
+}

@@ -1,13 +1,15 @@
 // ─────────────────────────────────────────────────────────────
-// Store React (Context). Carrega o dataset local uma vez, mantém
-// em memória e persiste a cada mudança. Mutations são otimistas:
-// o estado muda na hora e o total no topo reflete imediatamente.
+// Store React (Context). Carrega o dataset via Backend (Local ou
+// Supabase), mantém estado otimista e persiste cada mudança. Em
+// erro de persistência, re-sincroniza a partir do backend.
 // ─────────────────────────────────────────────────────────────
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { Loader2 } from 'lucide-react';
 import type { AfterpayDaily, AtendenteStat, CategoriaCusto, CustoVariavel, PlataformaStat } from '@/types';
-import { type Dataset, carregar, novoId, resetar, salvar } from '@/data/db';
+import { type Dataset, novoId } from '@/data/db';
+import { type Backend, LocalBackend } from '@/data/backend';
 
 interface DataContextValue {
   categorias: CategoriaCusto[];
@@ -25,80 +27,140 @@ interface DataContextValue {
   addCategoria: (input: Omit<CategoriaCusto, 'id'>) => CategoriaCusto;
   updateCategoria: (id: string, patch: Partial<Omit<CategoriaCusto, 'id'>>) => void;
 
-  /** Upsert de um dia (modo manual e futura sincronização). */
   lancarDaily: (daily: AfterpayDaily) => void;
   marcarSync: () => void;
-  restaurarExemplo: () => void;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
 
-export function DataProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<Dataset>(() => carregar());
-  const primeiraRender = useRef(true);
+const backendLocalPadrao = new LocalBackend();
 
-  // Persiste sempre que o dataset muda (menos no load inicial).
+export function DataProvider({ backend = backendLocalPadrao, children }: { backend?: Backend; children: ReactNode }) {
+  const [data, setData] = useState<Dataset | null>(null);
+  const backendRef = useRef(backend);
+  backendRef.current = backend;
+
+  const resync = useCallback(() => {
+    backendRef.current
+      .load()
+      .then(setData)
+      .catch((e) => console.error('Falha ao carregar dados:', e));
+  }, []);
+
   useEffect(() => {
-    if (primeiraRender.current) {
-      primeiraRender.current = false;
-      return;
-    }
-    salvar(data);
-  }, [data]);
+    let vivo = true;
+    setData(null);
+    backend
+      .load()
+      .then((ds) => vivo && setData(ds))
+      .catch((e) => console.error('Falha ao carregar dados:', e));
+    return () => {
+      vivo = false;
+    };
+  }, [backend]);
 
-  const addCusto = useCallback<DataContextValue['addCusto']>((input) => {
-    const novo: CustoVariavel = { ...input, id: novoId() };
-    setData((d) => ({ ...d, custos: [novo, ...d.custos] }));
-    return novo;
-  }, []);
+  // Aplica mudança otimista no estado e persiste no backend.
+  const aplicar = useCallback(
+    (otimista: (ds: Dataset) => Dataset, persistir: (b: Backend) => Promise<void>) => {
+      setData((d) => (d ? otimista(d) : d));
+      persistir(backendRef.current).catch((e) => {
+        console.error('Falha ao salvar, re-sincronizando:', e);
+        resync();
+      });
+    },
+    [resync],
+  );
 
-  const updateCusto = useCallback<DataContextValue['updateCusto']>((id, patch) => {
-    setData((d) => ({
-      ...d,
-      custos: d.custos.map((c) => (c.id === id ? { ...c, ...patch } : c)),
-    }));
-  }, []);
+  const addCusto = useCallback<DataContextValue['addCusto']>(
+    (input) => {
+      const novo: CustoVariavel = { ...input, id: novoId() };
+      aplicar(
+        (d) => ({ ...d, custos: [novo, ...d.custos] }),
+        (b) => b.addCusto(novo),
+      );
+      return novo;
+    },
+    [aplicar],
+  );
 
-  const deleteCusto = useCallback<DataContextValue['deleteCusto']>((id) => {
-    setData((d) => ({ ...d, custos: d.custos.filter((c) => c.id !== id) }));
-  }, []);
+  const updateCusto = useCallback<DataContextValue['updateCusto']>(
+    (id, patch) => {
+      aplicar(
+        (d) => ({ ...d, custos: d.custos.map((c) => (c.id === id ? { ...c, ...patch } : c)) }),
+        (b) => b.updateCusto(id, patch),
+      );
+    },
+    [aplicar],
+  );
 
-  const importarCustos = useCallback<DataContextValue['importarCustos']>((inputs) => {
-    const novos = inputs.map((i) => ({ ...i, id: novoId() }));
-    setData((d) => ({ ...d, custos: [...novos, ...d.custos] }));
-    return novos.length;
-  }, []);
+  const deleteCusto = useCallback<DataContextValue['deleteCusto']>(
+    (id) => {
+      aplicar(
+        (d) => ({ ...d, custos: d.custos.filter((c) => c.id !== id) }),
+        (b) => b.deleteCusto(id),
+      );
+    },
+    [aplicar],
+  );
 
-  const addCategoria = useCallback<DataContextValue['addCategoria']>((input) => {
-    const nova: CategoriaCusto = { ...input, id: novoId() };
-    setData((d) => ({ ...d, categorias: [...d.categorias, nova] }));
-    return nova;
-  }, []);
+  const importarCustos = useCallback<DataContextValue['importarCustos']>(
+    (inputs) => {
+      const novos = inputs.map((i) => ({ ...i, id: novoId() }));
+      aplicar(
+        (d) => ({ ...d, custos: [...novos, ...d.custos] }),
+        (b) => b.importarCustos(novos),
+      );
+      return novos.length;
+    },
+    [aplicar],
+  );
 
-  const updateCategoria = useCallback<DataContextValue['updateCategoria']>((id, patch) => {
-    setData((d) => ({
-      ...d,
-      categorias: d.categorias.map((c) => (c.id === id ? { ...c, ...patch } : c)),
-    }));
-  }, []);
+  const addCategoria = useCallback<DataContextValue['addCategoria']>(
+    (input) => {
+      const nova: CategoriaCusto = { ...input, id: novoId() };
+      aplicar(
+        (d) => ({ ...d, categorias: [...d.categorias, nova] }),
+        (b) => b.addCategoria(nova),
+      );
+      return nova;
+    },
+    [aplicar],
+  );
 
-  const lancarDaily = useCallback<DataContextValue['lancarDaily']>((daily) => {
-    setData((d) => {
-      const outros = d.dailies.filter((x) => x.data !== daily.data);
-      return { ...d, dailies: [...outros, daily].sort((a, b) => a.data.localeCompare(b.data)) };
-    });
-  }, []);
+  const updateCategoria = useCallback<DataContextValue['updateCategoria']>(
+    (id, patch) => {
+      aplicar(
+        (d) => ({ ...d, categorias: d.categorias.map((c) => (c.id === id ? { ...c, ...patch } : c)) }),
+        (b) => b.updateCategoria(id, patch),
+      );
+    },
+    [aplicar],
+  );
+
+  const lancarDaily = useCallback<DataContextValue['lancarDaily']>(
+    (daily) => {
+      aplicar(
+        (d) => {
+          const outros = d.dailies.filter((x) => x.data !== daily.data);
+          return { ...d, dailies: [...outros, daily].sort((a, b) => a.data.localeCompare(b.data)) };
+        },
+        (b) => b.lancarDaily(daily),
+      );
+    },
+    [aplicar],
+  );
 
   const marcarSync = useCallback(() => {
-    setData((d) => ({ ...d, ultimoSync: new Date().toISOString() }));
-  }, []);
+    const iso = new Date().toISOString();
+    aplicar(
+      (d) => ({ ...d, ultimoSync: iso }),
+      (b) => b.marcarSync(iso),
+    );
+  }, [aplicar]);
 
-  const restaurarExemplo = useCallback(() => {
-    setData(resetar());
-  }, []);
-
-  const value = useMemo<DataContextValue>(
-    () => ({
+  const value = useMemo<DataContextValue | null>(() => {
+    if (!data) return null;
+    return {
       categorias: data.categorias,
       dailies: data.dailies,
       custos: data.custos,
@@ -113,21 +175,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
       updateCategoria,
       lancarDaily,
       marcarSync,
-      restaurarExemplo,
-    }),
-    [
-      data,
-      addCusto,
-      updateCusto,
-      deleteCusto,
-      importarCustos,
-      addCategoria,
-      updateCategoria,
-      lancarDaily,
-      marcarSync,
-      restaurarExemplo,
-    ],
-  );
+    };
+  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, lancarDaily, marcarSync]);
+
+  if (!value) {
+    return (
+      <div className="min-h-screen grid place-items-center text-dim">
+        <div className="flex items-center gap-3">
+          <Loader2 className="animate-spin" size={20} /> Carregando…
+        </div>
+      </div>
+    );
+  }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }

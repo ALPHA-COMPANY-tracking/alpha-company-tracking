@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.4",
     "date-fns": "^4.4.0",
     "decimal.js": "^10.6.0",
     "exceljs": "^4.4.0",

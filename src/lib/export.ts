@@ -4,7 +4,6 @@
 // Excel. Datas em pt-BR.
 // ─────────────────────────────────────────────────────────────
 
-import ExcelJS from 'exceljs';
 import type { AfterpayDaily, CategoriaCusto, CustoVariavel, Periodo } from '@/types';
 import { centsToReais } from '@/lib/money';
 import { diasDoPeriodo } from '@/lib/dates';
@@ -39,6 +38,7 @@ export async function exportarXlsx(
   categorias: CategoriaCusto[],
   periodo: Periodo,
 ) {
+  const { default: ExcelJS } = await import('exceljs');
   const catMap = new Map(categorias.map((c) => [c.id, c]));
   const pnl = calcularPnl(dailies, custos, periodo);
   const r = centsToReais;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, RefreshCw } from 'lucide-react';
+import { LogOut, Plus, RefreshCw } from 'lucide-react';
 import { useData } from '@/store/DataProvider';
 import { usePeriodo } from '@/store/usePeriodo';
 import { PeriodSelector } from '@/components/pnl/PeriodSelector';
@@ -18,16 +18,38 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'export', label: 'Exportar' },
 ];
 
-export function AppShell() {
+export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: string }) {
   const { ultimoSync, marcarSync } = useData();
   const { preset, periodo, selecionarPreset, definirPersonalizado } = usePeriodo();
   const [tab, setTab] = useState<Tab>('pnl');
   const [modal, setModal] = useState(false);
 
+  const nome = email ? email.split('@')[0] : 'Jonas';
+
   return (
     <div className="min-h-full max-w-[1400px] mx-auto px-4 sm:px-6 py-5 pb-16">
       {/* Cabeçalho */}
-      <div className="text-center text-[15px] font-semibold text-[#cfcfdd] pb-4">Bem-vindo, Jonas!</div>
+      <div className="flex items-center justify-between pb-4">
+        <span className="text-[12px] text-dim2">
+          {onLogout ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-grn" /> Nuvem
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-dim2" /> Modo local
+            </span>
+          )}
+        </span>
+        <span className="text-[15px] font-semibold text-[#cfcfdd]">Bem-vindo, {nome}!</span>
+        {onLogout ? (
+          <button onClick={onLogout} className="inline-flex items-center gap-1.5 text-[12px] text-dim2 hover:text-red" title={email}>
+            <LogOut size={14} /> Sair
+          </button>
+        ) : (
+          <span className="w-12" />
+        )}
+      </div>
 
       {/* Barra de filtros / ações */}
       <div className="flex items-center gap-[10px] flex-wrap mb-4">
