@@ -6,13 +6,15 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { AfterpayDaily, CategoriaCusto, CustoVariavel } from '@/types';
+import type { AfterpayDaily, AtendenteStat, CategoriaCusto, CustoVariavel, PlataformaStat } from '@/types';
 import { type Dataset, carregar, novoId, resetar, salvar } from '@/data/db';
 
 interface DataContextValue {
   categorias: CategoriaCusto[];
   dailies: AfterpayDaily[];
   custos: CustoVariavel[];
+  atendentes: AtendenteStat[];
+  plataformas: PlataformaStat[];
   ultimoSync: string | null;
 
   addCusto: (input: Omit<CustoVariavel, 'id'>) => CustoVariavel;
@@ -100,6 +102,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       categorias: data.categorias,
       dailies: data.dailies,
       custos: data.custos,
+      atendentes: data.atendentes,
+      plataformas: data.plataformas,
       ultimoSync: data.ultimoSync,
       addCusto,
       updateCusto,

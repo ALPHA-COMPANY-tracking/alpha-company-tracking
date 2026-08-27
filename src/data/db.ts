@@ -3,8 +3,14 @@
 // trocamos esta implementação pelo Supabase mantendo a mesma API.
 // ─────────────────────────────────────────────────────────────
 
-import type { AfterpayDaily, CategoriaCusto, CustoVariavel } from '@/types';
-import { SEED_CATEGORIAS, gerarCustos, gerarDailies } from '@/data/seed';
+import type { AfterpayDaily, AtendenteStat, CategoriaCusto, CustoVariavel, PlataformaStat } from '@/types';
+import {
+  SEED_ATENDENTES,
+  SEED_CATEGORIAS,
+  SEED_PLATAFORMAS,
+  gerarCustos,
+  gerarDailies,
+} from '@/data/seed';
 
 const KEY = 'afterpay-pnl:v1';
 
@@ -12,6 +18,8 @@ export interface Dataset {
   categorias: CategoriaCusto[];
   dailies: AfterpayDaily[];
   custos: CustoVariavel[];
+  atendentes: AtendenteStat[];
+  plataformas: PlataformaStat[];
   ultimoSync: string | null;
 }
 
@@ -20,6 +28,8 @@ function seedInicial(): Dataset {
     categorias: SEED_CATEGORIAS,
     dailies: gerarDailies(),
     custos: gerarCustos(),
+    atendentes: SEED_ATENDENTES,
+    plataformas: SEED_PLATAFORMAS,
     ultimoSync: null,
   };
 }
@@ -37,6 +47,8 @@ export function carregar(): Dataset {
       categorias: parsed.categorias ?? SEED_CATEGORIAS,
       dailies: parsed.dailies ?? [],
       custos: parsed.custos ?? [],
+      atendentes: parsed.atendentes ?? SEED_ATENDENTES,
+      plataformas: parsed.plataformas ?? SEED_PLATAFORMAS,
       ultimoSync: parsed.ultimoSync ?? null,
     };
   } catch {

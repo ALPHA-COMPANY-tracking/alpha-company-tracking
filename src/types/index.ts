@@ -67,3 +67,20 @@ export interface Periodo {
   inicio: IsoDate;
   fim: IsoDate;
 }
+
+/**
+ * Desempenho por atendente. Hoje vem de dados de exemplo; quando o
+ * webhook do Afterpay estiver ligado (Etapa 8), passa a ser real por
+ * pedido. Valores em reais.
+ */
+export interface AtendenteStat {
+  nome: string;
+  valor_agendado: number;
+  pedidos: number;
+}
+
+/** Origem do lead / plataforma de venda. */
+export interface PlataformaStat {
+  nome: string;
+  pedidos: number;
+}
