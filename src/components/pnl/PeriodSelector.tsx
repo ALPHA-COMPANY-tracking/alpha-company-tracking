@@ -14,15 +14,15 @@ export function PeriodSelector({
   onCustom: (p: Periodo) => void;
 }) {
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <div className="inline-flex items-center gap-1 bg-card border border-line2 rounded-[10px] p-1">
+    <div className="flex items-center gap-2 flex-wrap max-w-full">
+      <div className="flex items-center gap-1 bg-card border border-line2 rounded-[10px] p-1 overflow-x-auto max-w-full [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {PRESETS.map((p) => {
           const ativo = preset === p.id;
           return (
             <button
               key={p.id}
               onClick={() => onPreset(p.id)}
-              className={`px-[11px] py-[6px] rounded-lg text-[12.5px] font-medium transition-colors ${
+              className={`px-[11px] py-[6px] rounded-lg text-[12.5px] font-medium transition-colors whitespace-nowrap shrink-0 ${
                 ativo ? 'bg-pur3 text-white' : 'text-dim hover:text-tx'
               }`}
             >

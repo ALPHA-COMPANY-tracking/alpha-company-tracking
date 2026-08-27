@@ -7,6 +7,7 @@ import { CustoModal } from '@/components/CustoModal';
 import { PnlScreen } from '@/screens/PnlScreen';
 import { CustosScreen } from '@/screens/CustosScreen';
 import { VizScreen } from '@/screens/VizScreen';
+import { ExportScreen } from '@/screens/ExportScreen';
 
 type Tab = 'pnl' | 'custos' | 'viz' | 'export';
 
@@ -65,12 +66,7 @@ export function AppShell() {
       {tab === 'pnl' && <PnlScreen periodo={periodo} onAddCusto={() => setModal(true)} />}
       {tab === 'custos' && <CustosScreen periodo={periodo} />}
       {tab === 'viz' && <VizScreen periodo={periodo} />}
-      {tab === 'export' && (
-        <div className="bg-card border border-line rounded-card p-10 text-center text-dim">
-          <div className="text-[15px] font-semibold text-tx mb-1">Em construção</div>
-          <div className="text-[13px]">Esta tela chega na próxima etapa do nosso passo a passo.</div>
-        </div>
-      )}
+      {tab === 'export' && <ExportScreen periodo={periodo} />}
 
       <CustoModal aberto={modal} onClose={() => setModal(false)} />
     </div>
