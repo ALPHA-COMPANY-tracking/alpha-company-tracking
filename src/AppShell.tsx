@@ -8,11 +8,13 @@ import { PnlScreen } from '@/screens/PnlScreen';
 import { CustosScreen } from '@/screens/CustosScreen';
 import { VizScreen } from '@/screens/VizScreen';
 import { ExportScreen } from '@/screens/ExportScreen';
+import { ManualEntryScreen } from '@/screens/ManualEntryScreen';
 
-type Tab = 'pnl' | 'custos' | 'viz' | 'export';
+type Tab = 'pnl' | 'lancar' | 'custos' | 'viz' | 'export';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'pnl', label: 'P&L' },
+  { id: 'lancar', label: 'Lançar Afterpay' },
   { id: 'custos', label: 'Custos Variáveis' },
   { id: 'viz', label: 'Visualização' },
   { id: 'export', label: 'Exportar' },
@@ -85,7 +87,8 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
         ))}
       </div>
 
-      {tab === 'pnl' && <PnlScreen periodo={periodo} onAddCusto={() => setModal(true)} />}
+      {tab === 'pnl' && <PnlScreen periodo={periodo} onAddCusto={() => setModal(true)} onLancarManual={() => setTab('lancar')} />}
+      {tab === 'lancar' && <ManualEntryScreen periodo={periodo} onConcluir={() => setTab('pnl')} />}
       {tab === 'custos' && <CustosScreen periodo={periodo} />}
       {tab === 'viz' && <VizScreen periodo={periodo} />}
       {tab === 'export' && <ExportScreen periodo={periodo} />}

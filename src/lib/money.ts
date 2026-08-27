@@ -67,6 +67,14 @@ export function formatMultiplier(x: number, decimals = 2): string {
   })}x`;
 }
 
+/** Distribui um total inteiro entre n posições o mais igual possível. */
+export function distribuirInteiro(total: number, n: number): number[] {
+  if (n <= 0) return [];
+  const base = Math.floor(total / n);
+  const resto = total - base * n;
+  return Array.from({ length: n }, (_, i) => base + (i < resto ? 1 : 0));
+}
+
 /** Divisão segura: retorna 0 quando o denominador é 0 (evita NaN/Infinity). */
 export function safeDiv(numerator: number, denominator: number): number {
   if (!denominator) return 0;

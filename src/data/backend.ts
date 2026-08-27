@@ -15,6 +15,7 @@ export interface Backend {
   addCategoria(c: CategoriaCusto): Promise<void>;
   updateCategoria(id: string, patch: Partial<CategoriaCusto>): Promise<void>;
   lancarDaily(d: AfterpayDaily): Promise<void>;
+  lancarDailies(ds: AfterpayDaily[]): Promise<void>;
   marcarSync(iso: string): Promise<void>;
 }
 
@@ -48,6 +49,13 @@ export class LocalBackend implements Backend {
     this.mut((ds) => {
       const outros = ds.dailies.filter((x) => x.data !== d.data);
       return { ...ds, dailies: [...outros, d].sort((a, b) => a.data.localeCompare(b.data)) };
+    });
+  }
+  async lancarDailies(arr: AfterpayDaily[]) {
+    this.mut((ds) => {
+      const datas = new Set(arr.map((d) => d.data));
+      const outros = ds.dailies.filter((x) => !datas.has(x.data));
+      return { ...ds, dailies: [...outros, ...arr].sort((a, b) => a.data.localeCompare(b.data)) };
     });
   }
   async marcarSync(iso: string) {

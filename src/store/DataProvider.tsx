@@ -28,6 +28,7 @@ interface DataContextValue {
   updateCategoria: (id: string, patch: Partial<Omit<CategoriaCusto, 'id'>>) => void;
 
   lancarDaily: (daily: AfterpayDaily) => void;
+  lancarDailies: (dailies: AfterpayDaily[]) => void;
   marcarSync: () => void;
 }
 
@@ -150,6 +151,20 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
     [aplicar],
   );
 
+  const lancarDailies = useCallback<DataContextValue['lancarDailies']>(
+    (arr) => {
+      aplicar(
+        (d) => {
+          const datas = new Set(arr.map((x) => x.data));
+          const outros = d.dailies.filter((x) => !datas.has(x.data));
+          return { ...d, dailies: [...outros, ...arr].sort((a, b) => a.data.localeCompare(b.data)) };
+        },
+        (b) => b.lancarDailies(arr),
+      );
+    },
+    [aplicar],
+  );
+
   const marcarSync = useCallback(() => {
     const iso = new Date().toISOString();
     aplicar(
@@ -174,9 +189,10 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
       addCategoria,
       updateCategoria,
       lancarDaily,
+      lancarDailies,
       marcarSync,
     };
-  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, lancarDaily, marcarSync]);
+  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, lancarDaily, lancarDailies, marcarSync]);
 
   if (!value) {
     return (

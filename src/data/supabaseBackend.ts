@@ -130,6 +130,17 @@ export class SupabaseBackend implements Backend {
       .upsert({ ...d, user_id: this.userId, sincronizado_em: new Date().toISOString() }, { onConflict: 'user_id,data' });
     if (error) throw error;
   }
+  async lancarDailies(arr: AfterpayDaily[]) {
+    if (arr.length === 0) return;
+    const agora = new Date().toISOString();
+    const { error } = await this.db
+      .from('afterpay_daily')
+      .upsert(
+        arr.map((d) => ({ ...d, user_id: this.userId, sincronizado_em: agora })),
+        { onConflict: 'user_id,data' },
+      );
+    if (error) throw error;
+  }
   async marcarSync() {
     // Sem tabela dedicada: o timestamp de sync fica no estado do cliente.
   }

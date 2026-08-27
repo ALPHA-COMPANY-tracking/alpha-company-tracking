@@ -19,7 +19,15 @@ import { Demonstrativo } from '@/components/pnl/Demonstrativo';
 import { GapBlock } from '@/components/pnl/GapBlock';
 import { EvolucaoChart } from '@/components/pnl/EvolucaoChart';
 
-export function PnlScreen({ periodo, onAddCusto }: { periodo: Periodo; onAddCusto: () => void }) {
+export function PnlScreen({
+  periodo,
+  onAddCusto,
+  onLancarManual,
+}: {
+  periodo: Periodo;
+  onAddCusto: () => void;
+  onLancarManual?: () => void;
+}) {
   const { dailies, custos, categorias } = useData();
   const [frustrados, setFrustrados] = useState(false);
 
@@ -50,12 +58,22 @@ export function PnlScreen({ periodo, onAddCusto }: { periodo: Periodo; onAddCust
             <div className="text-[13px] text-dim mb-5">
               Escolha outro período no topo, sincronize com o Afterpay ou lance os números manualmente.
             </div>
-            <button
-              onClick={onAddCusto}
-              className="px-4 py-[9px] rounded-[10px] text-[13px] font-semibold text-white bg-gradient-to-br from-pur3 to-pur"
-            >
-              Adicionar custo
-            </button>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              {onLancarManual && (
+                <button
+                  onClick={onLancarManual}
+                  className="px-4 py-[9px] rounded-[10px] text-[13px] font-semibold text-white bg-gradient-to-br from-pur3 to-pur"
+                >
+                  Lançar período manualmente
+                </button>
+              )}
+              <button
+                onClick={onAddCusto}
+                className="px-4 py-[9px] rounded-[10px] text-[13px] font-semibold text-dim border border-line2 hover:text-tx"
+              >
+                Adicionar custo
+              </button>
+            </div>
           </div>
         </Panel>
       ) : (
