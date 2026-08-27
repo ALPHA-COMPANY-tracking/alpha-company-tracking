@@ -11,11 +11,13 @@ function p(id: string, status: string, valor: number, vendedor: string, data = '
 describe('statusBucket', () => {
   it('classifica pago/aprovado, frustrado e pipeline', () => {
     expect(statusBucket('pagos')).toBe('aprovado');
-    expect(statusBucket('Pago')).toBe('aprovado');
+    expect(statusBucket('Pagos')).toBe('aprovado'); // case/acentos normalizados
     expect(statusBucket('frustrados')).toBe('frustrado');
-    expect(statusBucket('devolvido')).toBe('frustrado');
+    expect(statusBucket('Frustrados')).toBe('frustrado');
+    expect(statusBucket('devolvido')).toBe('pipeline'); // Devolvido != frustrado (aba separada)
     expect(statusBucket('cadastrados')).toBe('pipeline');
     expect(statusBucket('enviados')).toBe('pipeline');
+    expect(statusBucket('Cobrados')).toBe('pipeline');
     expect(statusBucket(null)).toBe('pipeline');
   });
 });

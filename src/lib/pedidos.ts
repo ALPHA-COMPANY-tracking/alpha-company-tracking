@@ -16,12 +16,11 @@ function norm(s: string | null | undefined): string {
     .toLowerCase();
 }
 
-// Status que contam como APROVADO (dinheiro confirmado).
-const APROVADO = new Set(['pagos', 'pago', 'aprovados', 'aprovado', 'concluido', 'concluidos']);
-// Status que contam como FRUSTRADO (perda / não convertido definitivamente).
-const FRUSTRADO = new Set([
-  'frustrados', 'frustrado', 'devolvido', 'devolvidos', 'cancelado', 'cancelados', 'roubo', 'reembolsado',
-]);
+// Status que contam como APROVADO (dinheiro confirmado) — aba "Pagos".
+const APROVADO = new Set(['pagos']);
+// Status que contam como FRUSTRADO (perda) — aba "Frustrados".
+// (Devolvido, Cobrados, Negociação, Enviados etc. ficam como pipeline.)
+const FRUSTRADO = new Set(['frustrados']);
 
 export function statusBucket(status: string | null | undefined): 'aprovado' | 'frustrado' | 'pipeline' {
   const s = norm(status);
