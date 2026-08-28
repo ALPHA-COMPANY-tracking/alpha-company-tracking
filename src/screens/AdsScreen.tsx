@@ -1,145 +1,164 @@
 import { useMemo, useState } from 'react';
-import { CalendarDays, CheckCircle2, Megaphone } from 'lucide-react';
+import { Check, Save, Trash2 } from 'lucide-react';
 import type { AfterpayDaily, Periodo } from '@/types';
-import { distribuirInteiro, formatBRL, formatMultiplier, formatPercent, reaisToCents } from '@/lib/money';
-import { diasDoPeriodo, formatDiaMes, isDentro } from '@/lib/dates';
-import { calcularPnl } from '@/lib/pnl';
+import { formatBRL, reaisToCents } from '@/lib/money';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
 import { MoneyInput } from '@/components/MoneyInput';
+
+/** Data local (America/Sao_Paulo ~ horário do usuário) no formato YYYY-MM-DD. */
+function hojeLocal(): string {
+  const n = new Date();
+  return new Date(n.getTime() - n.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+/** 'YYYY-MM-DD' → 'DD/MM/YYYY'. */
+function formatData(iso: string): string {
+  const [a, m, d] = iso.split('-');
+  return `${d}/${m}/${a}`;
+}
 
 function zeroDaily(data: string): AfterpayDaily {
   return {
     data,
     receita_aprovada: 0, qtd_pagamentos: 0, taxas_plataforma: 0, custo_produtos: 0,
     frete: 0, comissoes_vendedor: 0, comissoes_cobranca: 0, investimento_ads: 0,
-    taxas_investimento: 0, valor_frustrado: 0, qtd_frustrados: 0, valor_agendado: 0, qtd_agendados: 0,
+    taxas_investimento: 0, valor_frustrado: 0, qtd_frustrados: 0, valor_agendado: 0,
+    qtd_agendados: 0, leads: 0,
   };
 }
 
-export function AdsScreen({ periodo }: { periodo: Periodo }) {
-  const { dailies, custos, pedidos, lancarDailies } = useData();
-  const [inicio, setInicio] = useState(periodo.inicio);
-  const [fim, setFim] = useState(periodo.fim);
-
-  // Ads já lançado no período (soma do afterpay_daily).
-  const adsAtual = useMemo(
-    () =>
-      dailies
-        .filter((d) => isDentro(d.data, inicio, fim))
-        .reduce((acc, d) => acc + reaisToCents(d.investimento_ads), 0),
-    [dailies, inicio, fim],
-  );
-
-  const [cents, setCents] = useState(adsAtual);
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function AdsScreen(_props: { periodo: Periodo }) {
+  const { dailies, lancarDaily } = useData();
+  const [data, setData] = useState(hojeLocal());
+  const [cents, setCents] = useState(0);
+  const [leads, setLeads] = useState(0);
   const [salvo, setSalvo] = useState(false);
 
-  const dias = useMemo(() => (fim >= inicio ? diasDoPeriodo(inicio, fim) : []), [inicio, fim]);
-
-  // Prévia: P&L do período com esse valor de Ads.
-  const preview = useMemo(() => {
-    if (dias.length === 0) return null;
-    const dist = distribuirInteiro(cents, dias.length);
-    const cand = dias.map((data, i) => ({ ...zeroDaily(data), investimento_ads: dist[i] / 100 }));
-    return calcularPnl(cand, custos, { inicio, fim }, {}, pedidos);
-  }, [dias, cents, custos, inicio, fim, pedidos]);
-
-  function salvar() {
-    if (dias.length === 0) return;
-    const dist = distribuirInteiro(cents, dias.length);
-    const novos = dias.map((data, i) => ({ ...zeroDaily(data), investimento_ads: dist[i] / 100 }));
-    lancarDailies(novos);
-    setSalvo(true);
+  // Ao escolher uma data que já tem lançamento, prefill (vira "Atualizar").
+  function selecionarData(d: string) {
+    setData(d);
+    setSalvo(false);
+    const ex = dailies.find((x) => x.data === d);
+    setCents(ex ? reaisToCents(ex.investimento_ads) : 0);
+    setLeads(ex?.leads ?? 0);
   }
 
+  function salvar() {
+    if (!data) return;
+    lancarDaily({ ...zeroDaily(data), investimento_ads: cents / 100, leads });
+    setSalvo(true);
+    setTimeout(() => setSalvo(false), 2000);
+  }
+
+  function excluir(d: string) {
+    lancarDaily({ ...zeroDaily(d), investimento_ads: 0, leads: 0 });
+    if (d === data) { setCents(0); setLeads(0); }
+  }
+
+  const historico = useMemo(
+    () =>
+      dailies
+        .filter((d) => d.investimento_ads > 0 || (d.leads ?? 0) > 0)
+        .sort((a, b) => b.data.localeCompare(a.data)),
+    [dailies],
+  );
+
   return (
-    <div className="flex flex-col gap-4 max-w-[720px] mx-auto w-full">
-      <Panel title="Investimento em Ads (Meta)" hint="o único custo que nenhuma plataforma envia">
-        <div className="p-5 flex flex-col gap-5">
-          <div className="flex items-start gap-3">
-            <span className="w-10 h-10 rounded-[10px] bg-blu/15 grid place-items-center text-blu shrink-0">
-              <Megaphone size={20} />
-            </span>
-            <p className="m-0 text-[13px] text-dim leading-relaxed">
-              Digite quanto você gastou de <b className="text-dim">tráfego no Meta</b> neste período. A receita e os
-              demais custos já vêm do BlueSales automaticamente — aqui só entra o Ads, que completa o Lucro Real, o
-              ROAS e o CPA.
-            </p>
-          </div>
+    <div className="flex flex-col gap-5 max-w-[1000px] w-full">
+      <div>
+        <h1 className="text-[26px] font-extrabold text-tx tracking-tight">Marketing</h1>
+        <p className="text-[13px] text-dim mt-0.5">Registre o gasto geral de anúncios e a quantidade de leads por dia</p>
+      </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Campo label="Início do período">
-              <div className="flex items-center gap-2 bg-card2 border border-line2 rounded-[10px] px-3 py-[9px]">
-                <CalendarDays size={15} className="text-dim2" />
-                <input type="date" value={inicio} max={fim} onChange={(e) => { setInicio(e.target.value); setSalvo(false); }} className="bg-transparent text-[13px] text-tx outline-none [color-scheme:dark] w-full" />
-              </div>
-            </Campo>
-            <Campo label="Fim do período">
-              <div className="flex items-center gap-2 bg-card2 border border-line2 rounded-[10px] px-3 py-[9px]">
-                <CalendarDays size={15} className="text-dim2" />
-                <input type="date" value={fim} min={inicio} onChange={(e) => { setFim(e.target.value); setSalvo(false); }} className="bg-transparent text-[13px] text-tx outline-none [color-scheme:dark] w-full" />
-              </div>
-            </Campo>
-          </div>
+      <Panel title="Adicionar / Atualizar Métrica">
+        <div className="p-5">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="block">
+              <span className="block text-[11px] text-dim2 font-medium mb-[6px]">Data</span>
+              <input
+                type="date"
+                value={data}
+                onChange={(e) => selecionarData(e.target.value)}
+                className="bg-card2 border border-line2 rounded-[10px] px-3 py-[9px] text-[13px] text-tx outline-none [color-scheme:dark] focus:border-gold/50"
+              />
+            </label>
 
-          <Campo label="Investimento em Ads no período">
-            <MoneyInput cents={cents} onChange={(c) => { setCents(c); setSalvo(false); }} autoFocus />
-            {adsAtual > 0 && (
-              <span className="block text-[11px] text-dim2 mt-1">
-                Já lançado neste período: {formatBRL(adsAtual)}
-                {cents !== adsAtual && ' (será substituído)'}
-              </span>
-            )}
-          </Campo>
+            <label className="block w-[160px]">
+              <span className="block text-[11px] text-dim2 font-medium mb-[6px]">Investimento (R$)</span>
+              <MoneyInput cents={cents} onChange={(c) => { setCents(c); setSalvo(false); }} />
+            </label>
 
-          {/* Prévia do impacto */}
-          {preview && (
-            <div className="rounded-[12px] border border-line2 bg-card2 p-4">
-              <div className="text-[9.5px] tracking-[0.16em] uppercase font-bold text-dim2 mb-3">
-                Com esse Ads, o período fica ({formatDiaMes(inicio)}–{formatDiaMes(fim)})
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Mini label="Lucro Real" valor={formatBRL(preview.lucro_real)} cor={preview.lucro_real >= 0 ? '#34d399' : '#fb7185'} />
-                <Mini label="Margem" valor={formatPercent(preview.margem_real)} cor="#60a5fa" />
-                <Mini label="ROAS" valor={formatMultiplier(preview.roas)} cor="#f472b6" />
-                <Mini label="CPA" valor={formatBRL(preview.cpa)} cor="#c084fc" />
-              </div>
-            </div>
-          )}
+            <label className="block w-[110px]">
+              <span className="block text-[11px] text-dim2 font-medium mb-[6px]">Leads</span>
+              <input
+                type="number"
+                min={0}
+                value={leads || ''}
+                placeholder="0"
+                onChange={(e) => { setLeads(Math.max(0, Math.floor(Number(e.target.value) || 0))); setSalvo(false); }}
+                className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[9px] text-[13px] text-tx outline-none focus:border-gold/50"
+              />
+            </label>
 
-          {salvo ? (
-            <div className="flex items-center gap-2 rounded-[10px] border border-grn/30 bg-grn/[0.08] px-4 py-3 text-grn text-[13px] font-semibold">
-              <CheckCircle2 size={17} /> Ads salvo na nuvem! O P&L já atualizou.
-            </div>
-          ) : (
             <button
               onClick={salvar}
-              disabled={dias.length === 0}
-              className="self-start inline-flex items-center gap-2 text-white px-5 py-[11px] rounded-[10px] text-[13.5px] font-semibold bg-gradient-to-br from-pur3 to-pur disabled:opacity-40"
+              className={`inline-flex items-center gap-2 px-5 py-[10px] rounded-[10px] text-[13px] font-semibold transition-colors ${
+                salvo ? 'bg-grn/15 text-grn border border-grn/40' : 'bg-white text-[#141419] hover:bg-white/90'
+              }`}
             >
-              Salvar Ads do período
+              {salvo ? <><Check size={16} /> Salvo</> : <><Save size={16} /> Salvar</>}
             </button>
-          )}
+          </div>
+
+          <p className="text-[12px] text-dim2 mt-4 leading-relaxed">
+            O lançamento manual <b className="text-dim">SOMA</b> ao gasto sincronizado do Meta Ads do mesmo dia, não o
+            substitui. Use para o que a integração não enxerga (outras plataformas, criativo, influenciador).
+          </p>
         </div>
       </Panel>
-    </div>
-  );
-}
 
-function Campo({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="block text-[11px] text-dim2 font-medium mb-[6px]">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function Mini({ label, valor, cor }: { label: string; valor: string; cor: string }) {
-  return (
-    <div>
-      <div className="text-[9px] tracking-wide uppercase text-dim2 font-bold">{label}</div>
-      <div className="mono text-[15px] font-bold mt-0.5" style={{ color: cor }}>{valor}</div>
+      <Panel title="Histórico de Métricas">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px] min-w-[560px]">
+            <thead>
+              <tr className="text-dim2 text-[11px] uppercase tracking-wide">
+                <th className="text-left font-semibold px-5 py-3">Data</th>
+                <th className="text-left font-semibold px-5 py-3">Origem</th>
+                <th className="text-right font-semibold px-5 py-3">Investimento</th>
+                <th className="text-right font-semibold px-5 py-3">Leads</th>
+                <th className="text-right font-semibold px-5 py-3">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {historico.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-5 py-10 text-center text-dim2">Nenhuma métrica lançada ainda.</td>
+                </tr>
+              ) : (
+                historico.map((d) => (
+                  <tr key={d.data} className="border-t border-line/70 hover:bg-white/[0.015]">
+                    <td className="px-5 py-4 text-tx font-medium">{formatData(d.data)}</td>
+                    <td className="px-5 py-4 text-dim">Geral</td>
+                    <td className="px-5 py-4 text-right text-tx mono">{formatBRL(reaisToCents(d.investimento_ads))}</td>
+                    <td className="px-5 py-4 text-right text-tx mono">{d.leads ?? 0}</td>
+                    <td className="px-5 py-4 text-right">
+                      <button
+                        onClick={() => excluir(d.data)}
+                        className="inline-grid place-items-center w-8 h-8 rounded-lg text-red/80 hover:text-red hover:bg-red/10 transition-colors"
+                        title="Excluir lançamento"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
     </div>
   );
 }

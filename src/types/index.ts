@@ -27,6 +27,7 @@ export interface AfterpayDaily {
   // Marketing
   investimento_ads: number;
   taxas_investimento: number;
+  leads?: number; // qtd de leads do dia (lançamento manual)
 
   // Perdas
   valor_frustrado: number;

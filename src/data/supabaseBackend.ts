@@ -24,6 +24,7 @@ function mapDaily(r: Record<string, unknown>): AfterpayDaily {
     comissoes_cobranca: N(r.comissoes_cobranca),
     investimento_ads: N(r.investimento_ads),
     taxas_investimento: N(r.taxas_investimento),
+    leads: N(r.leads),
     valor_frustrado: N(r.valor_frustrado),
     qtd_frustrados: N(r.qtd_frustrados),
     valor_agendado: N(r.valor_agendado),
