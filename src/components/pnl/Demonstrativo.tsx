@@ -108,6 +108,7 @@ export function Demonstrativo({
   const [aberta, setAberta] = useState<Set<string | null>>(new Set());
   const catMap = new Map(categorias.map((c) => [c.id, c]));
   const receita = pnl.receita_aprovada;
+  const lucroPositivo = pnl.lucro_real >= 0;
 
   function toggleCat(id: string | null) {
     setAberta((prev) => {
@@ -283,20 +284,40 @@ export function Demonstrativo({
         </div>
       </div>
 
-      {/* LUCRO REAL */}
-      <div className="px-[18px] py-[20px] flex items-end justify-between gap-4 bg-gradient-to-br from-[#211a30] via-[#1c1a26] to-[#1a1a22] border-t border-[#3a2f55]">
+      {/* LUCRO REAL — o card inteiro fica verde no lucro e vermelho no prejuízo */}
+      <div
+        className={`px-[18px] py-[20px] flex items-end justify-between gap-4 bg-gradient-to-br border-t transition-colors ${
+          lucroPositivo
+            ? 'from-[#12281f] via-[#141f1b] to-[#141a18] border-grn/40'
+            : 'from-[#2c1620] via-[#25181e] to-[#1f171a] border-red/40'
+        }`}
+      >
         <div className="text-[15px] font-extrabold tracking-wide">
-          LUCRO REAL
+          <span className={lucroPositivo ? 'text-grn' : 'text-red'}>
+            {lucroPositivo ? 'LUCRO REAL' : 'PREJUÍZO REAL'}
+          </span>
           <span className="block font-medium text-[11px] text-dim2 tracking-normal mt-[6px] max-w-[220px] leading-relaxed">
             receita − custos Afterpay − custos variáveis{considerarFrustrados ? ' − frustrados' : ''}
           </span>
         </div>
         <div className="text-right">
-          <div className="mono text-[32px] font-extrabold text-grn tracking-tight leading-none drop-shadow-[0_0_18px_rgba(52,211,153,0.25)]">
+          <div
+            className={`mono text-[32px] font-extrabold tracking-tight leading-none ${
+              lucroPositivo
+                ? 'text-grn drop-shadow-[0_0_18px_rgba(52,211,153,0.25)]'
+                : 'text-red drop-shadow-[0_0_18px_rgba(251,113,133,0.25)]'
+            }`}
+          >
             {formatBRL(pnl.lucro_real)}
           </div>
-          <div className="inline-flex items-center gap-2 mt-2 text-[11px] text-dim">
-            <span className="border border-line2 rounded-full px-[9px] py-[3px] mono text-blu">Margem {formatPercent(pnl.margem_real)}</span>
+          <div className="inline-flex items-center gap-2 mt-2 text-[11px]">
+            <span
+              className={`rounded-full px-[9px] py-[3px] mono border ${
+                lucroPositivo ? 'text-grn border-grn/35 bg-grn/10' : 'text-red border-red/35 bg-red/10'
+              }`}
+            >
+              Margem {formatPercent(pnl.margem_real)}
+            </span>
           </div>
         </div>
       </div>

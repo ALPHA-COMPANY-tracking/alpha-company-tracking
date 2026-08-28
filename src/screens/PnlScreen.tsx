@@ -38,6 +38,7 @@ export function PnlScreen({
   );
 
   const vazio = pnl.receita_aprovada === 0 && pnl.custos_totais_reais === 0;
+  const lucroPositivo = pnl.lucro_real >= 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -54,12 +55,24 @@ export function PnlScreen({
           </div>
         </div>
         <div className="flex items-center gap-4 justify-center pt-4 sm:pt-0 sm:pl-6">
-          <div className="w-[42px] h-[42px] rounded-[12px] grid place-items-center bg-grn/[0.13] text-grn shrink-0">
-            <TrendingUp size={20} strokeWidth={1.9} />
+          <div
+            className={`w-[42px] h-[42px] rounded-[12px] grid place-items-center shrink-0 ${
+              lucroPositivo ? 'bg-grn/[0.13] text-grn' : 'bg-red/[0.13] text-red'
+            }`}
+          >
+            {lucroPositivo ? <TrendingUp size={20} strokeWidth={1.9} /> : <TrendingDown size={20} strokeWidth={1.9} />}
           </div>
           <div>
-            <div className="text-[12px] text-dim font-medium">Lucro Real (período)</div>
-            <div className="mono text-[30px] font-extrabold text-grn tracking-tight leading-tight">{formatBRL(pnl.lucro_real)}</div>
+            <div className="text-[12px] text-dim font-medium">
+              {lucroPositivo ? 'Lucro Real (período)' : 'Prejuízo Real (período)'}
+            </div>
+            <div
+              className={`mono text-[30px] font-extrabold tracking-tight leading-tight ${
+                lucroPositivo ? 'text-grn' : 'text-red'
+              }`}
+            >
+              {formatBRL(pnl.lucro_real)}
+            </div>
             <div className="text-[10.5px] text-dim2 mt-0.5">Margem {formatPercent(pnl.margem_real)}</div>
           </div>
         </div>
