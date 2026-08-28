@@ -74,22 +74,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ ok: true, ignorado: 'sem order.id' });
   }
 
-  const pedido = {
+  // IMPORTANTE: eventos de mudança de status às vezes vêm SEM os dados de
+  // pagamento/produto. Só gravamos os campos que vierem preenchidos, para
+  // não apagar (zerar) o valor/produto que já está salvo.
+  const pedido: Record<string, unknown> = {
     id: String(order.id),
     user_id: userId,
-    internal_id: order.internal_id ?? null,
     status: order.status ?? null,
-    data: dataSP(order.created_at),
-    valor: num(pagamento.valor ?? produto['preço']),
-    valor_bruto: num(pagamento.valor_bruto ?? pagamento.valor ?? produto['preço']),
-    produto_nome: produto.nome ?? null,
-    produto_plano: produto.plano ?? null,
-    codigo_plano: produto['código_do_plano'] ?? null,
-    metodo_pagamento: pagamento['método'] ?? null,
-    vendedor: vendedor.nome ?? null,
-    rastreamento: envio['código_de_rastreamento'] ?? null,
     atualizado_em: new Date().toISOString(),
   };
+  if (order.internal_id != null) pedido.internal_id = order.internal_id;
+  if (order.created_at) pedido.data = dataSP(order.created_at);
+  const v = num(pagamento.valor ?? produto['preço']);
+  if (v > 0) pedido.valor = v;
+  const vb = num(pagamento.valor_bruto ?? pagamento.valor ?? produto['preço']);
+  if (vb > 0) pedido.valor_bruto = vb;
+  if (produto.nome) pedido.produto_nome = produto.nome;
+  if (produto.plano) pedido.produto_plano = produto.plano;
+  if (produto['código_do_plano']) pedido.codigo_plano = produto['código_do_plano'];
+  if (pagamento['método']) pedido.metodo_pagamento = pagamento['método'];
+  if (vendedor.nome) pedido.vendedor = vendedor.nome;
+  if (envio['código_de_rastreamento']) pedido.rastreamento = envio['código_de_rastreamento'];
 
   const { error } = await supabase
     .from('bluesales_pedidos')
