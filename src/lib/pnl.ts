@@ -7,7 +7,7 @@
 import type { AfterpayDaily, CustoVariavel, IsoDate, Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
 import { agregarPedidos } from '@/lib/pedidos';
-import { COMISSAO_COBRANCA, COMISSAO_VENDEDOR, TAXA_PLATAFORMA_POR_DIA, custosDePedidos } from '@/lib/custosConfig';
+import { COMISSAO_COBRANCA, COMISSAO_VENDEDOR, custosDePedidos } from '@/lib/custosConfig';
 import {
   diasDoPeriodo,
   diasInclusivos,
@@ -196,8 +196,9 @@ export function calcularPnl(
     const cc = custosDePedidos(pedidos, periodo);
     custo_produtos = cc.custo_produtos;
     frete = cc.frete;
-    // Taxa de repasse: cobrada uma vez por dia com pagamento aprovado.
-    taxas_plataforma = reaisToCents(TAXA_PLATAFORMA_POR_DIA) * agg.dias_com_pagamento;
+    // A taxa de plataforma NÃO é derivável dos pedidos (dias com pagamentos
+    // idênticos têm taxas diferentes no BlueSales). Usamos o valor real
+    // lançado em afterpay_daily.taxas_plataforma — já somado acima.
     comissoes_vendedor = Math.round((receita_aprovada - taxas_plataforma) * COMISSAO_VENDEDOR);
     comissoes_cobranca = Math.round(receita_aprovada * COMISSAO_COBRANCA);
   }

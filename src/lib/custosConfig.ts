@@ -20,11 +20,12 @@ export const CUSTO_PRODUTO: { match: RegExp; custo: number }[] = [
 export const FRETE_POR_PEDIDO = 33.0;
 
 /**
- * Taxa de plataforma: R$ 2,50 por DIA em que houve pagamento aprovado
- * (taxa de repasse diário). Conferido contra o P&L do BlueSales:
- * Hoje 1 dia = R$ 2,50 · 7D 2 dias = R$ 5,00 · 30D 10 dias = R$ 25,00.
+ * A taxa de plataforma NÃO é calculável a partir dos pedidos: no P&L do
+ * BlueSales, dias com pagamentos idênticos aparecem com taxas diferentes
+ * (14/08 e 15/08 tiveram 2× R$ 735 e cobraram R$ 5,00 e R$ 0,00).
+ * Por isso ela é lançada por dia em `afterpay_daily.taxas_plataforma`,
+ * com o valor real do BlueSales.
  */
-export const TAXA_PLATAFORMA_POR_DIA = 2.5;
 
 /** Comissões: vendedor 5% da (receita − taxas); cobrança 1% da receita. */
 export const COMISSAO_VENDEDOR = 0.05;

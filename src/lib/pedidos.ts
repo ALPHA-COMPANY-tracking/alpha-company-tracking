@@ -44,8 +44,6 @@ export interface RevenuePedidos {
   qtd_agendados: number;
   valor_frustrado: number;
   qtd_frustrados: number;
-  /** Dias distintos com pelo menos um pagamento — base da taxa de repasse. */
-  dias_com_pagamento: number;
   porAtendente: AtendenteAgg[];
   porMetodo: { nome: string; pedidos: number }[];
   total: number; // quantos pedidos no período (fonte real disponível?)
@@ -72,7 +70,6 @@ export function agregarPedidos(pedidos: Pedido[], periodo: Periodo): RevenuePedi
 
   const atendentes = new Map<string, AtendenteAgg>();
   const metodos = new Map<string, number>();
-  const diasPagos = new Set<string>();
   const atendente = (nome: string) =>
     atendentes.get(nome) ?? { nome, valor_agendado: 0, pedidos: 0, receita: 0, aprovados: 0 };
 
@@ -106,7 +103,6 @@ export function agregarPedidos(pedidos: Pedido[], periodo: Periodo): RevenuePedi
     if (bucket === 'aprovado' && pagamentoNoPeriodo(p)) {
       receita_aprovada += valor;
       qtd_pagamentos += 1;
-      diasPagos.add(dataAprovacaoPedido(p));
 
       const a = atendente(nome);
       a.receita += valor;
@@ -122,7 +118,6 @@ export function agregarPedidos(pedidos: Pedido[], periodo: Periodo): RevenuePedi
     qtd_agendados,
     valor_frustrado,
     qtd_frustrados,
-    dias_com_pagamento: diasPagos.size,
     porAtendente: [...atendentes.values()].sort((a, b) => b.valor_agendado - a.valor_agendado),
     porMetodo: [...metodos.entries()].map(([nome, pedidos]) => ({ nome, pedidos })).sort((a, b) => b.pedidos - a.pedidos),
     total,
