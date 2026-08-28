@@ -146,6 +146,12 @@ export class SupabaseBackend implements Backend {
     const { error } = await this.db.from('categorias_custo').update(patch).eq('id', id);
     if (error) throw error;
   }
+  async deleteCategoria(id: string) {
+    // A FK é `on delete set null`: os custos lançados continuam existindo,
+    // apenas ficam sem categoria.
+    const { error } = await this.db.from('categorias_custo').delete().eq('id', id);
+    if (error) throw error;
+  }
   async lancarDaily(d: AfterpayDaily) {
     const { error } = await this.db
       .from('afterpay_daily')

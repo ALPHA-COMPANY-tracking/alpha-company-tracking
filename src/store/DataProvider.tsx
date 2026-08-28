@@ -27,6 +27,8 @@ interface DataContextValue {
 
   addCategoria: (input: Omit<CategoriaCusto, 'id'>) => CategoriaCusto;
   updateCategoria: (id: string, patch: Partial<Omit<CategoriaCusto, 'id'>>) => void;
+  /** Remove a categoria; os lançamentos ficam sem categoria (não são apagados). */
+  deleteCategoria: (id: string) => void;
 
   lancarDaily: (daily: AfterpayDaily) => void;
   lancarDailies: (dailies: AfterpayDaily[]) => void;
@@ -142,6 +144,20 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
     [aplicar],
   );
 
+  const deleteCategoria = useCallback<DataContextValue['deleteCategoria']>(
+    (id) => {
+      aplicar(
+        (d) => ({
+          ...d,
+          categorias: d.categorias.filter((c) => c.id !== id),
+          custos: d.custos.map((c) => (c.categoria_id === id ? { ...c, categoria_id: null } : c)),
+        }),
+        (b) => b.deleteCategoria(id),
+      );
+    },
+    [aplicar],
+  );
+
   const lancarDaily = useCallback<DataContextValue['lancarDaily']>(
     (daily) => {
       aplicar(
@@ -202,12 +218,13 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
       importarCustos,
       addCategoria,
       updateCategoria,
+      deleteCategoria,
       lancarDaily,
       lancarDailies,
       marcarSync,
       recarregar,
     };
-  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, lancarDaily, lancarDailies, marcarSync, recarregar]);
+  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, lancarDaily, lancarDailies, marcarSync, recarregar]);
 
   if (!value) {
     return (

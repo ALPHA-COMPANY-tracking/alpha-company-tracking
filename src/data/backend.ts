@@ -14,6 +14,7 @@ export interface Backend {
   importarCustos(cs: CustoVariavel[]): Promise<void>;
   addCategoria(c: CategoriaCusto): Promise<void>;
   updateCategoria(id: string, patch: Partial<CategoriaCusto>): Promise<void>;
+  deleteCategoria(id: string): Promise<void>;
   lancarDaily(d: AfterpayDaily): Promise<void>;
   lancarDailies(ds: AfterpayDaily[]): Promise<void>;
   marcarSync(iso: string): Promise<void>;
@@ -44,6 +45,15 @@ export class LocalBackend implements Backend {
   }
   async updateCategoria(id: string, patch: Partial<CategoriaCusto>) {
     this.mut((ds) => ({ ...ds, categorias: ds.categorias.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
+  }
+  async deleteCategoria(id: string) {
+    // Os lançamentos são preservados: ficam sem categoria (como no banco,
+    // onde a referência é `on delete set null`).
+    this.mut((ds) => ({
+      ...ds,
+      categorias: ds.categorias.filter((x) => x.id !== id),
+      custos: ds.custos.map((c) => (c.categoria_id === id ? { ...c, categoria_id: null } : c)),
+    }));
   }
   async lancarDaily(d: AfterpayDaily) {
     this.mut((ds) => {
