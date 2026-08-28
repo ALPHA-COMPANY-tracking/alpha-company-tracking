@@ -90,7 +90,8 @@ export interface Pedido {
   id: string;
   internal_id?: number | null;
   status: string | null;
-  data: IsoDate;
+  data: IsoDate; // data de criação do pedido — base do agendado
+  data_aprovacao?: IsoDate | null; // data do pagamento — base da receita aprovada (BlueSales conta por aqui)
   valor: number; // líquido (com desconto %) — base da receita aprovada
   valor_bruto?: number | null; // valor cheio do pedido — base do agendado
   produto_nome?: string | null;

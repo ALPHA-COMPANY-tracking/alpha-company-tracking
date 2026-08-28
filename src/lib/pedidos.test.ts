@@ -58,4 +58,20 @@ describe('agregarPedidos', () => {
     const pedidos = [p('1', 'pagos', 735, 'PETER', '2026-07-30')];
     expect(agregarPedidos(pedidos, periodo).qtd_agendados).toBe(0);
   });
+
+  it('conta aprovado pela data de pagamento (data_aprovacao), não pela criação', () => {
+    // Criado em julho, PAGO em agosto → agendado cai em julho, receita em agosto.
+    const pedido: Pedido = { ...p('1', 'pagos', 900, 'PETER', '2026-07-28'), data_aprovacao: '2026-08-03' };
+    const r = agregarPedidos([pedido], periodo);
+    expect(r.qtd_agendados).toBe(0); // criação foi em julho
+    expect(r.qtd_pagamentos).toBe(1); // pagamento foi em agosto
+    expect(r.receita_aprovada).toBe(900);
+  });
+
+  it('sem data_aprovacao, usa a data de criação (comportamento histórico)', () => {
+    const pedido = p('1', 'pagos', 900, 'PETER', '2026-08-10'); // sem data_aprovacao
+    const r = agregarPedidos([pedido], periodo);
+    expect(r.qtd_pagamentos).toBe(1);
+    expect(r.qtd_agendados).toBe(1);
+  });
 });

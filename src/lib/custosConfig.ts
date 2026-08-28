@@ -7,7 +7,7 @@
 import type { Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
-import { statusBucket } from '@/lib/pedidos';
+import { dataAprovacaoPedido, statusBucket } from '@/lib/pedidos';
 
 /** Custo do produto (COGS) por plano — detectado pelo texto do plano.
  *  Valores conferidos contra o P&L real do BlueSales. */
@@ -38,8 +38,9 @@ export function custosDePedidos(
   pedidos: Pedido[],
   periodo: Periodo,
 ): { custo_produtos: Cents; frete: Cents } {
+  // Custos dos aprovados acompanham a receita: contam pela data de pagamento.
   const aprovados = pedidos.filter(
-    (p) => isDentro(p.data, periodo.inicio, periodo.fim) && statusBucket(p.status) === 'aprovado',
+    (p) => statusBucket(p.status) === 'aprovado' && isDentro(dataAprovacaoPedido(p), periodo.inicio, periodo.fim),
   );
   let custo_produtos = 0;
   for (const p of aprovados) custo_produtos += reaisToCents(custoProdutoDoPlano(p.produto_plano));

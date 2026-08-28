@@ -49,46 +49,66 @@ export interface RevenuePedidos {
   total: number; // quantos pedidos no período (fonte real disponível?)
 }
 
-/** Agrega os pedidos de um período (lado da receita). */
+/** Data de pagamento do pedido (o BlueSales conta o "aprovado" por aqui).
+ *  Se ainda não foi carimbada (histórico), cai na data de criação. */
+export function dataAprovacaoPedido(p: Pedido): string {
+  return p.data_aprovacao || p.data;
+}
+
+/** Agrega os pedidos de um período (lado da receita).
+ *  - Agendado e frustrado contam pela data de CRIAÇÃO (p.data).
+ *  - Aprovado/receita conta pela data de PAGAMENTO (p.data_aprovacao ?? p.data),
+ *    para bater com o "Faturamento Aprovado" do BlueSales. */
 export function agregarPedidos(pedidos: Pedido[], periodo: Periodo): RevenuePedidos {
-  const noPeriodo = pedidos.filter((p) => isDentro(p.data, periodo.inicio, periodo.fim));
+  const criacaoNoPeriodo = (p: Pedido) => isDentro(p.data, periodo.inicio, periodo.fim);
+  const pagamentoNoPeriodo = (p: Pedido) => isDentro(dataAprovacaoPedido(p), periodo.inicio, periodo.fim);
 
   let receita_aprovada = 0, qtd_pagamentos = 0;
   let valor_agendado = 0, qtd_agendados = 0;
   let valor_frustrado = 0, qtd_frustrados = 0;
+  let total = 0;
 
   const atendentes = new Map<string, AtendenteAgg>();
   const metodos = new Map<string, number>();
+  const atendente = (nome: string) =>
+    atendentes.get(nome) ?? { nome, valor_agendado: 0, pedidos: 0, receita: 0, aprovados: 0 };
 
-  for (const p of noPeriodo) {
+  for (const p of pedidos) {
     const bucket = statusBucket(p.status);
     const valor = Number(p.valor) || 0; // líquido → receita
     const bruto = Number(p.valor_bruto ?? p.valor) || 0; // cheio → agendado
+    const nome = p.vendedor?.trim() || 'Sem atendente';
 
-    // Todos os pedidos entram no "agendado" (faturamento total, valor cheio).
-    valor_agendado += bruto;
-    qtd_agendados += 1;
+    // Lado do AGENDADO / funil — por data de criação.
+    if (criacaoNoPeriodo(p)) {
+      valor_agendado += bruto;
+      qtd_agendados += 1;
+      total += 1;
 
-    if (bucket === 'aprovado') {
+      const a = atendente(nome);
+      a.valor_agendado += bruto;
+      a.pedidos += 1;
+      atendentes.set(nome, a);
+
+      const met = p.metodo_pagamento?.trim() || 'Outro';
+      metodos.set(met, (metodos.get(met) ?? 0) + 1);
+
+      if (bucket === 'frustrado') {
+        valor_frustrado += valor;
+        qtd_frustrados += 1;
+      }
+    }
+
+    // Lado da RECEITA APROVADA — por data de pagamento.
+    if (bucket === 'aprovado' && pagamentoNoPeriodo(p)) {
       receita_aprovada += valor;
       qtd_pagamentos += 1;
-    } else if (bucket === 'frustrado') {
-      valor_frustrado += valor;
-      qtd_frustrados += 1;
-    }
 
-    const nome = p.vendedor?.trim() || 'Sem atendente';
-    const a = atendentes.get(nome) ?? { nome, valor_agendado: 0, pedidos: 0, receita: 0, aprovados: 0 };
-    a.valor_agendado += bruto;
-    a.pedidos += 1;
-    if (bucket === 'aprovado') {
+      const a = atendente(nome);
       a.receita += valor;
       a.aprovados += 1;
+      atendentes.set(nome, a);
     }
-    atendentes.set(nome, a);
-
-    const met = p.metodo_pagamento?.trim() || 'Outro';
-    metodos.set(met, (metodos.get(met) ?? 0) + 1);
   }
 
   return {
@@ -100,6 +120,6 @@ export function agregarPedidos(pedidos: Pedido[], periodo: Periodo): RevenuePedi
     qtd_frustrados,
     porAtendente: [...atendentes.values()].sort((a, b) => b.valor_agendado - a.valor_agendado),
     porMetodo: [...metodos.entries()].map(([nome, pedidos]) => ({ nome, pedidos })).sort((a, b) => b.pedidos - a.pedidos),
-    total: noPeriodo.length,
+    total,
   };
 }
