@@ -5,15 +5,23 @@
 import type { IsoDate, Periodo } from '@/types';
 import { addDias, hojeIso, parseYmd, primeiroDiaMes, ultimoDiaMes } from '@/lib/dates';
 
-export type PresetPeriodo = 'hoje' | '7d' | '30d' | 'mes_atual' | 'mes_passado' | 'personalizado';
+export type PresetPeriodo =
+  | 'hoje'
+  | 'ontem'
+  | '7d'
+  | '30d'
+  | 'mes_atual'
+  | 'mes_passado'
+  | 'personalizado';
 
 export const PRESETS: { id: PresetPeriodo; label: string }[] = [
   { id: 'hoje', label: 'Hoje' },
+  { id: 'ontem', label: 'Ontem' },
   { id: '7d', label: '7D' },
   { id: '30d', label: '30D' },
-  { id: 'mes_atual', label: 'Mês atual' },
+  { id: 'mes_atual', label: 'Este mês' },
   { id: 'mes_passado', label: 'Mês passado' },
-  { id: 'personalizado', label: 'Personalizado' },
+  { id: 'personalizado', label: 'Custom' },
 ];
 
 export function periodoDoPreset(preset: PresetPeriodo, hoje: IsoDate = hojeIso()): Periodo {
@@ -21,6 +29,10 @@ export function periodoDoPreset(preset: PresetPeriodo, hoje: IsoDate = hojeIso()
   switch (preset) {
     case 'hoje':
       return { inicio: hoje, fim: hoje };
+    case 'ontem': {
+      const o = addDias(hoje, -1);
+      return { inicio: o, fim: o };
+    }
     case '7d':
       return { inicio: addDias(hoje, -6), fim: hoje };
     case '30d':
@@ -33,7 +45,6 @@ export function periodoDoPreset(preset: PresetPeriodo, hoje: IsoDate = hojeIso()
       return { inicio: primeiroDiaMes(py, pm), fim: ultimoDiaMes(py, pm) };
     }
     case 'personalizado':
-      // fallback: últimos 30 dias; o usuário escolhe as datas na UI
       return { inicio: addDias(hoje, -29), fim: hoje };
   }
 }

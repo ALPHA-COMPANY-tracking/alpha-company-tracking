@@ -31,6 +31,8 @@ interface DataContextValue {
   lancarDaily: (daily: AfterpayDaily) => void;
   lancarDailies: (dailies: AfterpayDaily[]) => void;
   marcarSync: () => void;
+  /** Re-busca todos os dados do backend (botão Atualizar). */
+  recarregar: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -174,6 +176,15 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
     );
   }, [aplicar]);
 
+  const recarregar = useCallback<DataContextValue['recarregar']>(async () => {
+    try {
+      const ds = await backendRef.current.load();
+      setData({ ...ds, ultimoSync: new Date().toISOString() });
+    } catch (e) {
+      console.error('Falha ao atualizar:', e);
+    }
+  }, []);
+
   const value = useMemo<DataContextValue | null>(() => {
     if (!data) return null;
     return {
@@ -193,8 +204,9 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
       lancarDaily,
       lancarDailies,
       marcarSync,
+      recarregar,
     };
-  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, lancarDaily, lancarDailies, marcarSync]);
+  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, lancarDaily, lancarDailies, marcarSync, recarregar]);
 
   if (!value) {
     return (

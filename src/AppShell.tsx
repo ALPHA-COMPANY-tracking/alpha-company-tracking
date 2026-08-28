@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LogOut, Plus, RefreshCw } from 'lucide-react';
+import { Check, LogOut, Plus, RefreshCw } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { useData } from '@/store/DataProvider';
 import { usePeriodo } from '@/store/usePeriodo';
@@ -22,10 +22,22 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: string }) {
-  const { ultimoSync, marcarSync } = useData();
+  const { ultimoSync, recarregar } = useData();
   const { preset, periodo, selecionarPreset, definirPersonalizado } = usePeriodo();
   const [tab, setTab] = useState<Tab>('pnl');
   const [modal, setModal] = useState(false);
+  const [atualizando, setAtualizando] = useState(false);
+  const [atualizado, setAtualizado] = useState(false);
+
+  async function atualizar() {
+    if (atualizando) return;
+    setAtualizando(true);
+    setAtualizado(false);
+    await recarregar();
+    setAtualizando(false);
+    setAtualizado(true);
+    setTimeout(() => setAtualizado(false), 2200);
+  }
 
   const nome = email ? email.split('@')[0] : 'Jonas';
 
@@ -67,11 +79,22 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
         <PeriodSelector preset={preset} periodo={periodo} onPreset={selecionarPreset} onCustom={definirPersonalizado} />
         <div className="flex-1" />
         <button
-          onClick={marcarSync}
-          className="inline-flex items-center gap-2 bg-card border border-line2 text-tx px-[14px] py-[9px] rounded-[10px] text-[13px] font-semibold hover:border-pur/60"
-          title={ultimoSync ? `Último sync: ${new Date(ultimoSync).toLocaleString('pt-BR')}` : 'Modo local — sincronização real na Etapa 8'}
+          onClick={atualizar}
+          disabled={atualizando}
+          className={`inline-flex items-center gap-2 bg-card border px-[14px] py-[9px] rounded-[10px] text-[13px] font-semibold transition-colors ${
+            atualizado ? 'border-grn/50 text-grn' : 'border-line2 text-tx hover:border-gold/50'
+          }`}
+          title={ultimoSync ? `Última atualização: ${new Date(ultimoSync).toLocaleString('pt-BR')}` : 'Atualizar dados'}
         >
-          <RefreshCw size={15} /> Sincronizar
+          {atualizado ? (
+            <>
+              <Check size={15} /> Atualizado
+            </>
+          ) : (
+            <>
+              <RefreshCw size={15} className={atualizando ? 'animate-spin' : ''} /> Atualizar
+            </>
+          )}
         </button>
         <button
           onClick={() => setModal(true)}

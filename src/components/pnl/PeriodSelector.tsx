@@ -1,5 +1,5 @@
+import { CalendarDays } from 'lucide-react';
 import type { Periodo } from '@/types';
-import { formatDiaMes } from '@/lib/dates';
 import { PRESETS, type PresetPeriodo } from '@/lib/periodo';
 
 export function PeriodSelector({
@@ -14,26 +14,35 @@ export function PeriodSelector({
   onCustom: (p: Periodo) => void;
 }) {
   return (
-    <div className="flex items-center gap-2 flex-wrap max-w-full">
-      <div className="flex items-center gap-1 bg-card border border-line2 rounded-[10px] p-1 overflow-x-auto max-w-full [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="inline-flex items-center gap-1.5 text-[10.5px] font-bold text-grn tracking-[0.14em] mr-0.5">
+        <span className="relative flex w-2 h-2">
+          <span className="absolute inline-flex w-full h-full rounded-full bg-grn opacity-60 animate-ping" />
+          <span className="relative inline-flex w-2 h-2 rounded-full bg-grn" />
+        </span>
+        AO VIVO
+      </span>
+
+      <div className="flex items-center gap-1 bg-card border border-line2 rounded-full p-1 overflow-x-auto max-w-full [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {PRESETS.map((p) => {
           const ativo = preset === p.id;
           return (
             <button
               key={p.id}
               onClick={() => onPreset(p.id)}
-              className={`px-[11px] py-[6px] rounded-lg text-[12.5px] font-medium transition-colors whitespace-nowrap shrink-0 ${
-                ativo ? 'bg-pur3 text-white' : 'text-dim hover:text-tx'
+              className={`inline-flex items-center gap-1 px-[13px] py-[6px] rounded-full text-[12.5px] font-semibold whitespace-nowrap shrink-0 transition-colors ${
+                ativo ? 'bg-tx text-[#141419]' : 'text-dim hover:text-tx'
               }`}
             >
+              {p.id === 'personalizado' && <CalendarDays size={13} />}
               {p.label}
             </button>
           );
         })}
       </div>
 
-      {preset === 'personalizado' ? (
-        <div className="inline-flex items-center gap-2 bg-card border border-line2 rounded-[10px] px-3 py-[7px]">
+      {preset === 'personalizado' && (
+        <div className="inline-flex items-center gap-2 bg-card border border-line2 rounded-full px-3 py-[7px]">
           <input
             type="date"
             value={periodo.inicio}
@@ -41,7 +50,7 @@ export function PeriodSelector({
             onChange={(e) => onCustom({ ...periodo, inicio: e.target.value })}
             className="bg-transparent text-[12.5px] text-tx outline-none [color-scheme:dark]"
           />
-          <span className="text-dim2 text-xs">até</span>
+          <span className="text-dim2 text-xs">→</span>
           <input
             type="date"
             value={periodo.fim}
@@ -50,10 +59,6 @@ export function PeriodSelector({
             className="bg-transparent text-[12.5px] text-tx outline-none [color-scheme:dark]"
           />
         </div>
-      ) : (
-        <span className="text-[12.5px] text-dim2 mono">
-          {formatDiaMes(periodo.inicio)} – {formatDiaMes(periodo.fim)}
-        </span>
       )}
     </div>
   );
