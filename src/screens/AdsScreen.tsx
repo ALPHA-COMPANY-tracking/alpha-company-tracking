@@ -66,7 +66,7 @@ export function AdsScreen(_props: { periodo: Periodo }) {
   );
 
   return (
-    <div className="flex flex-col gap-5 max-w-[1000px] w-full">
+    <div className="flex flex-col gap-5 w-full">
       <div>
         <h1 className="text-[26px] font-extrabold text-tx tracking-tight">Marketing</h1>
         <p className="text-[13px] text-dim mt-0.5">Registre o gasto geral de anúncios e a quantidade de leads por dia</p>

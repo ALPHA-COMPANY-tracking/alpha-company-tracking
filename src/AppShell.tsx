@@ -43,9 +43,9 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
   const nome = email ? email.split('@')[0] : 'Jonas';
 
   return (
-    <div className="min-h-full max-w-[1500px] mx-auto lg:flex">
+    <div className="min-h-screen w-full lg:flex">
       {/* ───────── Menu lateral esquerdo ───────── */}
-      <aside className="lg:w-[248px] lg:shrink-0 lg:min-h-screen lg:border-r border-line/70 px-4 lg:px-4 pt-5 lg:sticky lg:top-0 lg:self-start">
+      <aside className="lg:w-[250px] lg:shrink-0 lg:min-h-screen lg:border-r border-line/70 lg:bg-card/40 px-4 pt-5 lg:sticky lg:top-0 lg:self-start">
         <div className="flex items-center gap-3 pb-4 mb-3 border-b border-line/70 lg:border-0 lg:mb-4">
           <LogoMark size={42} />
           <Wordmark />

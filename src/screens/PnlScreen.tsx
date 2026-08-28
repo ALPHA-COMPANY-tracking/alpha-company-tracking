@@ -42,7 +42,7 @@ export function PnlScreen({
   return (
     <div className="flex flex-col gap-4">
       {/* Herói — Faturamento Agendado (esquerda) · Lucro Real (direita) */}
-      <div className="max-w-[720px] mx-auto w-full bg-card border border-line rounded-card px-[22px] py-[18px] grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-line">
+      <div className="w-full bg-card border border-line rounded-card px-[22px] py-[18px] grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-line">
         <div className="flex items-center gap-4 justify-center pb-4 sm:pb-0 sm:pr-6">
           <div className="w-[42px] h-[42px] rounded-[12px] grid place-items-center bg-pur/[0.13] text-pur2 shrink-0">
             <CalendarClock size={20} strokeWidth={1.9} />
