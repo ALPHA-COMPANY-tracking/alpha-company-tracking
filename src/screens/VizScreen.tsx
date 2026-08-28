@@ -6,6 +6,7 @@ import { calcularPnl } from '@/lib/pnl';
 import { agregarPedidos } from '@/lib/pedidos';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
+import { LogoMark } from '@/components/Logo';
 import { EvolucaoChart } from '@/components/pnl/EvolucaoChart';
 import { BarsVertical } from '@/components/viz/BarsVertical';
 import { DonutCategorias } from '@/components/viz/DonutCategorias';
@@ -57,6 +58,28 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Banner premium AJ Alpha Company */}
+      <div className="relative overflow-hidden rounded-card border border-gold/25 bg-gradient-to-br from-[#1b160d] via-card to-[#130f09]">
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: 'radial-gradient(420px 220px at 12% 0%, rgba(212,175,55,0.16), transparent 70%)' }}
+        />
+        <div className="relative flex items-center gap-4 sm:gap-5 px-5 sm:px-7 py-5">
+          <LogoMark size={62} className="shadow-[0_10px_30px_-8px_rgba(212,175,55,0.4)]" />
+          <div className="min-w-0">
+            <div className="text-gold-metal font-extrabold text-[19px] sm:text-[22px] tracking-[0.04em]">AJ ALPHA COMPANY</div>
+            <div className="text-dim text-[12px] sm:text-[12.5px] mt-0.5">
+              Resultados · <span className="text-gold3">After Pay</span> — {rangeLabel}
+            </div>
+          </div>
+          <div className="ml-auto text-right hidden sm:block pl-4 border-l border-gold/15">
+            <div className="text-[9.5px] uppercase tracking-[0.16em] text-gold3 font-bold">Lucro Real</div>
+            <div className="mono font-extrabold text-[22px] text-grn leading-tight mt-1">{formatBRL(pnl.lucro_real)}</div>
+            <div className="text-[10.5px] text-dim2 mt-0.5">margem {formatPercent(pnl.margem_real)}</div>
+          </div>
+        </div>
+      </div>
+
       <Panel title="Evolução no período" hint={`${rangeLabel} · valores diários`}>
         <div className="p-3 pb-0">
           <EvolucaoChart dailies={dailies} custos={custos} periodo={periodo} />

@@ -21,6 +21,9 @@ export default {
         yel: '#fbbf24',
         red: '#fb7185',
         cyan: '#22d3ee',
+        gold: '#d4af37',
+        gold2: '#f0d98f',
+        gold3: '#a8792e',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { LogOut, Plus, RefreshCw } from 'lucide-react';
+import { LogoMark, Wordmark } from '@/components/Logo';
 import { useData } from '@/store/DataProvider';
 import { usePeriodo } from '@/store/usePeriodo';
 import { PeriodSelector } from '@/components/pnl/PeriodSelector';
@@ -30,27 +31,35 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
 
   return (
     <div className="min-h-full max-w-[1400px] mx-auto px-4 sm:px-6 py-5 pb-16">
-      {/* Cabeçalho */}
-      <div className="flex items-center justify-between pb-4">
-        <span className="text-[12px] text-dim2">
-          {onLogout ? (
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-grn" /> Nuvem
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-dim2" /> Modo local
-            </span>
+      {/* Barra de marca */}
+      <div className="flex items-center justify-between gap-3 pb-4 mb-4 border-b border-line/70">
+        <div className="flex items-center gap-3">
+          <LogoMark size={44} />
+          <Wordmark />
+        </div>
+        <div className="flex items-center gap-3 sm:gap-4">
+          <span className="text-[11.5px] text-dim2 hidden sm:inline">
+            {onLogout ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-grn" /> Nuvem
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-dim2" /> Modo local
+              </span>
+            )}
+          </span>
+          <span className="text-[12.5px] text-dim hidden sm:inline">Olá, <b className="text-tx font-semibold">{nome}</b></span>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="inline-flex items-center gap-1.5 text-[12px] text-dim2 hover:text-red border border-line2 rounded-lg px-2.5 py-1.5"
+              title={email}
+            >
+              <LogOut size={14} /> Sair
+            </button>
           )}
-        </span>
-        <span className="text-[15px] font-semibold text-[#cfcfdd]">Bem-vindo, {nome}!</span>
-        {onLogout ? (
-          <button onClick={onLogout} className="inline-flex items-center gap-1.5 text-[12px] text-dim2 hover:text-red" title={email}>
-            <LogOut size={14} /> Sair
-          </button>
-        ) : (
-          <span className="w-12" />
-        )}
+        </div>
       </div>
 
       {/* Barra de filtros / ações */}

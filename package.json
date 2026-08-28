@@ -29,6 +29,7 @@
     "@vitejs/plugin-react": "^6.1.0",
     "@vitest/ui": "^4.1.11",
     "autoprefixer": "^10.5.4",
+    "jimp": "^1.6.1",
     "oxlint": "^1.79.0",
     "postcss": "^8.5.26",
     "tailwindcss": "^3.4.19",

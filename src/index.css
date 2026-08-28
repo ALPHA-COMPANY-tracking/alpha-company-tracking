@@ -30,6 +30,20 @@
     font-family: 'JetBrains Mono', monospace;
     font-variant-numeric: tabular-nums;
   }
+  /* Texto dourado metálico (brand AJ Alpha Company) */
+  .text-gold-metal {
+    background: linear-gradient(135deg, #f7e7ad 0%, #d4af37 42%, #a8792e 72%, #f0d98f 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  .bg-gold-metal {
+    background: linear-gradient(135deg, #f2d98b 0%, #d4af37 45%, #a8792e 100%);
+  }
+  .border-gold-soft {
+    border-color: rgba(212, 175, 55, 0.35);
+  }
   /* thin scrollbar for dark UI */
   ::-webkit-scrollbar {
     width: 10px;

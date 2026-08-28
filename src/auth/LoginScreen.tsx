@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Loader2, TrendingUp } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { Logo } from '@/components/Logo';
 
 export function LoginScreen() {
   const [modo, setModo] = useState<'entrar' | 'cadastrar'>('entrar');
@@ -33,20 +34,30 @@ export function LoginScreen() {
   }
 
   return (
-    <div className="min-h-screen grid place-items-center bg-bg px-4">
-      <div className="w-full max-w-[380px]">
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <span className="w-10 h-10 rounded-[12px] bg-grn/[0.13] grid place-items-center text-grn">
-            <TrendingUp size={20} strokeWidth={1.9} />
-          </span>
-          <span className="text-[17px] font-bold text-tx">Dashboard Financeiro</span>
+    <div className="relative min-h-screen grid place-items-center bg-bg px-4 overflow-hidden">
+      {/* brilho dourado de fundo */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(560px 420px at 50% 26%, rgba(212,175,55,0.14), transparent 70%), radial-gradient(700px 500px at 50% 120%, rgba(168,121,46,0.08), transparent 70%)',
+        }}
+      />
+      <div className="relative w-full max-w-[400px]">
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-7">
+          <Logo width={230} className="drop-shadow-[0_10px_40px_rgba(212,175,55,0.18)]" />
         </div>
 
-        <div className="bg-card border border-line rounded-card p-6">
-          <h1 className="m-0 text-[16px] font-bold text-tx mb-1">
-            {modo === 'entrar' ? 'Entrar' : 'Criar conta'}
-          </h1>
-          <p className="mt-0 mb-5 text-[12.5px] text-dim">
+        <div className="bg-card/90 backdrop-blur border border-gold/20 rounded-card p-6 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.7)]">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="h-px flex-1 bg-gradient-to-r from-transparent to-gold/40" />
+            <h1 className="m-0 text-[13px] font-bold text-gold2 tracking-[0.18em] uppercase">
+              {modo === 'entrar' ? 'Entrar' : 'Criar conta'}
+            </h1>
+            <span className="h-px flex-1 bg-gradient-to-l from-transparent to-gold/40" />
+          </div>
+          <p className="mt-0 mb-5 text-[12.5px] text-dim text-center">
             {modo === 'entrar' ? 'Acesse seu P&L na nuvem.' : 'Crie sua conta para salvar na nuvem.'}
           </p>
 
@@ -58,7 +69,7 @@ export function LoginScreen() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx text-[13px] outline-none focus:border-pur"
+                className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[11px] text-tx text-[13px] outline-none focus:border-gold/60 transition-colors"
               />
             </label>
             <label className="block">
@@ -69,7 +80,7 @@ export function LoginScreen() {
                 minLength={6}
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
-                className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx text-[13px] outline-none focus:border-pur"
+                className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[11px] text-tx text-[13px] outline-none focus:border-gold/60 transition-colors"
               />
             </label>
 
@@ -79,10 +90,10 @@ export function LoginScreen() {
             <button
               type="submit"
               disabled={carregando}
-              className="mt-1 inline-flex items-center justify-center gap-2 text-white px-4 py-[11px] rounded-[10px] text-[13.5px] font-semibold bg-gradient-to-br from-pur3 to-pur disabled:opacity-60"
+              className="mt-1 inline-flex items-center justify-center gap-2 bg-gold-metal text-[#2a1e08] px-4 py-[12px] rounded-[10px] text-[13.5px] font-extrabold tracking-wide disabled:opacity-60 hover:brightness-105 shadow-[0_8px_24px_-8px_rgba(212,175,55,0.5)] transition"
             >
               {carregando && <Loader2 size={16} className="animate-spin" />}
-              {modo === 'entrar' ? 'Entrar' : 'Criar conta'}
+              {modo === 'entrar' ? 'ENTRAR' : 'CRIAR CONTA'}
             </button>
           </form>
 
@@ -92,11 +103,15 @@ export function LoginScreen() {
               setErro('');
               setAviso('');
             }}
-            className="w-full text-center mt-4 text-[12.5px] text-dim2 hover:text-dim"
+            className="w-full text-center mt-4 text-[12.5px] text-dim2 hover:text-gold2 transition-colors"
           >
             {modo === 'entrar' ? 'Não tem conta? Criar agora' : 'Já tem conta? Entrar'}
           </button>
         </div>
+
+        <p className="text-center text-[10.5px] text-dim2 tracking-[0.25em] mt-5 uppercase">
+          AJ Alpha Company · After Pay
+        </p>
       </div>
     </div>
   );
