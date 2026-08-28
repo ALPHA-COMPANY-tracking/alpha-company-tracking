@@ -53,7 +53,8 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
 
   useEffect(() => {
     let vivo = true;
-    setData(null);
+    // Não zera o estado aqui: se o backend for recriado (ex.: renovação de
+    // token), a tela ficaria vazia até a recarga terminar.
     backend
       .load()
       .then((ds) => vivo && setData(ds))

@@ -18,9 +18,13 @@ export function AuthGate() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Memoiza pelo ID do usuário, não pelo objeto `session`: o Supabase emite
+  // uma nova sessão a cada renovação de token, e recriar o backend aí
+  // remontaria o DataProvider (a tela ficava preta no meio do "Atualizar").
+  const userId = session?.user.id ?? null;
   const backend = useMemo(
-    () => (supabase && session ? new SupabaseBackend(supabase, session.user.id) : null),
-    [session],
+    () => (supabase && userId ? new SupabaseBackend(supabase, userId) : null),
+    [userId],
   );
 
   if (session === undefined) {
