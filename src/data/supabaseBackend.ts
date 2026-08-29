@@ -99,6 +99,7 @@ export class SupabaseBackend implements Backend {
       valor: N(r.valor),
       valor_bruto: r.valor_bruto != null ? N(r.valor_bruto) : null,
       valor_agendado: r.valor_agendado != null ? N(r.valor_agendado) : null,
+      perda_real: r.perda_real != null ? N(r.perda_real) : null,
       produto_nome: r.produto_nome ?? null,
       produto_plano: r.produto_plano ?? null,
       codigo_plano: r.codigo_plano ?? null,
@@ -151,6 +152,14 @@ export class SupabaseBackend implements Backend {
     // A FK é `on delete set null`: os custos lançados continuam existindo,
     // apenas ficam sem categoria.
     const { error } = await this.db.from('categorias_custo').delete().eq('id', id);
+    if (error) throw error;
+  }
+  async definirPerdaPedido(id: string, perda: number | null) {
+    const { error } = await this.db
+      .from('bluesales_pedidos')
+      .update({ perda_real: perda })
+      .eq('id', id)
+      .eq('user_id', this.userId);
     if (error) throw error;
   }
   async lancarDaily(d: AfterpayDaily) {

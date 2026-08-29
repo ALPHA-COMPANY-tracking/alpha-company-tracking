@@ -98,6 +98,9 @@ export interface Pedido {
   /** Valor no momento do agendamento — base do Faturamento Agendado.
    *  Congelado no primeiro evento: desconto negociado depois não o altera. */
   valor_agendado?: number | null;
+  /** Perda real deste pedido quando frustrado (ajuste manual).
+   *  null = calcular automaticamente (custo do produto + frete). */
+  perda_real?: number | null;
   produto_nome?: string | null;
   produto_plano?: string | null;
   codigo_plano?: string | null;

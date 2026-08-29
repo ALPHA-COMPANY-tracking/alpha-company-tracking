@@ -123,7 +123,7 @@ export function Demonstrativo({
   const composicao = [
     { label: 'Custos Afterpay', total: pnl.custos_afterpay, cor: '#fb7185' },
     { label: 'Custos variáveis', total: pnl.custos_variaveis_total, cor: '#a855f7' },
-    ...(considerarFrustrados ? [{ label: 'Frustrados', total: pnl.valor_frustrado, cor: '#fbbf24' }] : []),
+    ...(considerarFrustrados ? [{ label: 'Perda dos frustrados', total: pnl.perda_real_frustrados, cor: '#fbbf24' }] : []),
     { label: 'Lucro real', total: Math.max(0, pnl.lucro_real), cor: '#34d399' },
   ];
   const somaComp = composicao.reduce((a, s) => a + s.total, 0) || 1;
@@ -140,7 +140,7 @@ export function Demonstrativo({
             onChange={(e) => onToggleFrustrados(e.target.checked)}
           />
           <span className="w-[29px] h-4 rounded-full bg-[#2f2f3b] relative transition-colors peer-checked:bg-pur3 after:content-[''] after:absolute after:top-[2.5px] after:left-[2.5px] after:w-[11px] after:h-[11px] after:rounded-full after:bg-[#75758a] after:transition-all peer-checked:after:left-[15px] peer-checked:after:bg-white" />
-          Considerar frustrados como perda
+          Descontar a perda real dos frustrados
         </label>
       </div>
 
@@ -257,12 +257,40 @@ export function Demonstrativo({
         </button>
       </div>
 
-      {/* PERDAS */}
-      <Sec>
-        Perdas <span className="text-[#45454f] tracking-normal normal-case font-medium">(informativo — não entra no lucro)</span>
-      </Sec>
-      <div className="mx-[18px] mb-3">
-        <LinhaCusto Icon={TriangleAlert} label="Frustrados (valor perdido)" note={`${pnl.qtd_frustrados} pedidos`} cents={pnl.valor_frustrado} receita={receita} />
+      {/* PERDAS — valor do pedido (informativo) e perda real (esta desconta) */}
+      <Sec>Perdas · pedidos frustrados</Sec>
+      <div className="mx-[18px] mb-3 rounded-[12px] border border-yel/25 bg-yel/[0.04] overflow-hidden">
+        <div className="px-4 py-[13px] flex items-center justify-between gap-3 border-b border-yel/15">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <TriangleAlert size={15} className="text-yel shrink-0" />
+              <span className="text-[13.5px] text-[#dcdce6]">Valor perdido</span>
+              <span className="text-[9.5px] text-dim2 border border-line2 rounded-full px-[7px] py-[1.5px] shrink-0">
+                {pnl.qtd_frustrados} pedidos
+              </span>
+            </div>
+            <div className="text-[11px] text-dim2 mt-[3px] ml-[23px]">
+              receita que não entrou — não sai do seu caixa
+            </div>
+          </div>
+          <span className="mono text-[14px] font-bold text-dim shrink-0">{formatBRL(pnl.valor_frustrado)}</span>
+        </div>
+
+        <div className="px-4 py-[13px] flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <TriangleAlert size={15} className="text-red shrink-0" />
+              <span className="text-[13.5px] font-semibold text-tx">Valor real perdido</span>
+            </div>
+            <div className="text-[11px] text-dim2 mt-[3px] ml-[23px]">
+              custo do produto + frete{' '}
+              {pnl.frustrados_considerados ? '· descontado do Lucro Real' : '· ative abaixo para descontar'}
+            </div>
+          </div>
+          <span className="mono text-[15px] font-extrabold text-red shrink-0">
+            {formatBRLSigned(pnl.perda_real_frustrados, 'custo')}
+          </span>
+        </div>
       </div>
 
       {/* PARA ONDE FOI CADA REAL */}

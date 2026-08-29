@@ -38,6 +38,19 @@ export function custoProdutoDoPlano(plano?: string | null): number {
   return 0;
 }
 
+/**
+ * Perda REAL de um pedido frustrado, em reais.
+ *
+ * O valor do pedido é a receita que não entrou — não o dinheiro que saiu.
+ * O que se perde de fato é o produto enviado + o frete de ida. Um ajuste
+ * manual (`perda_real`) tem prioridade: cobre casos como o produto ter
+ * voltado, onde só o frete foi perdido.
+ */
+export function perdaRealDePedido(p: Pedido): number {
+  if (p.perda_real != null) return Number(p.perda_real) || 0;
+  return custoProdutoDoPlano(p.produto_plano) + FRETE_POR_PEDIDO;
+}
+
 /** Custo de produto + frete dos pedidos APROVADOS do período (em centavos). */
 export function custosDePedidos(
   pedidos: Pedido[],

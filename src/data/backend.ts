@@ -15,6 +15,8 @@ export interface Backend {
   addCategoria(c: CategoriaCusto): Promise<void>;
   updateCategoria(id: string, patch: Partial<CategoriaCusto>): Promise<void>;
   deleteCategoria(id: string): Promise<void>;
+  /** Ajusta a perda real de um pedido frustrado (null = voltar ao cálculo). */
+  definirPerdaPedido(id: string, perda: number | null): Promise<void>;
   lancarDaily(d: AfterpayDaily): Promise<void>;
   lancarDailies(ds: AfterpayDaily[]): Promise<void>;
   marcarSync(iso: string): Promise<void>;
@@ -53,6 +55,12 @@ export class LocalBackend implements Backend {
       ...ds,
       categorias: ds.categorias.filter((x) => x.id !== id),
       custos: ds.custos.map((c) => (c.categoria_id === id ? { ...c, categoria_id: null } : c)),
+    }));
+  }
+  async definirPerdaPedido(id: string, perda: number | null) {
+    this.mut((ds) => ({
+      ...ds,
+      pedidos: ds.pedidos.map((p) => (p.id === id ? { ...p, perda_real: perda } : p)),
     }));
   }
   async lancarDaily(d: AfterpayDaily) {

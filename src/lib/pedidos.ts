@@ -6,6 +6,7 @@
 
 import type { Pedido, Periodo } from '@/types';
 import { isDentro } from '@/lib/dates';
+import { perdaRealDePedido } from '@/lib/custosConfig';
 
 /** Normaliza status: minúsculo, sem acento, sem espaços nas bordas. */
 function norm(s: string | null | undefined): string {
@@ -44,6 +45,8 @@ export interface RevenuePedidos {
   qtd_agendados: number;
   valor_frustrado: number;
   qtd_frustrados: number;
+  /** Dinheiro que de fato saiu do caixa nos frustrados (produto + frete). */
+  perda_real_frustrados: number;
   porAtendente: AtendenteAgg[];
   porMetodo: { nome: string; pedidos: number }[];
   total: number; // quantos pedidos no período (fonte real disponível?)
@@ -65,7 +68,7 @@ export function agregarPedidos(pedidos: Pedido[], periodo: Periodo): RevenuePedi
 
   let receita_aprovada = 0, qtd_pagamentos = 0;
   let valor_agendado = 0, qtd_agendados = 0;
-  let valor_frustrado = 0, qtd_frustrados = 0;
+  let valor_frustrado = 0, qtd_frustrados = 0, perda_real_frustrados = 0;
   let total = 0;
 
   const atendentes = new Map<string, AtendenteAgg>();
@@ -99,6 +102,7 @@ export function agregarPedidos(pedidos: Pedido[], periodo: Periodo): RevenuePedi
       if (bucket === 'frustrado') {
         valor_frustrado += valor;
         qtd_frustrados += 1;
+        perda_real_frustrados += perdaRealDePedido(p);
       }
     }
 
@@ -121,6 +125,7 @@ export function agregarPedidos(pedidos: Pedido[], periodo: Periodo): RevenuePedi
     qtd_agendados,
     valor_frustrado,
     qtd_frustrados,
+    perda_real_frustrados,
     porAtendente: [...atendentes.values()].sort((a, b) => b.valor_agendado - a.valor_agendado),
     porMetodo: [...metodos.entries()].map(([nome, pedidos]) => ({ nome, pedidos })).sort((a, b) => b.pedidos - a.pedidos),
     total,

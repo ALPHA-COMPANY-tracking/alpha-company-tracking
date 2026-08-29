@@ -106,6 +106,8 @@ export interface PnlResult {
   // Perdas
   valor_frustrado: Cents;
   qtd_frustrados: number;
+  /** Perda de caixa nos frustrados: produto + frete (ou ajuste manual). */
+  perda_real_frustrados: Cents;
   frustrados_considerados: boolean;
 
   // Resultado real
@@ -168,6 +170,9 @@ export function calcularPnl(
   let qtd_pagamentos = somaI((r) => r.qtd_pagamentos);
   let valor_frustrado = somaC((r) => r.valor_frustrado);
   let qtd_frustrados = somaI((r) => r.qtd_frustrados);
+  // Sem pedidos do BlueSales não dá para calcular a perda real (depende do
+  // plano de cada pedido): cai no valor cheio do frustrado.
+  let perda_real_frustrados = valor_frustrado;
   let valor_agendado = somaC((r) => r.valor_agendado);
   let qtd_agendados = somaI((r) => r.qtd_agendados);
 
@@ -177,6 +182,7 @@ export function calcularPnl(
     qtd_pagamentos = agg.qtd_pagamentos;
     valor_frustrado = reaisToCents(agg.valor_frustrado);
     qtd_frustrados = agg.qtd_frustrados;
+    perda_real_frustrados = reaisToCents(agg.perda_real_frustrados);
     valor_agendado = reaisToCents(agg.valor_agendado);
     qtd_agendados = agg.qtd_agendados;
   }
@@ -233,12 +239,14 @@ export function calcularPnl(
     .map(([categoria_id, v]) => ({ categoria_id, total: v.total, qtd: v.qtd }))
     .sort((a, b) => b.total - a.total);
 
+  // O que desconta do lucro é a PERDA REAL (produto + frete), não o valor
+  // cheio do pedido — este é só a receita que não entrou.
   const frustrados_considerados = opts.considerarFrustrados ?? false;
   const custosBase = custos_afterpay + custos_variaveis_total;
-  const custos_totais_reais = custosBase + (frustrados_considerados ? valor_frustrado : 0);
+  const custos_totais_reais = custosBase + (frustrados_considerados ? perda_real_frustrados : 0);
   const lucro_real = receita_aprovada - custos_totais_reais;
   const margem_real = safeDiv(lucro_real, receita_aprovada);
-  const lucro_real_com_frustrados = receita_aprovada - (custosBase + valor_frustrado);
+  const lucro_real_com_frustrados = receita_aprovada - (custosBase + perda_real_frustrados);
   const diferenca_afterpay = lucro_real - lucro_afterpay;
 
   const valor_pendente = valor_agendado - receita_aprovada;
@@ -268,6 +276,7 @@ export function calcularPnl(
     qtd_lancamentos,
     valor_frustrado,
     qtd_frustrados,
+    perda_real_frustrados,
     frustrados_considerados,
     custos_totais_reais,
     lucro_real,

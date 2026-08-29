@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BarChart3, Check, Download, LogOut, Megaphone, PieChart, Plus, RefreshCw, Wallet } from 'lucide-react';
+import { BarChart3, Check, Download, LogOut, Megaphone, PieChart, Plus, RefreshCw, TriangleAlert, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { useData } from '@/store/DataProvider';
@@ -8,16 +8,18 @@ import { PeriodSelector } from '@/components/pnl/PeriodSelector';
 import { CustoModal } from '@/components/CustoModal';
 import { PnlScreen } from '@/screens/PnlScreen';
 import { CustosScreen } from '@/screens/CustosScreen';
+import { FrustradosScreen } from '@/screens/FrustradosScreen';
 import { VizScreen } from '@/screens/VizScreen';
 import { ExportScreen } from '@/screens/ExportScreen';
 import { AdsScreen } from '@/screens/AdsScreen';
 
-type Tab = 'pnl' | 'ads' | 'custos' | 'viz' | 'export';
+type Tab = 'pnl' | 'ads' | 'custos' | 'frustrados' | 'viz' | 'export';
 
 const TABS: { id: Tab; label: string; Icon: LucideIcon }[] = [
   { id: 'pnl', label: 'Demonstração de Resultados', Icon: BarChart3 },
   { id: 'ads', label: 'Anúncios (Meta)', Icon: Megaphone },
   { id: 'custos', label: 'Custos Variáveis', Icon: Wallet },
+  { id: 'frustrados', label: 'Frustrados', Icon: TriangleAlert },
   { id: 'viz', label: 'Visualização', Icon: PieChart },
   { id: 'export', label: 'Exportador', Icon: Download },
 ];
@@ -130,6 +132,7 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
         {tab === 'pnl' && <PnlScreen periodo={periodo} onAddCusto={() => setModal(true)} onLancarManual={() => setTab('ads')} />}
         {tab === 'ads' && <AdsScreen periodo={periodo} />}
         {tab === 'custos' && <CustosScreen periodo={periodo} />}
+        {tab === 'frustrados' && <FrustradosScreen periodo={periodo} />}
         {tab === 'viz' && <VizScreen periodo={periodo} />}
         {tab === 'export' && <ExportScreen periodo={periodo} />}
       </main>
