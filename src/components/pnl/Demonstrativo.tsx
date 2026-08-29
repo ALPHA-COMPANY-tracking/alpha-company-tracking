@@ -139,18 +139,8 @@ export function Demonstrativo({
 
   return (
     <div className="bg-card border border-line rounded-card overflow-hidden">
-      <div className="px-[18px] py-[15px] flex items-center justify-between border-b border-line">
+      <div className="px-[18px] py-[15px] border-b border-line">
         <h2 className="m-0 text-[14.5px] font-bold">Demonstrativo P&amp;L</h2>
-        <label className="inline-flex items-center gap-[9px] text-[11px] text-dim cursor-pointer select-none">
-          <input
-            type="checkbox"
-            className="peer sr-only"
-            checked={usarPerdaReal}
-            onChange={(e) => onTogglePerdaReal(e.target.checked)}
-          />
-          <span className="w-[29px] h-4 rounded-full bg-[#2f2f3b] relative transition-colors peer-checked:bg-pur3 after:content-[''] after:absolute after:top-[2.5px] after:left-[2.5px] after:w-[11px] after:h-[11px] after:rounded-full after:bg-[#75758a] after:transition-all peer-checked:after:left-[15px] peer-checked:after:bg-white" />
-          {usarPerdaReal ? 'Descontando a perda real' : 'Descontando o valor cheio'}
-        </label>
       </div>
 
       {/* RECEITA — destaque */}
@@ -309,6 +299,27 @@ export function Demonstrativo({
             {usarPerdaReal ? formatBRLSigned(pnl.perda_real_frustrados, 'custo') : formatBRL(pnl.perda_real_frustrados)}
           </span>
         </div>
+
+        {/* Escolha de qual das duas perdas desconta do Lucro Real */}
+        <label className="flex items-center gap-3 px-4 py-[12px] border-t border-yel/15 bg-[#17171e] cursor-pointer select-none">
+          <input
+            type="checkbox"
+            className="peer sr-only"
+            checked={usarPerdaReal}
+            onChange={(e) => onTogglePerdaReal(e.target.checked)}
+          />
+          <span className="w-[34px] h-[19px] rounded-full bg-[#2f2f3b] relative transition-colors peer-checked:bg-red/70 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:w-[13px] after:h-[13px] after:rounded-full after:bg-[#75758a] after:transition-all peer-checked:after:left-[18px] peer-checked:after:bg-white shrink-0" />
+          <span className="min-w-0">
+            <span className="block text-[12.5px] font-semibold text-tx">
+              {usarPerdaReal ? 'Descontando o valor real perdido' : 'Descontando o valor perdido total'}
+            </span>
+            <span className="block text-[11px] text-dim2 mt-[2px]">
+              {usarPerdaReal
+                ? 'desligue para descontar o valor cheio dos pedidos'
+                : 'ligue para descontar só o que saiu do caixa'}
+            </span>
+          </span>
+        </label>
       </div>
 
       {/* PARA ONDE FOI CADA REAL */}
