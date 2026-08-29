@@ -17,9 +17,15 @@ export function GapBlock({ pnl }: { pnl: PnlResult }) {
         <span className="text-[11.5px] text-dim2">{formatPercent(pnl.conversao_agendado)} de conversão</span>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
         <Num label="Agendado" value={formatBRL(pnl.valor_agendado)} sub={`${pnl.qtd_agendados} pedidos`} color="text-pur2" />
         <Num label="Aprovado" value={formatBRL(pnl.receita_aprovada)} sub={`${pnl.qtd_pagamentos} pedidos`} color="text-grn" />
+        <Num
+          label="Pendente geral"
+          value={formatBRL(pnl.valor_pendente)}
+          sub={`${qtdPendente} pedidos · com frustrados`}
+          color="text-yel"
+        />
         <Num
           label="Frustrado"
           value={formatBRL(pnl.valor_frustrado)}
@@ -40,7 +46,8 @@ export function GapBlock({ pnl }: { pnl: PnlResult }) {
       </div>
 
       <div className="text-[11px] text-dim2 mt-[10px]">
-        Em rota = agendado − aprovado − frustrado. É o que ainda pode cair na conta.
+        Pendente geral = agendado − aprovado (inclui os frustrados). Em rota tira os frustrados: é o que ainda pode
+        cair na conta.
       </div>
     </div>
   );
