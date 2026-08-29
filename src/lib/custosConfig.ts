@@ -31,6 +31,9 @@ export const FRETE_POR_PEDIDO = 33.0;
 export const COMISSAO_VENDEDOR = 0.05; // padrão de quem não está na lista
 export const COMISSAO_COBRANCA = 0.01;
 
+/** Quem recebe a comissão de cobrança. */
+export const RESPONSAVEL_COBRANCA = 'WESLAINE';
+
 /**
  * Percentual por vendedor, quando difere do padrão. A chave é o nome como
  * o BlueSales manda, normalizado (maiúsculas, sem acento).

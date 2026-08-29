@@ -15,6 +15,7 @@ import type { CategoriaCusto, CustoVariavel, Periodo } from '@/types';
 import type { Cents } from '@/lib/money';
 import { formatBRL, formatBRLSigned, formatPercent, safeDiv } from '@/lib/money';
 import { type DescontoFrustrados, type PnlResult, custoNoPeriodo } from '@/lib/pnl';
+import { COMISSAO_COBRANCA, RESPONSAVEL_COBRANCA } from '@/lib/custosConfig';
 
 function Sec({ children, hl = false }: { children: React.ReactNode; hl?: boolean }) {
   return (
@@ -192,7 +193,24 @@ export function Demonstrativo({
           )
         }
       />
-      <LinhaCusto Icon={Users} label="Comissões Cobrança" cents={pnl.comissoes_cobranca} receita={receita} />
+      <LinhaCusto
+        Icon={Users}
+        label="Comissões Cobrança"
+        cents={pnl.comissoes_cobranca}
+        receita={receita}
+        detalhe={
+          <div className="flex items-center justify-between gap-3 text-[11.5px]">
+            <span className="flex items-center gap-[7px] min-w-0">
+              <span className="text-[#c8c8d6] truncate">{RESPONSAVEL_COBRANCA}</span>
+              <span className="mono text-[10px] font-bold text-blu border border-blu/30 bg-blu/10 rounded-full px-[6px] py-[1px] shrink-0">
+                {formatPercent(COMISSAO_COBRANCA)}
+              </span>
+              <span className="text-dim2 shrink-0">de {formatBRL(receita)}</span>
+            </span>
+            <span className="mono text-dim shrink-0">{formatBRL(pnl.comissoes_cobranca)}</span>
+          </div>
+        }
+      />
 
       <Sec>Marketing</Sec>
       <LinhaCusto Icon={Megaphone} label="Investimento em Ads" cents={pnl.investimento_ads} receita={receita} />
