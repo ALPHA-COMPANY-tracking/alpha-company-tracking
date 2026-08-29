@@ -32,11 +32,11 @@ export function PnlScreen({
   onLancarManual?: () => void;
 }) {
   const { dailies, custos, categorias, pedidos } = useData();
-  const [frustrados, setFrustrados] = useState(false);
+  const [usarPerdaReal, setUsarPerdaReal] = useState(true);
 
   const pnl = useMemo(
-    () => calcularPnl(dailies, custos, periodo, { considerarFrustrados: frustrados }, pedidos),
-    [dailies, custos, periodo, frustrados, pedidos],
+    () => calcularPnl(dailies, custos, periodo, { usarPerdaReal }, pedidos),
+    [dailies, custos, periodo, usarPerdaReal, pedidos],
   );
 
   const vazio = pnl.receita_aprovada === 0 && pnl.custos_totais_reais === 0;
@@ -170,8 +170,8 @@ export function PnlScreen({
             categorias={categorias}
             custos={custos}
             periodo={periodo}
-            considerarFrustrados={frustrados}
-            onToggleFrustrados={setFrustrados}
+            usarPerdaReal={usarPerdaReal}
+            onTogglePerdaReal={setUsarPerdaReal}
             onAddCusto={onAddCusto}
           />
 
