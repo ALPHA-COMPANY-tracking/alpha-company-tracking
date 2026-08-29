@@ -14,7 +14,7 @@ import {
 import type { Periodo } from '@/types';
 import { formatBRL, formatBRLCompact, formatMultiplier, formatPercent, reaisToCents } from '@/lib/money';
 import { formatDiaMes } from '@/lib/dates';
-import { calcularPnl } from '@/lib/pnl';
+import { type DescontoFrustrados, calcularPnl } from '@/lib/pnl';
 import { agregarPedidos } from '@/lib/pedidos';
 import { useData } from '@/store/DataProvider';
 import { KpiCard, Panel } from '@/components/ui';
@@ -32,11 +32,11 @@ export function PnlScreen({
   onLancarManual?: () => void;
 }) {
   const { dailies, custos, categorias, pedidos } = useData();
-  const [usarPerdaReal, setUsarPerdaReal] = useState(true);
+  const [modoFrustrados, setModoFrustrados] = useState<DescontoFrustrados>('nenhum');
 
   const pnl = useMemo(
-    () => calcularPnl(dailies, custos, periodo, { usarPerdaReal }, pedidos),
-    [dailies, custos, periodo, usarPerdaReal, pedidos],
+    () => calcularPnl(dailies, custos, periodo, { descontarFrustrados: modoFrustrados }, pedidos),
+    [dailies, custos, periodo, modoFrustrados, pedidos],
   );
 
   const vazio = pnl.receita_aprovada === 0 && pnl.custos_totais_reais === 0;
@@ -170,8 +170,8 @@ export function PnlScreen({
             categorias={categorias}
             custos={custos}
             periodo={periodo}
-            usarPerdaReal={usarPerdaReal}
-            onTogglePerdaReal={setUsarPerdaReal}
+            modoFrustrados={modoFrustrados}
+            onModoFrustrados={setModoFrustrados}
             onAddCusto={onAddCusto}
           />
 

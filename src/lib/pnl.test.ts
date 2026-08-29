@@ -37,36 +37,31 @@ function custoUnico(valor: number): CustoVariavel {
 }
 
 describe('calcularPnl — critérios de aceite', () => {
-  // Nota: os frustrados SEMPRE descontam do lucro (o toggle escolhe se é a
-  // perda real ou o valor cheio). Sem pedidos do BlueSales não há como
-  // calcular a perda real — o fixture cai no valor cheio (R$ 2.940,00).
-  // O "lucro Afterpay" (6.041,08) segue sem esse desconto, por isso a
-  // diferença entre os dois.
-  it('1. sem custos variáveis: afterpay 14.772,17 · lucro 3.101,08 (após frustrados)', () => {
+  // Padrão: os frustrados NÃO descontam do lucro — é assim que o BlueSales
+  // apresenta (mostra a perda no bloco Perdas, mas não a subtrai).
+  it('1. sem custos variáveis: afterpay 14.772,17 · lucro 6.041,08 · margem 29,0%', () => {
     const r = calcularPnl([dia], [], periodo);
     expect(r.custos_afterpay).toBe(1_477_217); // R$ 14.772,17
-    expect(r.desconto_frustrados).toBe(294_000); // R$ 2.940,00
-    expect(r.lucro_real).toBe(310_108); // 6.041,08 − 2.940,00
-    expect(r.lucro_afterpay).toBe(604_108); // R$ 6.041,08 (sem frustrados)
-    expect(formatPercent(r.margem_real)).toBe('14,9%');
+    expect(r.desconto_frustrados).toBe(0); // padrão 'nenhum'
+    expect(r.lucro_real).toBe(604_108); // R$ 6.041,08
+    expect(r.lucro_afterpay).toBe(604_108);
+    expect(formatPercent(r.margem_real)).toBe('29,0%');
   });
 
-  it('2. com custos variáveis de 1.500,00: totais 19.212,17 · lucro 1.601,08', () => {
+  it('2. com custos variáveis de 1.500,00: totais 16.272,17 · lucro 4.541,08 · margem 21,8%', () => {
     const r = calcularPnl([dia], [custoUnico(1500)], periodo);
     expect(r.custos_variaveis_total).toBe(150_000);
-    expect(r.custos_totais_reais).toBe(1_921_217); // 14.772,17 + 1.500 + 2.940
-    expect(r.lucro_real).toBe(160_108); // R$ 1.601,08
-    expect(formatPercent(r.margem_real)).toBe('7,7%');
+    expect(r.custos_totais_reais).toBe(1_627_217); // R$ 16.272,17
+    expect(r.lucro_real).toBe(454_108); // R$ 4.541,08
+    expect(formatPercent(r.margem_real)).toBe('21,8%');
   });
 
-  it('3. o toggle escolhe QUAL valor desconta, não SE desconta', () => {
-    const real = calcularPnl([dia], [], periodo, { usarPerdaReal: true });
-    const cheio = calcularPnl([dia], [], periodo, { usarPerdaReal: false });
-    // Sem pedidos do BlueSales os dois caem no valor cheio do fixture.
-    expect(real.desconto_frustrados).toBe(294_000);
-    expect(cheio.desconto_frustrados).toBe(294_000);
-    expect(real.usar_perda_real).toBe(true);
-    expect(cheio.usar_perda_real).toBe(false);
+  it('3. modo "cheio" desconta o valor dos frustrados: lucro 3.101,08', () => {
+    const r = calcularPnl([dia], [], periodo, { descontarFrustrados: 'cheio' });
+    expect(r.desconto_frustrados).toBe(294_000); // R$ 2.940,00
+    expect(r.lucro_real).toBe(310_108); // R$ 3.101,08
+    // e o comparativo "com frustrados" existe mesmo no modo padrão:
+    expect(calcularPnl([dia], [], periodo).lucro_real_com_frustrados).toBe(310_108);
   });
 
   it('4. valor pendente 27.336,75 · conversão 42,9%', () => {
@@ -109,9 +104,9 @@ describe('indicadores derivados', () => {
     expect(r.roas).toBeCloseTo(2.04, 2);
   });
 
-  it('diferença vs Afterpay = custos variáveis + frustrados (sinal negativo)', () => {
+  it('diferença vs Afterpay = custos variáveis (sinal negativo)', () => {
     const r = calcularPnl([dia], [custoUnico(1500)], periodo);
-    expect(r.diferenca_afterpay).toBe(-444_000); // −(1.500,00 + 2.940,00)
+    expect(r.diferenca_afterpay).toBe(-150_000); // − R$ 1.500,00
   });
 });
 

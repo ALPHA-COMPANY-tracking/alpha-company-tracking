@@ -74,14 +74,17 @@ export interface PontoDiario {
   lucro: Cents;
 }
 
+/** O que os pedidos frustrados descontam do Lucro Real. */
+export type DescontoFrustrados = 'nenhum' | 'real' | 'cheio';
+
 export interface PnlOptions {
   /**
-   * Como descontar os frustrados do lucro. O desconto sempre acontece;
-   * o que muda é o valor:
-   *   true  (padrão) → perda real (produto + frete): o que saiu do caixa
-   *   false           → valor cheio dos pedidos: a receita que não entrou
+   * O que descontar do lucro pelos pedidos frustrados:
+   *   'nenhum' (padrão) → nada; espelha o BlueSales, que só informa a perda
+   *   'real'            → produto + frete: o que de fato saiu do caixa
+   *   'cheio'           → valor dos pedidos: a receita que não entrou
    */
-  usarPerdaReal?: boolean;
+  descontarFrustrados?: DescontoFrustrados;
 }
 
 /** Resultado do P&L de um período. Dinheiro em CENTAVOS; razões em 0..1. */
@@ -113,9 +116,9 @@ export interface PnlResult {
   qtd_frustrados: number;
   /** Perda de caixa nos frustrados: produto + frete (ou ajuste manual). */
   perda_real_frustrados: Cents;
-  /** true = o lucro está descontando a perda real; false = o valor cheio. */
-  usar_perda_real: boolean;
-  /** Quanto os frustrados tiraram do lucro neste modo. */
+  /** Modo escolhido para os frustrados. */
+  modo_frustrados: DescontoFrustrados;
+  /** Quanto os frustrados tiraram do lucro neste modo (0 em 'nenhum'). */
   desconto_frustrados: Cents;
 
   // Resultado real
@@ -247,11 +250,12 @@ export function calcularPnl(
     .map(([categoria_id, v]) => ({ categoria_id, total: v.total, qtd: v.qtd }))
     .sort((a, b) => b.total - a.total);
 
-  // Os frustrados sempre descontam; o toggle escolhe o valor: a perda real
-  // (produto + frete, o que saiu do caixa) ou o valor cheio dos pedidos.
-  const usar_perda_real = opts.usarPerdaReal ?? true;
+  // Padrão 'nenhum': espelha o BlueSales, que mostra a perda mas não a
+  // desconta do lucro. Os outros modos descontam a perda real ou o valor cheio.
+  const modo_frustrados = opts.descontarFrustrados ?? 'nenhum';
   const custosBase = custos_afterpay + custos_variaveis_total;
-  const desconto_frustrados = usar_perda_real ? perda_real_frustrados : valor_frustrado;
+  const desconto_frustrados =
+    modo_frustrados === 'real' ? perda_real_frustrados : modo_frustrados === 'cheio' ? valor_frustrado : 0;
   const custos_totais_reais = custosBase + desconto_frustrados;
   const lucro_real = receita_aprovada - custos_totais_reais;
   const margem_real = safeDiv(lucro_real, receita_aprovada);
@@ -286,7 +290,7 @@ export function calcularPnl(
     valor_frustrado,
     qtd_frustrados,
     perda_real_frustrados,
-    usar_perda_real,
+    modo_frustrados,
     desconto_frustrados,
     custos_totais_reais,
     lucro_real,

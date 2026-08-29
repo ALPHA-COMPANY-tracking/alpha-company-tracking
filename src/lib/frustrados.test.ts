@@ -66,28 +66,33 @@ describe('frustrados no P&L', () => {
     expect(agg.perda_real_frustrados).toBe(232); // 2 x (83 + 33) — caixa
   });
 
-  it('o toggle escolhe qual valor desconta do lucro', () => {
-    const real = calcularPnl([], [], periodo, { usarPerdaReal: true }, pedidos);
-    const cheio = calcularPnl([], [], periodo, { usarPerdaReal: false }, pedidos);
+  it('os três modos descontam valores diferentes', () => {
+    const nenhum = calcularPnl([], [], periodo, { descontarFrustrados: 'nenhum' }, pedidos);
+    const real = calcularPnl([], [], periodo, { descontarFrustrados: 'real' }, pedidos);
+    const cheio = calcularPnl([], [], periodo, { descontarFrustrados: 'cheio' }, pedidos);
 
     expect(real.valor_frustrado).toBe(147_000); // R$ 1.470,00 (receita não realizada)
     expect(real.perda_real_frustrados).toBe(23_200); // R$ 232,00 (caixa)
 
-    // Ligado desconta a perda real; desligado, o valor cheio dos pedidos.
+    expect(nenhum.desconto_frustrados).toBe(0);
     expect(real.desconto_frustrados).toBe(23_200);
     expect(cheio.desconto_frustrados).toBe(147_000);
-    expect(real.lucro_real - cheio.lucro_real).toBe(147_000 - 23_200);
+
+    // O lucro cai exatamente o que cada modo desconta.
+    expect(nenhum.lucro_real - real.lucro_real).toBe(23_200);
+    expect(nenhum.lucro_real - cheio.lucro_real).toBe(147_000);
   });
 
-  it('o padrão é descontar a perda real', () => {
+  it('o padrão é não descontar — espelha o BlueSales', () => {
     const padrao = calcularPnl([], [], periodo, {}, pedidos);
-    expect(padrao.usar_perda_real).toBe(true);
-    expect(padrao.desconto_frustrados).toBe(23_200);
+    expect(padrao.modo_frustrados).toBe('nenhum');
+    expect(padrao.desconto_frustrados).toBe(0);
+    expect(padrao.lucro_real).toBe(padrao.lucro_afterpay); // sem custos variáveis
   });
 
   it('respeita o ajuste manual no total do período', () => {
     const ajustados = [pedidos[0], frustrado('f1', 735, '6 POTE', 33), frustrado('f2', 735, '6 POTE')];
-    const pnl = calcularPnl([], [], periodo, { usarPerdaReal: true }, ajustados);
+    const pnl = calcularPnl([], [], periodo, { descontarFrustrados: 'real' }, ajustados);
     expect(pnl.perda_real_frustrados).toBe(14_900); // 33 + 116 = R$ 149,00
   });
 });

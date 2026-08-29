@@ -14,7 +14,7 @@ import {
 import type { CategoriaCusto, CustoVariavel, Periodo } from '@/types';
 import type { Cents } from '@/lib/money';
 import { formatBRL, formatBRLSigned, formatPercent, safeDiv } from '@/lib/money';
-import { type PnlResult, custoNoPeriodo } from '@/lib/pnl';
+import { type DescontoFrustrados, type PnlResult, custoNoPeriodo } from '@/lib/pnl';
 
 function Sec({ children, hl = false }: { children: React.ReactNode; hl?: boolean }) {
   return (
@@ -102,16 +102,16 @@ export function Demonstrativo({
   categorias,
   custos,
   periodo,
-  usarPerdaReal,
-  onTogglePerdaReal,
+  modoFrustrados,
+  onModoFrustrados,
   onAddCusto,
 }: {
   pnl: PnlResult;
   categorias: CategoriaCusto[];
   custos: CustoVariavel[];
   periodo: Periodo;
-  usarPerdaReal: boolean;
-  onTogglePerdaReal: (v: boolean) => void;
+  modoFrustrados: DescontoFrustrados;
+  onModoFrustrados: (v: DescontoFrustrados) => void;
   onAddCusto: () => void;
 }) {
   const [aberta, setAberta] = useState<Set<string | null>>(new Set());
@@ -262,64 +262,73 @@ export function Demonstrativo({
         {/* Valor cheio dos pedidos — desconta quando o botão está DESLIGADO */}
         <div
           className={`px-4 py-[13px] flex items-center justify-between gap-3 border-b border-yel/15 ${
-            !usarPerdaReal ? 'bg-red/[0.07]' : ''
+            modoFrustrados === 'cheio' ? 'bg-red/[0.07]' : ''
           }`}
         >
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <TriangleAlert size={15} className={usarPerdaReal ? 'text-yel shrink-0' : 'text-red shrink-0'} />
-              <span className={`text-[13.5px] ${usarPerdaReal ? 'text-[#dcdce6]' : 'font-semibold text-tx'}`}>
+              <TriangleAlert size={15} className={modoFrustrados === 'cheio' ? 'text-red shrink-0' : 'text-yel shrink-0'} />
+              <span className={`text-[13.5px] ${modoFrustrados === 'cheio' ? 'font-semibold text-tx' : 'text-[#dcdce6]'}`}>
                 Valor perdido
               </span>
               <span className="text-[9.5px] text-dim2 border border-line2 rounded-full px-[7px] py-[1.5px] shrink-0">
                 {pnl.qtd_frustrados} pedidos
               </span>
-              {!usarPerdaReal && <Chip>descontando</Chip>}
+              {modoFrustrados === 'cheio' && <Chip>descontando</Chip>}
             </div>
             <div className="text-[11px] text-dim2 mt-[3px] ml-[23px]">receita que não entrou</div>
           </div>
-          <span className={`mono shrink-0 ${!usarPerdaReal ? 'text-[15px] font-extrabold text-red' : 'text-[14px] font-bold text-dim'}`}>
-            {!usarPerdaReal ? formatBRLSigned(pnl.valor_frustrado, 'custo') : formatBRL(pnl.valor_frustrado)}
+          <span className={`mono shrink-0 ${modoFrustrados === 'cheio' ? 'text-[15px] font-extrabold text-red' : 'text-[14px] font-bold text-dim'}`}>
+            {modoFrustrados === 'cheio' ? formatBRLSigned(pnl.valor_frustrado, 'custo') : formatBRL(pnl.valor_frustrado)}
           </span>
         </div>
 
         {/* Perda de caixa — desconta quando o botão está LIGADO */}
-        <div className={`px-4 py-[13px] flex items-center justify-between gap-3 ${usarPerdaReal ? 'bg-red/[0.07]' : ''}`}>
+        <div className={`px-4 py-[13px] flex items-center justify-between gap-3 ${modoFrustrados === 'real' ? 'bg-red/[0.07]' : ''}`}>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <TriangleAlert size={15} className={usarPerdaReal ? 'text-red shrink-0' : 'text-yel shrink-0'} />
-              <span className={`text-[13.5px] ${usarPerdaReal ? 'font-semibold text-tx' : 'text-[#dcdce6]'}`}>
+              <TriangleAlert size={15} className={modoFrustrados === 'real' ? 'text-red shrink-0' : 'text-yel shrink-0'} />
+              <span className={`text-[13.5px] ${modoFrustrados === 'real' ? 'font-semibold text-tx' : 'text-[#dcdce6]'}`}>
                 Valor real perdido
               </span>
-              {usarPerdaReal && <Chip>descontando</Chip>}
+              {modoFrustrados === 'real' && <Chip>descontando</Chip>}
             </div>
             <div className="text-[11px] text-dim2 mt-[3px] ml-[23px]">custo do produto + frete</div>
           </div>
-          <span className={`mono shrink-0 ${usarPerdaReal ? 'text-[15px] font-extrabold text-red' : 'text-[14px] font-bold text-dim'}`}>
-            {usarPerdaReal ? formatBRLSigned(pnl.perda_real_frustrados, 'custo') : formatBRL(pnl.perda_real_frustrados)}
+          <span className={`mono shrink-0 ${modoFrustrados === 'real' ? 'text-[15px] font-extrabold text-red' : 'text-[14px] font-bold text-dim'}`}>
+            {modoFrustrados === 'real' ? formatBRLSigned(pnl.perda_real_frustrados, 'custo') : formatBRL(pnl.perda_real_frustrados)}
           </span>
         </div>
 
-        {/* Escolha de qual das duas perdas desconta do Lucro Real */}
-        <label className="flex items-center gap-3 px-4 py-[12px] border-t border-yel/15 bg-[#17171e] cursor-pointer select-none">
-          <input
-            type="checkbox"
-            className="peer sr-only"
-            checked={usarPerdaReal}
-            onChange={(e) => onTogglePerdaReal(e.target.checked)}
-          />
-          <span className="w-[34px] h-[19px] rounded-full bg-[#2f2f3b] relative transition-colors peer-checked:bg-red/70 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:w-[13px] after:h-[13px] after:rounded-full after:bg-[#75758a] after:transition-all peer-checked:after:left-[18px] peer-checked:after:bg-white shrink-0" />
-          <span className="min-w-0">
-            <span className="block text-[12.5px] font-semibold text-tx">
-              {usarPerdaReal ? 'Descontando o valor real perdido' : 'Descontando o valor perdido total'}
-            </span>
-            <span className="block text-[11px] text-dim2 mt-[2px]">
-              {usarPerdaReal
-                ? 'desligue para descontar o valor cheio dos pedidos'
-                : 'ligue para descontar só o que saiu do caixa'}
-            </span>
-          </span>
-        </label>
+        {/* O que os frustrados descontam do Lucro Real */}
+        <div className="px-4 py-[12px] border-t border-yel/15 bg-[#17171e]">
+          <div className="text-[11px] text-dim2 mb-[8px]">Descontar do Lucro Real:</div>
+          <div className="flex flex-wrap gap-[6px]">
+            {(
+              [
+                { id: 'nenhum', label: 'Nada', hint: 'igual ao BlueSales' },
+                { id: 'real', label: 'Valor real perdido', hint: 'produto + frete' },
+                { id: 'cheio', label: 'Valor perdido total', hint: 'valor dos pedidos' },
+              ] as const
+            ).map((op) => {
+              const ativo = modoFrustrados === op.id;
+              return (
+                <button
+                  key={op.id}
+                  onClick={() => onModoFrustrados(op.id)}
+                  className={`text-left px-3 py-[7px] rounded-[9px] border text-[12px] font-semibold transition-colors ${
+                    ativo
+                      ? 'border-red/50 bg-red/15 text-tx'
+                      : 'border-line2 text-dim hover:text-tx hover:border-line2'
+                  }`}
+                >
+                  {op.label}
+                  <span className="block text-[10px] font-medium text-dim2 mt-[1px]">{op.hint}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* PARA ONDE FOI CADA REAL */}
@@ -354,7 +363,9 @@ export function Demonstrativo({
             {lucroPositivo ? 'LUCRO REAL' : 'PREJUÍZO REAL'}
           </span>
           <span className="block font-medium text-[11px] text-dim2 tracking-normal mt-[6px] max-w-[220px] leading-relaxed">
-            receita − custos Afterpay − custos variáveis − {usarPerdaReal ? 'perda real' : 'valor'} dos frustrados
+            receita − custos Afterpay − custos variáveis
+            {modoFrustrados === 'real' && ' − perda real dos frustrados'}
+            {modoFrustrados === 'cheio' && ' − valor dos frustrados'}
           </span>
         </div>
         <div className="text-right">
