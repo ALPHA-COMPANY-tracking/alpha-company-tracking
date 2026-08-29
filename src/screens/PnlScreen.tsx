@@ -12,13 +12,15 @@ import {
   Wallet,
 } from 'lucide-react';
 import type { Periodo } from '@/types';
-import { formatBRL, formatMultiplier, formatPercent } from '@/lib/money';
+import { formatBRL, formatBRLCompact, formatMultiplier, formatPercent, reaisToCents } from '@/lib/money';
+import { formatDiaMes } from '@/lib/dates';
 import { calcularPnl } from '@/lib/pnl';
+import { agregarPedidos } from '@/lib/pedidos';
 import { useData } from '@/store/DataProvider';
 import { KpiCard, Panel } from '@/components/ui';
 import { Demonstrativo } from '@/components/pnl/Demonstrativo';
 import { GapBlock } from '@/components/pnl/GapBlock';
-import { EvolucaoChart } from '@/components/pnl/EvolucaoChart';
+import { BarsVertical } from '@/components/viz/BarsVertical';
 
 export function PnlScreen({
   periodo,
@@ -39,6 +41,23 @@ export function PnlScreen({
 
   const vazio = pnl.receita_aprovada === 0 && pnl.custos_totais_reais === 0;
   const lucroPositivo = pnl.lucro_real >= 0;
+
+  // Desempenho por vendedor no período (fonte: pedidos do BlueSales).
+  const agg = useMemo(() => agregarPedidos(pedidos, periodo), [pedidos, periodo]);
+  const barrasAgendado = useMemo(
+    () =>
+      [...agg.porAtendente]
+        .sort((a, b) => b.valor_agendado - a.valor_agendado)
+        .map((a) => ({ label: a.nome, value: a.valor_agendado, display: formatBRLCompact(reaisToCents(a.valor_agendado)) })),
+    [agg],
+  );
+  const barrasPedidos = useMemo(
+    () =>
+      [...agg.porAtendente]
+        .sort((a, b) => b.pedidos - a.pedidos)
+        .map((a) => ({ label: a.nome, value: a.pedidos, display: String(a.pedidos) })),
+    [agg],
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -145,14 +164,21 @@ export function PnlScreen({
 
           <GapBlock pnl={pnl} />
 
-          <Panel title="Evolução no período" hint="valores diários">
-            <div className="p-3">
-              <EvolucaoChart dailies={dailies} custos={custos} periodo={periodo} opts={{ considerarFrustrados: frustrados }} />
-              <div className="flex gap-[18px] px-3 pt-1 pb-2 text-[11.5px] text-dim">
-                <span className="flex items-center gap-2"><i className="w-[9px] h-[9px] rounded-sm bg-grn inline-block" />Receita aprovada</span>
-                <span className="flex items-center gap-2"><i className="w-[9px] h-[9px] rounded-sm bg-pur inline-block" />Lucro real</span>
-              </div>
-            </div>
+          {/* Desempenho dos vendedores no período */}
+          <Panel title="Faturamento Agendado por Vendedor" hint={`${formatDiaMes(periodo.inicio)} a ${formatDiaMes(periodo.fim)} · R$`}>
+            {barrasAgendado.length > 0 ? (
+              <BarsVertical data={barrasAgendado} gradId="pnl-vend-valor" altura={280} />
+            ) : (
+              <div className="p-10 text-center text-[13px] text-dim2">Nenhum agendamento no período.</div>
+            )}
+          </Panel>
+
+          <Panel title="Agendamentos por Vendedor" hint="quantidade de pedidos">
+            {barrasPedidos.length > 0 ? (
+              <BarsVertical data={barrasPedidos} gradId="pnl-vend-qtd" />
+            ) : (
+              <div className="p-10 text-center text-[13px] text-dim2">Nenhum agendamento no período.</div>
+            )}
           </Panel>
         </>
       )}

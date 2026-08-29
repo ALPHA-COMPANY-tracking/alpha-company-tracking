@@ -32,7 +32,9 @@ export function BarsVertical({
           axisLine={false}
           interval={0}
         />
-        <Bar dataKey="value" fill={`url(#${gradId})`} radius={[5, 5, 0, 0]} isAnimationActive={false}>
+        {/* maxBarSize evita uma barra ocupando a largura toda quando há
+            poucos vendedores (hoje só o PETER). */}
+        <Bar dataKey="value" fill={`url(#${gradId})`} radius={[5, 5, 0, 0]} isAnimationActive={false} maxBarSize={110}>
           <LabelList
             dataKey="display"
             position="top"
