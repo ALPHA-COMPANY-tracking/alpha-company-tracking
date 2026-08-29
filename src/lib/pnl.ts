@@ -7,7 +7,7 @@
 import type { AfterpayDaily, CustoVariavel, IsoDate, Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
 import { agregarPedidos } from '@/lib/pedidos';
-import { COMISSAO_COBRANCA, COMISSAO_VENDEDOR, custosDePedidos } from '@/lib/custosConfig';
+import { COMISSAO_COBRANCA, comissaoDoVendedor, custosDePedidos } from '@/lib/custosConfig';
 import {
   diasDoPeriodo,
   diasInclusivos,
@@ -160,6 +160,31 @@ export function serieDiaria(
 }
 
 /** Calcula o P&L completo de um período. */
+/**
+ * Comissão dos vendedores: cada um com o seu percentual, sobre a própria
+ * receita menos a parcela proporcional das taxas de plataforma.
+ *
+ * Com todos no mesmo percentual o resultado é idêntico à conta antiga
+ * (`pct × (receita − taxas)`), então trocar para cá não mexe em nada de
+ * quem já estava no padrão:
+ *   Σ pct·(receita_v − taxas·receita_v/receita) = pct·(receita − taxas)
+ */
+function comissaoVendedores(
+  porAtendente: { nome: string; receita: number }[],
+  receitaTotal: Cents,
+  taxas: Cents,
+): Cents {
+  if (receitaTotal <= 0) return 0;
+  let total = 0;
+  for (const a of porAtendente) {
+    const receitaV = reaisToCents(a.receita);
+    if (receitaV <= 0) continue;
+    const taxasV = Math.round(taxas * (receitaV / receitaTotal));
+    total += Math.round((receitaV - taxasV) * comissaoDoVendedor(a.nome));
+  }
+  return total;
+}
+
 export function calcularPnl(
   dailies: AfterpayDaily[],
   custos: CustoVariavel[],
@@ -215,7 +240,7 @@ export function calcularPnl(
     // A taxa de plataforma NÃO é derivável dos pedidos (dias com pagamentos
     // idênticos têm taxas diferentes no BlueSales). Usamos o valor real
     // lançado em afterpay_daily.taxas_plataforma — já somado acima.
-    comissoes_vendedor = Math.round((receita_aprovada - taxas_plataforma) * COMISSAO_VENDEDOR);
+    comissoes_vendedor = comissaoVendedores(agg.porAtendente, receita_aprovada, taxas_plataforma);
     comissoes_cobranca = Math.round(receita_aprovada * COMISSAO_COBRANCA);
   }
 

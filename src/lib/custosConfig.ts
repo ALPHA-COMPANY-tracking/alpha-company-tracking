@@ -27,9 +27,27 @@ export const FRETE_POR_PEDIDO = 33.0;
  * com o valor real do BlueSales.
  */
 
-/** Comissões: vendedor 5% da (receita − taxas); cobrança 1% da receita. */
-export const COMISSAO_VENDEDOR = 0.05;
+/** Comissões: vendedor % da (receita − taxas); cobrança 1% da receita. */
+export const COMISSAO_VENDEDOR = 0.05; // padrão de quem não está na lista
 export const COMISSAO_COBRANCA = 0.01;
+
+/**
+ * Percentual por vendedor, quando difere do padrão. A chave é o nome como
+ * o BlueSales manda, normalizado (maiúsculas, sem acento).
+ */
+export const COMISSAO_POR_VENDEDOR: Record<string, number> = {
+  MATHEUS: 0.06, // entrou em 31/08/2026 com 1 ponto a mais
+};
+
+/** Percentual de comissão do vendedor (cai no padrão se não estiver na lista). */
+export function comissaoDoVendedor(nome?: string | null): number {
+  const chave = (nome ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim()
+    .toUpperCase();
+  return COMISSAO_POR_VENDEDOR[chave] ?? COMISSAO_VENDEDOR;
+}
 
 /** Retorna o custo do produto (reais) a partir do texto do plano. */
 export function custoProdutoDoPlano(plano?: string | null): number {

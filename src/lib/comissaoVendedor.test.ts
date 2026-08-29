@@ -1,0 +1,82 @@
+// Comissão por vendedor.
+//
+// PETER: 5% (padrão) · MATHEUS: 6% (entrou em 31/08/2026).
+// A conta é feita por vendedor, sobre a receita dele menos a parcela
+// proporcional das taxas de plataforma. Com todos no mesmo percentual o
+// total é idêntico à conta antiga — o que garante que nada muda para o
+// PETER.
+import { describe, expect, it } from 'vitest';
+import type { Pedido, Periodo } from '@/types';
+import { calcularPnl } from '@/lib/pnl';
+import { comissaoDoVendedor } from '@/lib/custosConfig';
+
+const periodo: Periodo = { inicio: '2026-08-01', fim: '2026-08-31' };
+
+function daily(data: string, taxas: number) {
+  return {
+    data,
+    receita_aprovada: 0, qtd_pagamentos: 0, taxas_plataforma: taxas, custo_produtos: 0,
+    frete: 0, comissoes_vendedor: 0, comissoes_cobranca: 0, investimento_ads: 0,
+    taxas_investimento: 0, valor_frustrado: 0, qtd_frustrados: 0, valor_agendado: 0,
+    qtd_agendados: 0,
+  };
+}
+
+function pago(id: string, valor: number, vendedor: string, dia = '2026-08-10'): Pedido {
+  return {
+    id,
+    status: 'pagos',
+    data: dia,
+    data_aprovacao: dia,
+    valor,
+    valor_bruto: valor,
+    valor_agendado: valor,
+    produto_plano: 'DERMAX PREMIUM - 6 POTE',
+    vendedor,
+    metodo_pagamento: 'pix',
+  };
+}
+
+describe('comissaoDoVendedor', () => {
+  it('MATHEUS 6%, PETER 5%, desconhecido cai no padrão', () => {
+    expect(comissaoDoVendedor('MATHEUS')).toBe(0.06);
+    expect(comissaoDoVendedor('Matheus')).toBe(0.06); // nome como vier do BlueSales
+    expect(comissaoDoVendedor('PETER')).toBe(0.05);
+    expect(comissaoDoVendedor('Fulano')).toBe(0.05);
+    expect(comissaoDoVendedor(null)).toBe(0.05);
+  });
+});
+
+describe('comissão no P&L', () => {
+  it('NÃO muda nada para o PETER: agosto/2026 segue em R$ 1.266,66', () => {
+    // Números reais do mês: receita R$ 25.358,25 e taxas R$ 25,00.
+    // 5% × (25.358,25 − 25,00) = R$ 1.266,66 — igual ao BlueSales.
+    const pedidos = [pago('p1', 25_358.25, 'PETER')];
+    const pnl = calcularPnl([daily('2026-08-10', 25)], [], periodo, {}, pedidos);
+    expect(pnl.receita_aprovada).toBe(2_535_825);
+    expect(pnl.taxas_plataforma).toBe(2_500);
+    expect(pnl.comissoes_vendedor).toBe(126_666); // R$ 1.266,66
+  });
+
+  it('cada vendedor com seu percentual', () => {
+    // PETER 1.000 (5%) e MATHEUS 1.000 (6%), sem taxas.
+    const pedidos = [pago('p1', 1000, 'PETER'), pago('m1', 1000, 'MATHEUS')];
+    const pnl = calcularPnl([], [], periodo, {}, pedidos);
+    expect(pnl.comissoes_vendedor).toBe(5_000 + 6_000); // R$ 50 + R$ 60
+  });
+
+  it('as taxas são rateadas na proporção da receita de cada um', () => {
+    // Receita 2.000 (metade de cada) e taxas de R$ 10 → R$ 5 para cada.
+    const pedidos = [pago('p1', 1000, 'PETER'), pago('m1', 1000, 'MATHEUS')];
+    const pnl = calcularPnl([daily('2026-08-10', 10)], [], periodo, {}, pedidos);
+    // PETER: 5% × (1000 − 5) = 49,75 · MATHEUS: 6% × (1000 − 5) = 59,70
+    expect(pnl.comissoes_vendedor).toBe(4_975 + 5_970);
+  });
+
+  it('com todos no padrão, o total é o mesmo da fórmula única', () => {
+    const pedidos = [pago('a', 700, 'PETER'), pago('b', 300, 'ANA')];
+    const pnl = calcularPnl([daily('2026-08-10', 20)], [], periodo, {}, pedidos);
+    // 5% × (1000 − 20) = R$ 49,00
+    expect(pnl.comissoes_vendedor).toBe(4_900);
+  });
+});
