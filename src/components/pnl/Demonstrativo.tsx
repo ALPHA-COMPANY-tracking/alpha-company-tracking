@@ -133,6 +133,19 @@ export function Demonstrativo({
     });
   }
 
+  // Lucro que cada opção de desconto produz — mostrado dentro dos botões
+  // para dar para comparar sem precisar clicar em cada uma.
+  const lucroSemFrustrados = pnl.lucro_real + pnl.desconto_frustrados;
+  const opcoesFrustrados: { id: DescontoFrustrados; label: string; hint: string; lucro: Cents }[] = [
+    { id: 'nenhum', label: 'Nada', hint: 'igual ao BlueSales', lucro: lucroSemFrustrados },
+    {
+      id: 'real',
+      label: 'Valor real perdido',
+      hint: 'produto + frete',
+      lucro: lucroSemFrustrados - pnl.perda_real_frustrados,
+    },
+  ];
+
   // Segmentos da barra "para onde foi cada real"
   const composicao = [
     { label: 'Custos Afterpay', total: pnl.custos_afterpay, cor: '#fb7185' },
@@ -340,24 +353,23 @@ export function Demonstrativo({
         <div className="px-4 py-[12px] border-t border-yel/15 bg-[#17171e]">
           <div className="text-[11px] text-dim2 mb-[8px]">Descontar do Lucro Real:</div>
           <div className="flex flex-wrap gap-[6px]">
-            {(
-              [
-                { id: 'nenhum', label: 'Nada', hint: 'igual ao BlueSales' },
-                { id: 'real', label: 'Valor real perdido', hint: 'produto + frete' },
-              ] as const
-            ).map((op) => {
+            {opcoesFrustrados.map((op) => {
               const ativo = modoFrustrados === op.id;
               return (
                 <button
                   key={op.id}
                   onClick={() => onModoFrustrados(op.id)}
-                  className={`text-left px-3 py-[7px] rounded-[9px] border text-[12px] font-semibold transition-colors ${
+                  className={`text-left px-3 py-[8px] rounded-[9px] border text-[12px] font-semibold transition-colors ${
                     ativo
                       ? 'border-red/50 bg-red/15 text-tx'
                       : 'border-line2 text-dim hover:text-tx hover:border-line2'
                   }`}
                 >
                   {op.label}
+                  {/* O lucro que cada opção produz, para comparar sem clicar */}
+                  <span className={`block mono text-[13px] font-extrabold mt-[3px] ${op.lucro >= 0 ? 'text-grn' : 'text-red'}`}>
+                    {formatBRL(op.lucro)}
+                  </span>
                   <span className="block text-[10px] font-medium text-dim2 mt-[1px]">{op.hint}</span>
                 </button>
               );
