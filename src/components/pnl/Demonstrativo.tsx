@@ -36,6 +36,7 @@ function LinhaCusto({
   cents,
   receita,
   zero = false,
+  detalhe,
 }: {
   Icon: LucideIcon;
   label: string;
@@ -43,6 +44,8 @@ function LinhaCusto({
   cents: Cents;
   receita: Cents;
   zero?: boolean;
+  /** Bloco opcional abaixo da linha (ex.: quebra por vendedor). */
+  detalhe?: React.ReactNode;
 }) {
   const pct = safeDiv(cents, receita);
   const barW = cents > 0 ? Math.max(1.5, Math.min(100, pct * 100)) : 0;
@@ -68,6 +71,7 @@ function LinhaCusto({
       <div className="mt-[9px] ml-[41px] h-[3px] rounded-full bg-[#22222b] overflow-hidden">
         <div className="h-full rounded-full bg-gradient-to-r from-red/40 to-red" style={{ width: `${barW}%` }} />
       </div>
+      {detalhe && <div className="ml-[41px] mt-[10px]">{detalhe}</div>}
     </div>
   );
 }
@@ -164,7 +168,30 @@ export function Demonstrativo({
       <Sec>Custos operacionais</Sec>
       <LinhaCusto Icon={ShoppingCart} label="Custo dos Produtos" cents={pnl.custo_produtos} receita={receita} />
       <LinhaCusto Icon={Truck} label="Frete" cents={pnl.frete} receita={receita} />
-      <LinhaCusto Icon={Users} label="Comissões Vendedor" cents={pnl.comissoes_vendedor} receita={receita} />
+      <LinhaCusto
+        Icon={Users}
+        label="Comissões Vendedor"
+        cents={pnl.comissoes_vendedor}
+        receita={receita}
+        detalhe={
+          pnl.comissoes_por_vendedor.length > 0 && (
+            <div className="flex flex-col gap-[5px]">
+              {pnl.comissoes_por_vendedor.map((v) => (
+                <div key={v.nome} className="flex items-center justify-between gap-3 text-[11.5px]">
+                  <span className="flex items-center gap-[7px] min-w-0">
+                    <span className="text-[#c8c8d6] truncate">{v.nome}</span>
+                    <span className="mono text-[10px] font-bold text-blu border border-blu/30 bg-blu/10 rounded-full px-[6px] py-[1px] shrink-0">
+                      {formatPercent(v.pct)}
+                    </span>
+                    <span className="text-dim2 shrink-0">de {formatBRL(v.receita)}</span>
+                  </span>
+                  <span className="mono text-dim shrink-0">{formatBRL(v.comissao)}</span>
+                </div>
+              ))}
+            </div>
+          )
+        }
+      />
       <LinhaCusto Icon={Users} label="Comissões Cobrança" cents={pnl.comissoes_cobranca} receita={receita} />
 
       <Sec>Marketing</Sec>

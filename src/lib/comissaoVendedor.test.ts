@@ -73,6 +73,31 @@ describe('comissão no P&L', () => {
     expect(pnl.comissoes_vendedor).toBe(4_975 + 5_970);
   });
 
+  it('a quebra por vendedor soma o total e traz nome, % e valor', () => {
+    const pedidos = [pago('p1', 1000, 'PETER'), pago('m1', 500, 'MATHEUS')];
+    const pnl = calcularPnl([], [], periodo, {}, pedidos);
+
+    const peter = pnl.comissoes_por_vendedor.find((v) => v.nome === 'PETER')!;
+    const matheus = pnl.comissoes_por_vendedor.find((v) => v.nome === 'MATHEUS')!;
+    expect(peter.pct).toBe(0.05);
+    expect(peter.receita).toBe(100_000);
+    expect(peter.comissao).toBe(5_000); // R$ 50,00
+    expect(matheus.pct).toBe(0.06);
+    expect(matheus.comissao).toBe(3_000); // 6% de R$ 500 = R$ 30,00
+
+    const soma = pnl.comissoes_por_vendedor.reduce((s, v) => s + v.comissao, 0);
+    expect(soma).toBe(pnl.comissoes_vendedor);
+  });
+
+  it('vendedor configurado aparece com o % mesmo sem venda no período', () => {
+    // MATHEUS começa 31/08: antes disso precisa aparecer zerado, com os 6%.
+    const pnl = calcularPnl([], [], periodo, {}, [pago('p1', 1000, 'PETER')]);
+    const matheus = pnl.comissoes_por_vendedor.find((v) => v.nome === 'MATHEUS')!;
+    expect(matheus.pct).toBe(0.06);
+    expect(matheus.receita).toBe(0);
+    expect(matheus.comissao).toBe(0);
+  });
+
   it('com todos no padrão, o total é o mesmo da fórmula única', () => {
     const pedidos = [pago('a', 700, 'PETER'), pago('b', 300, 'ANA')];
     const pnl = calcularPnl([daily('2026-08-10', 20)], [], periodo, {}, pedidos);

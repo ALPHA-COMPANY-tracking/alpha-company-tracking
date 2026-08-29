@@ -7,7 +7,7 @@
 import type { AfterpayDaily, CustoVariavel, IsoDate, Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
 import { agregarPedidos } from '@/lib/pedidos';
-import { COMISSAO_COBRANCA, comissaoDoVendedor, custosDePedidos } from '@/lib/custosConfig';
+import { COMISSAO_COBRANCA, COMISSAO_POR_VENDEDOR, comissaoDoVendedor, custosDePedidos } from '@/lib/custosConfig';
 import {
   diasDoPeriodo,
   diasInclusivos,
@@ -77,6 +77,16 @@ export interface PontoDiario {
 /** O que os pedidos frustrados descontam do Lucro Real. */
 export type DescontoFrustrados = 'nenhum' | 'real';
 
+/** Quanto cada vendedor gerou de comissão no período. */
+export interface ComissaoVendedor {
+  nome: string;
+  /** Percentual dele (0,05 = 5%). */
+  pct: number;
+  /** Receita aprovada atribuída a ele. */
+  receita: Cents;
+  comissao: Cents;
+}
+
 export interface PnlOptions {
   /**
    * O que descontar do lucro pelos pedidos frustrados:
@@ -97,6 +107,8 @@ export interface PnlResult {
   custo_produtos: Cents;
   frete: Cents;
   comissoes_vendedor: Cents;
+  /** Quebra da comissão por vendedor (vazio sem pedidos do BlueSales). */
+  comissoes_por_vendedor: ComissaoVendedor[];
   comissoes_cobranca: Cents;
   investimento_ads: Cents;
   taxas_investimento: Cents;
@@ -173,16 +185,26 @@ function comissaoVendedores(
   porAtendente: { nome: string; receita: number }[],
   receitaTotal: Cents,
   taxas: Cents,
-): Cents {
-  if (receitaTotal <= 0) return 0;
-  let total = 0;
+): ComissaoVendedor[] {
+  const receitaPorNome = new Map<string, Cents>();
   for (const a of porAtendente) {
-    const receitaV = reaisToCents(a.receita);
-    if (receitaV <= 0) continue;
-    const taxasV = Math.round(taxas * (receitaV / receitaTotal));
-    total += Math.round((receitaV - taxasV) * comissaoDoVendedor(a.nome));
+    const nome = a.nome.trim() || 'Sem atendente';
+    receitaPorNome.set(nome, (receitaPorNome.get(nome) ?? 0) + reaisToCents(a.receita));
   }
-  return total;
+  // Quem tem percentual configurado aparece mesmo sem venda no período,
+  // para a taxa combinada ficar sempre visível.
+  for (const nome of Object.keys(COMISSAO_POR_VENDEDOR)) {
+    if (!receitaPorNome.has(nome)) receitaPorNome.set(nome, 0);
+  }
+
+  return [...receitaPorNome.entries()]
+    .map(([nome, receita]) => {
+      const pct = comissaoDoVendedor(nome);
+      const taxasV = receitaTotal > 0 ? Math.round(taxas * (receita / receitaTotal)) : 0;
+      const comissao = receita > 0 ? Math.round((receita - taxasV) * pct) : 0;
+      return { nome, pct, receita, comissao };
+    })
+    .sort((a, b) => b.comissao - a.comissao || a.nome.localeCompare(b.nome));
 }
 
 export function calcularPnl(
@@ -227,6 +249,7 @@ export function calcularPnl(
   let custo_produtos = somaC((r) => r.custo_produtos);
   let frete = somaC((r) => r.frete);
   let comissoes_vendedor = somaC((r) => r.comissoes_vendedor);
+  let comissoes_por_vendedor: ComissaoVendedor[] = [];
   let comissoes_cobranca = somaC((r) => r.comissoes_cobranca);
   const investimento_ads = somaC((r) => r.investimento_ads);
   const taxas_investimento = somaC((r) => r.taxas_investimento);
@@ -240,7 +263,8 @@ export function calcularPnl(
     // A taxa de plataforma NÃO é derivável dos pedidos (dias com pagamentos
     // idênticos têm taxas diferentes no BlueSales). Usamos o valor real
     // lançado em afterpay_daily.taxas_plataforma — já somado acima.
-    comissoes_vendedor = comissaoVendedores(agg.porAtendente, receita_aprovada, taxas_plataforma);
+    comissoes_por_vendedor = comissaoVendedores(agg.porAtendente, receita_aprovada, taxas_plataforma);
+    comissoes_vendedor = comissoes_por_vendedor.reduce((s, c) => s + c.comissao, 0);
     comissoes_cobranca = Math.round(receita_aprovada * COMISSAO_COBRANCA);
   }
 
@@ -301,6 +325,7 @@ export function calcularPnl(
     custo_produtos,
     frete,
     comissoes_vendedor,
+    comissoes_por_vendedor,
     comissoes_cobranca,
     investimento_ads,
     taxas_investimento,
