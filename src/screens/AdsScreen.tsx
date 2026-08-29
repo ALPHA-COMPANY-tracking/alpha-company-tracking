@@ -33,34 +33,44 @@ export function AdsScreen(_props: { periodo: Periodo }) {
   const { dailies, lancarDaily } = useData();
   const [data, setData] = useState(hojeLocal());
   const [cents, setCents] = useState(0);
+  const [taxa, setTaxa] = useState(0);
   const [leads, setLeads] = useState(0);
   const [salvo, setSalvo] = useState(false);
+
+  /** Lançamento existente do dia — a base de qualquer gravação, para não
+   *  apagar campos que não estão neste formulário. */
+  const doDia = (d: string) => dailies.find((x) => x.data === d);
 
   // Ao escolher uma data que já tem lançamento, prefill (vira "Atualizar").
   function selecionarData(d: string) {
     setData(d);
     setSalvo(false);
-    const ex = dailies.find((x) => x.data === d);
+    const ex = doDia(d);
     setCents(ex ? reaisToCents(ex.investimento_ads) : 0);
+    setTaxa(ex ? reaisToCents(ex.taxas_plataforma) : 0);
     setLeads(ex?.leads ?? 0);
   }
 
   function salvar() {
     if (!data) return;
-    lancarDaily({ ...zeroDaily(data), investimento_ads: cents / 100, leads });
+    // Parte do que já existe: gravar do zero apagaria os outros campos do dia.
+    const base = doDia(data) ?? zeroDaily(data);
+    lancarDaily({ ...base, investimento_ads: cents / 100, taxas_plataforma: taxa / 100, leads });
     setSalvo(true);
     setTimeout(() => setSalvo(false), 2000);
   }
 
   function excluir(d: string) {
-    lancarDaily({ ...zeroDaily(d), investimento_ads: 0, leads: 0 });
+    // Zera só o que esta tela controla; a taxa do dia é preservada.
+    const base = doDia(d) ?? zeroDaily(d);
+    lancarDaily({ ...base, investimento_ads: 0, leads: 0 });
     if (d === data) { setCents(0); setLeads(0); }
   }
 
   const historico = useMemo(
     () =>
       dailies
-        .filter((d) => d.investimento_ads > 0 || (d.leads ?? 0) > 0)
+        .filter((d) => d.investimento_ads > 0 || (d.leads ?? 0) > 0 || d.taxas_plataforma > 0)
         .sort((a, b) => b.data.localeCompare(a.data)),
     [dailies],
   );
@@ -88,6 +98,13 @@ export function AdsScreen(_props: { periodo: Periodo }) {
             <label className="block w-[160px]">
               <span className="block text-[11px] text-dim2 font-medium mb-[6px]">Investimento (R$)</span>
               <MoneyInput cents={cents} onChange={(c) => { setCents(c); setSalvo(false); }} />
+            </label>
+
+            <label className="block w-[130px]">
+              <span className="block text-[11px] text-dim2 font-medium mb-[6px]" title="Taxa de plataforma cobrada pelo BlueSales neste dia">
+                Taxa BlueSales
+              </span>
+              <MoneyInput cents={taxa} onChange={(c) => { setTaxa(c); setSalvo(false); }} />
             </label>
 
             <label className="block w-[110px]">
@@ -127,6 +144,7 @@ export function AdsScreen(_props: { periodo: Periodo }) {
                 <th className="text-left font-semibold px-5 py-3">Data</th>
                 <th className="text-left font-semibold px-5 py-3">Origem</th>
                 <th className="text-right font-semibold px-5 py-3">Investimento</th>
+                <th className="text-right font-semibold px-5 py-3">Taxa</th>
                 <th className="text-right font-semibold px-5 py-3">Leads</th>
                 <th className="text-right font-semibold px-5 py-3">Ações</th>
               </tr>
@@ -134,7 +152,7 @@ export function AdsScreen(_props: { periodo: Periodo }) {
             <tbody>
               {historico.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-10 text-center text-dim2">Nenhuma métrica lançada ainda.</td>
+                  <td colSpan={6} className="px-5 py-10 text-center text-dim2">Nenhuma métrica lançada ainda.</td>
                 </tr>
               ) : (
                 historico.map((d) => (
@@ -142,6 +160,7 @@ export function AdsScreen(_props: { periodo: Periodo }) {
                     <td className="px-5 py-4 text-tx font-medium">{formatData(d.data)}</td>
                     <td className="px-5 py-4 text-dim">Geral</td>
                     <td className="px-5 py-4 text-right text-tx mono">{formatBRL(reaisToCents(d.investimento_ads))}</td>
+                    <td className="px-5 py-4 text-right text-dim mono">{formatBRL(reaisToCents(d.taxas_plataforma))}</td>
                     <td className="px-5 py-4 text-right text-tx mono">{d.leads ?? 0}</td>
                     <td className="px-5 py-4 text-right">
                       <button

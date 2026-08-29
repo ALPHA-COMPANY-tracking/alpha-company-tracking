@@ -80,6 +80,20 @@ describe('taxa de plataforma (lançada por dia)', () => {
     expect(pnl.lucro_real).toBe(89_880); // BlueSales: R$ 898,80 ✓
   });
 
+  it('reproduz o P&L do BlueSales de 28/08 (2 pagamentos, Ads R$ 803)', () => {
+    const periodo: Periodo = { inicio: '2026-08-28', fim: '2026-08-28' };
+    const pedidos = [
+      pago('a', 435, '2026-08-28', '3 POTE'),
+      pago('b', 735, '2026-08-28', '6 POTE'),
+    ];
+    const pnl = calcularPnl([daily('2026-08-28', 2.5, 803)], [], periodo, {}, pedidos);
+
+    expect(pnl.receita_aprovada).toBe(117_000); // R$ 1.170,00
+    expect(pnl.taxas_plataforma).toBe(250); // R$ 2,50
+    expect(pnl.comissoes_vendedor).toBe(5_838); // 5% × (1170 − 2,50) = R$ 58,38
+    expect(pnl.lucro_real).toBe(11_292); // BlueSales: R$ 112,92 ✓
+  });
+
   it('soma as taxas de vários dias do período', () => {
     const periodo: Periodo = { inicio: '2026-08-14', fim: '2026-08-15' };
     const pedidos = [
