@@ -14,6 +14,8 @@ describe('statusBucket', () => {
     expect(statusBucket('Pagos')).toBe('aprovado'); // case/acentos normalizados
     expect(statusBucket('frustrados')).toBe('frustrado');
     expect(statusBucket('Frustrados')).toBe('frustrado');
+    expect(statusBucket('frustrado')).toBe('frustrado'); // singular, por segurança
+    expect(statusBucket('pago')).toBe('aprovado');
     expect(statusBucket('devolvido')).toBe('pipeline'); // Devolvido != frustrado (aba separada)
     expect(statusBucket('cadastrados')).toBe('pipeline');
     expect(statusBucket('enviados')).toBe('pipeline');

@@ -18,10 +18,12 @@ function norm(s: string | null | undefined): string {
 }
 
 // Status que contam como APROVADO (dinheiro confirmado) — aba "Pagos".
-const APROVADO = new Set(['pagos']);
+// O singular entra por segurança: o backfill veio "Pagos" e o webhook manda
+// "pagos", mas não custa aceitar as duas formas.
+const APROVADO = new Set(['pagos', 'pago']);
 // Status que contam como FRUSTRADO (perda) — aba "Frustrados".
 // (Devolvido, Cobrados, Negociação, Enviados etc. ficam como pipeline.)
-const FRUSTRADO = new Set(['frustrados']);
+const FRUSTRADO = new Set(['frustrados', 'frustrado']);
 
 export function statusBucket(status: string | null | undefined): 'aprovado' | 'frustrado' | 'pipeline' {
   const s = norm(status);
