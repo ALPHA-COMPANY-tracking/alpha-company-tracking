@@ -259,28 +259,19 @@ export function Demonstrativo({
       {/* PERDAS — valor do pedido (informativo) e perda real (esta desconta) */}
       <Sec>Perdas · pedidos frustrados</Sec>
       <div className="mx-[18px] mb-3 rounded-[12px] border border-yel/25 bg-yel/[0.04] overflow-hidden">
-        {/* Valor cheio dos pedidos — desconta quando o botão está DESLIGADO */}
-        <div
-          className={`px-4 py-[13px] flex items-center justify-between gap-3 border-b border-yel/15 ${
-            modoFrustrados === 'cheio' ? 'bg-red/[0.07]' : ''
-          }`}
-        >
+        {/* Valor cheio dos pedidos — sempre informativo */}
+        <div className="px-4 py-[13px] flex items-center justify-between gap-3 border-b border-yel/15">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <TriangleAlert size={15} className={modoFrustrados === 'cheio' ? 'text-red shrink-0' : 'text-yel shrink-0'} />
-              <span className={`text-[13.5px] ${modoFrustrados === 'cheio' ? 'font-semibold text-tx' : 'text-[#dcdce6]'}`}>
-                Valor perdido
-              </span>
+              <TriangleAlert size={15} className="text-yel shrink-0" />
+              <span className="text-[13.5px] text-[#dcdce6]">Valor perdido</span>
               <span className="text-[9.5px] text-dim2 border border-line2 rounded-full px-[7px] py-[1.5px] shrink-0">
                 {pnl.qtd_frustrados} pedidos
               </span>
-              {modoFrustrados === 'cheio' && <Chip>descontando</Chip>}
             </div>
             <div className="text-[11px] text-dim2 mt-[3px] ml-[23px]">receita que não entrou</div>
           </div>
-          <span className={`mono shrink-0 ${modoFrustrados === 'cheio' ? 'text-[15px] font-extrabold text-red' : 'text-[14px] font-bold text-dim'}`}>
-            {modoFrustrados === 'cheio' ? formatBRLSigned(pnl.valor_frustrado, 'custo') : formatBRL(pnl.valor_frustrado)}
-          </span>
+          <span className="mono text-[14px] font-bold text-dim shrink-0">{formatBRL(pnl.valor_frustrado)}</span>
         </div>
 
         {/* Perda de caixa — desconta quando o botão está LIGADO */}
@@ -308,7 +299,6 @@ export function Demonstrativo({
               [
                 { id: 'nenhum', label: 'Nada', hint: 'igual ao BlueSales' },
                 { id: 'real', label: 'Valor real perdido', hint: 'produto + frete' },
-                { id: 'cheio', label: 'Valor perdido total', hint: 'valor dos pedidos' },
               ] as const
             ).map((op) => {
               const ativo = modoFrustrados === op.id;
@@ -365,7 +355,6 @@ export function Demonstrativo({
           <span className="block font-medium text-[11px] text-dim2 tracking-normal mt-[6px] max-w-[220px] leading-relaxed">
             receita − custos Afterpay − custos variáveis
             {modoFrustrados === 'real' && ' − perda real dos frustrados'}
-            {modoFrustrados === 'cheio' && ' − valor dos frustrados'}
           </span>
         </div>
         <div className="text-right">

@@ -56,9 +56,11 @@ describe('calcularPnl — critérios de aceite', () => {
     expect(formatPercent(r.margem_real)).toBe('21,8%');
   });
 
-  it('3. modo "cheio" desconta o valor dos frustrados: lucro 3.101,08', () => {
-    const r = calcularPnl([dia], [], periodo, { descontarFrustrados: 'cheio' });
-    expect(r.desconto_frustrados).toBe(294_000); // R$ 2.940,00
+  it('3. modo "real" desconta a perda de caixa dos frustrados', () => {
+    // Sem pedidos do BlueSales não dá para separar produto+frete: o
+    // fixture cai no valor cheio do frustrado (R$ 2.940,00).
+    const r = calcularPnl([dia], [], periodo, { descontarFrustrados: 'real' });
+    expect(r.desconto_frustrados).toBe(294_000);
     expect(r.lucro_real).toBe(310_108); // R$ 3.101,08
     // e o comparativo "com frustrados" existe mesmo no modo padrão:
     expect(calcularPnl([dia], [], periodo).lucro_real_com_frustrados).toBe(310_108);

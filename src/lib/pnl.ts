@@ -75,14 +75,13 @@ export interface PontoDiario {
 }
 
 /** O que os pedidos frustrados descontam do Lucro Real. */
-export type DescontoFrustrados = 'nenhum' | 'real' | 'cheio';
+export type DescontoFrustrados = 'nenhum' | 'real';
 
 export interface PnlOptions {
   /**
    * O que descontar do lucro pelos pedidos frustrados:
    *   'nenhum' (padrão) → nada; espelha o BlueSales, que só informa a perda
    *   'real'            → produto + frete: o que de fato saiu do caixa
-   *   'cheio'           → valor dos pedidos: a receita que não entrou
    */
   descontarFrustrados?: DescontoFrustrados;
 }
@@ -254,8 +253,7 @@ export function calcularPnl(
   // desconta do lucro. Os outros modos descontam a perda real ou o valor cheio.
   const modo_frustrados = opts.descontarFrustrados ?? 'nenhum';
   const custosBase = custos_afterpay + custos_variaveis_total;
-  const desconto_frustrados =
-    modo_frustrados === 'real' ? perda_real_frustrados : modo_frustrados === 'cheio' ? valor_frustrado : 0;
+  const desconto_frustrados = modo_frustrados === 'real' ? perda_real_frustrados : 0;
   const custos_totais_reais = custosBase + desconto_frustrados;
   const lucro_real = receita_aprovada - custos_totais_reais;
   const margem_real = safeDiv(lucro_real, receita_aprovada);

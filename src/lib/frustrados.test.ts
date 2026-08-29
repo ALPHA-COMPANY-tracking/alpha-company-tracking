@@ -66,21 +66,17 @@ describe('frustrados no P&L', () => {
     expect(agg.perda_real_frustrados).toBe(232); // 2 x (83 + 33) — caixa
   });
 
-  it('os três modos descontam valores diferentes', () => {
+  it('só o modo "real" desconta, e desconta a perda de caixa', () => {
     const nenhum = calcularPnl([], [], periodo, { descontarFrustrados: 'nenhum' }, pedidos);
     const real = calcularPnl([], [], periodo, { descontarFrustrados: 'real' }, pedidos);
-    const cheio = calcularPnl([], [], periodo, { descontarFrustrados: 'cheio' }, pedidos);
 
     expect(real.valor_frustrado).toBe(147_000); // R$ 1.470,00 (receita não realizada)
     expect(real.perda_real_frustrados).toBe(23_200); // R$ 232,00 (caixa)
 
     expect(nenhum.desconto_frustrados).toBe(0);
     expect(real.desconto_frustrados).toBe(23_200);
-    expect(cheio.desconto_frustrados).toBe(147_000);
-
-    // O lucro cai exatamente o que cada modo desconta.
+    // O lucro cai exatamente a perda real — nunca o valor dos pedidos.
     expect(nenhum.lucro_real - real.lucro_real).toBe(23_200);
-    expect(nenhum.lucro_real - cheio.lucro_real).toBe(147_000);
   });
 
   it('o padrão é não descontar — espelha o BlueSales', () => {
