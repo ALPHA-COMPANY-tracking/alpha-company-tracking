@@ -98,18 +98,19 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
         </div>
       </Panel>
 
-      <Panel title="Valor Agendado por Atendente" hint="período · R$">
-        <BarsVertical data={barrasAgendado} gradId="ga-atend" altura={280} />
-      </Panel>
-
+      {/* Vendedor: valor e quantidade lado a lado */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Panel title="Valor Agendado por Atendente" hint="período · R$">
+          <BarsVertical data={barrasAgendado} gradId="ga-atend" />
+        </Panel>
         <Panel title="Pedidos por Atendente" hint="quantidade">
           <BarsVertical data={barrasPedidos} gradId="ga-ped" />
         </Panel>
-        <Panel title="Vendas por Plataforma" hint="origem do lead">
-          <BarsVertical data={barrasPlataforma} gradId="ga-plat" />
-        </Panel>
       </div>
+
+      <Panel title="Vendas por Plataforma" hint="origem do lead">
+        <BarsVertical data={barrasPlataforma} gradId="ga-plat" />
+      </Panel>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Panel title="Custos Variáveis por Categoria" hint={`${formatBRL(pnl.custos_variaveis_total)} no período`}>

@@ -182,15 +182,15 @@ export function PnlScreen({
       {/* Desempenho dos vendedores — aparece sempre que houver agendamentos,
           mesmo antes do primeiro pagamento aprovado do período. */}
       {agg.qtd_agendados > 0 && (
-        <>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Panel title="Faturamento Agendado por Vendedor" hint={`${formatDiaMes(periodo.inicio)} a ${formatDiaMes(periodo.fim)} · R$`}>
-            <BarsVertical data={barrasAgendado} gradId="pnl-vend-valor" altura={280} />
+            <BarsVertical data={barrasAgendado} gradId="pnl-vend-valor" />
           </Panel>
 
           <Panel title="Agendamentos por Vendedor" hint="quantidade de pedidos">
             <BarsVertical data={barrasPedidos} gradId="pnl-vend-qtd" />
           </Panel>
-        </>
+        </div>
       )}
     </div>
   );
