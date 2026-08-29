@@ -100,10 +100,23 @@ export function PnlScreen({
       {vazio ? (
         <Panel>
           <div className="p-10 text-center">
-            <div className="text-[15px] font-semibold text-tx mb-2">Nenhum dado neste período</div>
-            <div className="text-[13px] text-dim mb-5">
-              Escolha outro período no topo, sincronize com o Afterpay ou lance os números manualmente.
-            </div>
+            {agg.qtd_agendados > 0 ? (
+              <>
+                <div className="text-[15px] font-semibold text-tx mb-2">Nenhum pagamento aprovado ainda</div>
+                <div className="text-[13px] text-dim mb-5">
+                  Você tem <b className="text-tx">{agg.qtd_agendados} agendamento{agg.qtd_agendados > 1 ? 's' : ''}</b>{' '}
+                  somando <b className="text-pur2">{formatBRL(reaisToCents(agg.valor_agendado))}</b>. O P&L aparece
+                  quando o primeiro pagamento entrar.
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-[15px] font-semibold text-tx mb-2">Nenhum dado neste período</div>
+                <div className="text-[13px] text-dim mb-5">
+                  Escolha outro período no topo, sincronize com o Afterpay ou lance os números manualmente.
+                </div>
+              </>
+            )}
             <div className="flex items-center justify-center gap-2 flex-wrap">
               {onLancarManual && (
                 <button
@@ -163,22 +176,19 @@ export function PnlScreen({
           />
 
           <GapBlock pnl={pnl} />
+        </>
+      )}
 
-          {/* Desempenho dos vendedores no período */}
+      {/* Desempenho dos vendedores — aparece sempre que houver agendamentos,
+          mesmo antes do primeiro pagamento aprovado do período. */}
+      {agg.qtd_agendados > 0 && (
+        <>
           <Panel title="Faturamento Agendado por Vendedor" hint={`${formatDiaMes(periodo.inicio)} a ${formatDiaMes(periodo.fim)} · R$`}>
-            {barrasAgendado.length > 0 ? (
-              <BarsVertical data={barrasAgendado} gradId="pnl-vend-valor" altura={280} />
-            ) : (
-              <div className="p-10 text-center text-[13px] text-dim2">Nenhum agendamento no período.</div>
-            )}
+            <BarsVertical data={barrasAgendado} gradId="pnl-vend-valor" altura={280} />
           </Panel>
 
           <Panel title="Agendamentos por Vendedor" hint="quantidade de pedidos">
-            {barrasPedidos.length > 0 ? (
-              <BarsVertical data={barrasPedidos} gradId="pnl-vend-qtd" />
-            ) : (
-              <div className="p-10 text-center text-[13px] text-dim2">Nenhum agendamento no período.</div>
-            )}
+            <BarsVertical data={barrasPedidos} gradId="pnl-vend-qtd" />
           </Panel>
         </>
       )}
