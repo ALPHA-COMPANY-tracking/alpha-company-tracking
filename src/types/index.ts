@@ -93,8 +93,11 @@ export interface Pedido {
   status: string | null;
   data: IsoDate; // data de criação do pedido — base do agendado
   data_aprovacao?: IsoDate | null; // data do pagamento — base da receita aprovada (BlueSales conta por aqui)
-  valor: number; // líquido (com desconto %) — base da receita aprovada
-  valor_bruto?: number | null; // valor cheio do pedido — base do agendado
+  valor: number; // valor cobrado hoje (payment.amount) — base da receita aprovada
+  valor_bruto?: number | null; // valor cheio, antes de qualquer desconto (referência)
+  /** Valor no momento do agendamento — base do Faturamento Agendado.
+   *  Congelado no primeiro evento: desconto negociado depois não o altera. */
+  valor_agendado?: number | null;
   produto_nome?: string | null;
   produto_plano?: string | null;
   codigo_plano?: string | null;

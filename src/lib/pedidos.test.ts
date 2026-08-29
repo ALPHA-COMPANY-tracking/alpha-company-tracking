@@ -59,18 +59,26 @@ describe('agregarPedidos', () => {
     expect(agregarPedidos(pedidos, periodo).qtd_agendados).toBe(0);
   });
 
-  it('agendado usa o valor COBRADO, não o cheio (pedido com desconto)', () => {
-    // Caso real de 29/08/2026: BLV-GDU2EG43PM tem gross_amount 735 e
-    // amount 700 (desconto de R$ 35). O BlueSales mostra R$ 2.170,00.
+  it('agendado congela o valor do agendamento; desconto posterior só afeta a receita', () => {
+    // Casos reais conferidos no "Resultado Diário" do BlueSales:
+    //  · BLV-GDU2EG43PM (29/08) nasceu com desconto → agenda 700
+    //  · BLV-8RUBBQ8ZHC (24/08) agendou 735 e depois negociou 700 na cobrança
+    //  · BLV-3GKQG2596F (12/08) agendou 730 e pagou 698,25
     const pedidos: Pedido[] = [
-      { ...p('1', 'cadastrados', 700, 'PETER'), valor_bruto: 735 },
-      { ...p('2', 'aguard_coleta', 735, 'PETER'), valor_bruto: 735 },
-      { ...p('3', 'aguard_coleta', 735, 'PETER'), valor_bruto: 735 },
+      { ...p('nasceu-com-desconto', 'aguard_coleta', 700, 'PETER'), valor_bruto: 735, valor_agendado: 700 },
+      { ...p('desconto-na-cobranca', 'cobrados', 700, 'PETER'), valor_bruto: 735, valor_agendado: 735 },
+      { ...p('desconto-no-pagamento', 'pagos', 698.25, 'PETER'), valor_bruto: 735, valor_agendado: 730 },
     ];
     const r = agregarPedidos(pedidos, periodo);
     expect(r.qtd_agendados).toBe(3);
-    expect(r.valor_agendado).toBe(2170); // não 2205
-    expect(r.porAtendente[0].valor_agendado).toBe(2170);
+    expect(r.valor_agendado).toBe(2165); // 700 + 735 + 730 — não os 2.205 cheios
+    expect(r.porAtendente[0].valor_agendado).toBe(2165);
+    expect(r.receita_aprovada).toBe(698.25); // a receita usa o valor cobrado
+  });
+
+  it('sem valor_agendado gravado, cai no valor do pedido', () => {
+    const r = agregarPedidos([p('1', 'cadastrados', 735, 'PETER')], periodo);
+    expect(r.valor_agendado).toBe(735);
   });
 
   it('conta aprovado pela data de pagamento (data_aprovacao), não pela criação', () => {

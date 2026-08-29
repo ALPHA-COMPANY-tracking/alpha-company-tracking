@@ -98,6 +98,7 @@ export class SupabaseBackend implements Backend {
       data_aprovacao: r.data_aprovacao != null ? String(r.data_aprovacao) : null,
       valor: N(r.valor),
       valor_bruto: r.valor_bruto != null ? N(r.valor_bruto) : null,
+      valor_agendado: r.valor_agendado != null ? N(r.valor_agendado) : null,
       produto_nome: r.produto_nome ?? null,
       produto_plano: r.produto_plano ?? null,
       codigo_plano: r.codigo_plano ?? null,
