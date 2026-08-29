@@ -59,6 +59,20 @@ describe('agregarPedidos', () => {
     expect(agregarPedidos(pedidos, periodo).qtd_agendados).toBe(0);
   });
 
+  it('agendado usa o valor COBRADO, não o cheio (pedido com desconto)', () => {
+    // Caso real de 29/08/2026: BLV-GDU2EG43PM tem gross_amount 735 e
+    // amount 700 (desconto de R$ 35). O BlueSales mostra R$ 2.170,00.
+    const pedidos: Pedido[] = [
+      { ...p('1', 'cadastrados', 700, 'PETER'), valor_bruto: 735 },
+      { ...p('2', 'aguard_coleta', 735, 'PETER'), valor_bruto: 735 },
+      { ...p('3', 'aguard_coleta', 735, 'PETER'), valor_bruto: 735 },
+    ];
+    const r = agregarPedidos(pedidos, periodo);
+    expect(r.qtd_agendados).toBe(3);
+    expect(r.valor_agendado).toBe(2170); // não 2205
+    expect(r.porAtendente[0].valor_agendado).toBe(2170);
+  });
+
   it('conta aprovado pela data de pagamento (data_aprovacao), não pela criação', () => {
     // Criado em julho, PAGO em agosto → agendado cai em julho, receita em agosto.
     const pedido: Pedido = { ...p('1', 'pagos', 900, 'PETER', '2026-07-28'), data_aprovacao: '2026-08-03' };

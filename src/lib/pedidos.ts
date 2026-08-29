@@ -75,18 +75,20 @@ export function agregarPedidos(pedidos: Pedido[], periodo: Periodo): RevenuePedi
 
   for (const p of pedidos) {
     const bucket = statusBucket(p.status);
-    const valor = Number(p.valor) || 0; // líquido → receita
-    const bruto = Number(p.valor_bruto ?? p.valor) || 0; // cheio → agendado
+    // Sempre o valor COBRADO (payment.amount): é o que o BlueSales usa tanto
+    // no "Faturamento Agendado" quanto no "Aprovado". O valor cheio
+    // (valor_bruto / gross_amount) fica só como referência do desconto.
+    const valor = Number(p.valor) || 0;
     const nome = p.vendedor?.trim() || 'Sem atendente';
 
     // Lado do AGENDADO / funil — por data de criação.
     if (criacaoNoPeriodo(p)) {
-      valor_agendado += bruto;
+      valor_agendado += valor;
       qtd_agendados += 1;
       total += 1;
 
       const a = atendente(nome);
-      a.valor_agendado += bruto;
+      a.valor_agendado += valor;
       a.pedidos += 1;
       atendentes.set(nome, a);
 
