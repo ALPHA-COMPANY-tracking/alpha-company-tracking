@@ -32,7 +32,7 @@ export function PnlScreen({
   onLancarManual?: () => void;
 }) {
   const { dailies, custos, categorias, pedidos } = useData();
-  const [modoFrustrados, setModoFrustrados] = useState<DescontoFrustrados>('nenhum');
+  const [modoFrustrados, setModoFrustrados] = useState<DescontoFrustrados>('real');
 
   const pnl = useMemo(
     () => calcularPnl(dailies, custos, periodo, { descontarFrustrados: modoFrustrados }, pedidos),

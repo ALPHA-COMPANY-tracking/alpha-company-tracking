@@ -90,8 +90,9 @@ export interface ComissaoVendedor {
 export interface PnlOptions {
   /**
    * O que descontar do lucro pelos pedidos frustrados:
-   *   'nenhum' (padrão) → nada; espelha o BlueSales, que só informa a perda
-   *   'real'            → produto + frete: o que de fato saiu do caixa
+   *   'real' (padrão na tela) → produto + frete: o que de fato saiu do caixa
+   *   'nenhum'                → nada; reproduz o lucro do BlueSales
+   * O default da função é 'nenhum' para não alterar quem chama sem opções.
    */
   descontarFrustrados?: DescontoFrustrados;
 }
