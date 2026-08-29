@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BarChart3, Check, Download, LogOut, Megaphone, PieChart, Plus, RefreshCw, TriangleAlert, Wallet } from 'lucide-react';
+import { BarChart3, Download, LogOut, Megaphone, PieChart, RefreshCw, TriangleAlert, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { useData } from '@/store/DataProvider';
@@ -25,21 +25,17 @@ const TABS: { id: Tab; label: string; Icon: LucideIcon }[] = [
 ];
 
 export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: string }) {
-  const { ultimoSync, recarregar } = useData();
+  const { ultimoSync } = useData();
   const { preset, periodo, selecionarPreset, definirPersonalizado } = usePeriodo();
   const [tab, setTab] = useState<Tab>('pnl');
   const [modal, setModal] = useState(false);
   const [atualizando, setAtualizando] = useState(false);
-  const [atualizado, setAtualizado] = useState(false);
 
-  async function atualizar() {
+  /** Recarrega a página inteira, como um F5 — nada de estado antigo em tela. */
+  function atualizar() {
     if (atualizando) return;
-    setAtualizando(true);
-    setAtualizado(false);
-    await recarregar();
-    setAtualizando(false);
-    setAtualizado(true);
-    setTimeout(() => setAtualizado(false), 2200);
+    setAtualizando(true); // spinner até a página trocar
+    window.location.reload();
   }
 
   const nome = email ? email.split('@')[0] : 'Jonas';
@@ -97,36 +93,31 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
 
       {/* ───────── Área principal ───────── */}
       <main className="flex-1 min-w-0 px-4 sm:px-6 py-5 pb-16">
-        {/* Barra de filtros / ações */}
-        <div className="flex items-center gap-[10px] flex-wrap mb-5">
+        {/* Barra de filtros: seletor centralizado, ações à direita.
+            Os dois lados usam flex-1 para o seletor ficar no meio de verdade. */}
+        <div className="flex items-center gap-3 flex-wrap justify-center lg:flex-nowrap mb-5">
+          <div className="hidden lg:block flex-1" />
           <PeriodSelector preset={preset} periodo={periodo} onPreset={selecionarPreset} onCustom={definirPersonalizado} />
-          <div className="flex-1" />
-          <button
-            onClick={atualizar}
-            disabled={atualizando}
-            className={`inline-flex items-center gap-2 bg-card border px-[14px] py-[9px] rounded-[10px] text-[13px] font-semibold transition-colors ${
-              atualizado ? 'border-grn/50 text-grn' : 'border-line2 text-tx hover:border-gold/50'
-            }`}
-            title={ultimoSync ? `Última atualização: ${new Date(ultimoSync).toLocaleString('pt-BR')}` : 'Atualizar dados'}
-          >
-            {atualizado ? (<><Check size={15} /> Atualizado</>) : (<><RefreshCw size={15} className={atualizando ? 'animate-spin' : ''} /> Atualizar</>)}
-          </button>
-          <button
-            onClick={() => setModal(true)}
-            className="inline-flex items-center gap-2 text-white px-[14px] py-[9px] rounded-[10px] text-[13px] font-semibold bg-gradient-to-br from-pur3 to-pur"
-          >
-            <Plus size={15} /> Adicionar custo
-          </button>
-          {/* Conta no mobile */}
-          {onLogout && (
+          <div className="flex items-center gap-2 lg:flex-1 lg:justify-end shrink-0">
             <button
-              onClick={onLogout}
-              className="lg:hidden inline-flex items-center gap-1.5 text-[12px] text-dim2 hover:text-red border border-line2 rounded-lg px-2.5 py-[9px]"
-              title={email}
+              onClick={atualizar}
+              disabled={atualizando}
+              className="inline-flex items-center gap-2 bg-card border border-line2 text-tx hover:border-gold/50 px-[15px] py-[10px] rounded-[10px] text-[13.5px] font-semibold transition-colors disabled:opacity-60"
+              title={ultimoSync ? `Última atualização: ${new Date(ultimoSync).toLocaleString('pt-BR')}` : 'Recarregar a página'}
             >
-              <LogOut size={14} /> Sair
+              <RefreshCw size={15} className={atualizando ? 'animate-spin' : ''} /> Atualizar
             </button>
-          )}
+            {/* Conta no mobile */}
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="lg:hidden inline-flex items-center gap-1.5 text-[12px] text-dim2 hover:text-red border border-line2 rounded-lg px-2.5 py-[9px]"
+                title={email}
+              >
+                <LogOut size={14} /> Sair
+              </button>
+            )}
+          </div>
         </div>
 
         {tab === 'pnl' && <PnlScreen periodo={periodo} onAddCusto={() => setModal(true)} onLancarManual={() => setTab('ads')} />}

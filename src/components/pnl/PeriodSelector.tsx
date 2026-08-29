@@ -15,7 +15,7 @@ export function PeriodSelector({
 }) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="inline-flex items-center gap-1.5 text-[10.5px] font-bold text-grn tracking-[0.14em] mr-0.5">
+      <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold text-grn tracking-[0.14em] mr-0.5">
         <span className="relative flex w-2 h-2">
           <span className="absolute inline-flex w-full h-full rounded-full bg-grn opacity-60 animate-ping" />
           <span className="relative inline-flex w-2 h-2 rounded-full bg-grn" />
@@ -30,7 +30,7 @@ export function PeriodSelector({
             <button
               key={p.id}
               onClick={() => onPreset(p.id)}
-              className={`inline-flex items-center gap-1 px-[13px] py-[6px] rounded-full text-[12.5px] font-semibold whitespace-nowrap shrink-0 transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-[16px] py-[8px] rounded-full text-[13.5px] font-semibold whitespace-nowrap shrink-0 transition-colors ${
                 ativo ? 'bg-tx text-[#141419]' : 'text-dim hover:text-tx'
               }`}
             >
