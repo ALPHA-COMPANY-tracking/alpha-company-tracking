@@ -6,8 +6,20 @@
 // Env vars: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
 // ─────────────────────────────────────────────────────────────
 
-import webpush from 'web-push';
 import type { SupabaseClient } from '@supabase/supabase-js';
+
+/**
+ * `web-push` é CommonJS: importar no topo derrubava a função inteira na
+ * Vercel (o webhook passou a responder 500 e os pedidos pararam de
+ * entrar). Carregamos sob demanda e só dentro do try do envio.
+ */
+async function libWebPush() {
+  const mod = await import('web-push');
+  return ((mod as unknown as { default?: unknown }).default ?? mod) as {
+    setVapidDetails: (s: string, pub: string, priv: string) => void;
+    sendNotification: (sub: unknown, payload: string) => Promise<unknown>;
+  };
+}
 
 export interface Aviso {
   titulo: string;
@@ -57,13 +69,14 @@ export async function enviarPush(db: SupabaseClient, userId: string, aviso: Avis
   const privada = process.env.VAPID_PRIVATE_KEY;
   if (!publica || !privada) return 0; // push não configurado ainda
 
-  webpush.setVapidDetails(process.env.VAPID_SUBJECT ?? 'mailto:contato@ajalpha.com', publica, privada);
-
   const { data } = await db
     .from('push_subscriptions')
     .select('endpoint,p256dh,auth')
     .eq('user_id', userId);
   if (!data?.length) return 0;
+
+  const webpush = await libWebPush();
+  webpush.setVapidDetails(process.env.VAPID_SUBJECT ?? 'mailto:contato@ajalpha.com', publica, privada);
 
   const carga = JSON.stringify({ ...aviso, url: aviso.url ?? '/' });
   let enviados = 0;
