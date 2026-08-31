@@ -3,7 +3,7 @@
 // Mesmas regras do P&L da tela (ver src/lib/pnl.ts).
 // ─────────────────────────────────────────────────────────────
 
-import { COMISSAO_COBRANCA, FRETE_POR_PEDIDO, comissaoDoVendedor, custoProdutoDoPlano, ehPago } from './custos';
+import { COMISSAO_COBRANCA, FRETE_POR_PEDIDO, comissaoDoVendedor, custoProdutoDoPlano, ehPago } from './lib-custos';
 
 export interface ResumoDia {
   data: string;
@@ -123,4 +123,10 @@ export function avisoDoResumo(r: ResumoDia, final: boolean): { titulo: string; c
     // tags diferentes: o parcial se substitui, o fechamento fica separado
     tag: final ? 'resumo-final' : 'resumo-parcial',
   };
+}
+
+// Este arquivo existe em /api só porque a Vercel empacota apenas o que
+// está aqui dentro. Não é uma rota de verdade: responde 404.
+export default function handler(_req: unknown, res: { status: (n: number) => { end: () => void } }) {
+  res.status(404).end();
 }

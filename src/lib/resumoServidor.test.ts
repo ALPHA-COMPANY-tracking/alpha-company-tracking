@@ -2,9 +2,9 @@
 // fechamento. O primeiro bloco garante que as regras de custo do
 // servidor não se descolem das do app.
 import { describe, expect, it } from 'vitest';
-import * as servidor from '../../server/custos';
+import * as servidor from '../../api/lib-custos';
 import * as app from '@/lib/custosConfig';
-import { avisoDoResumo, montarResumo } from '../../server/resumo';
+import { avisoDoResumo, montarResumo } from '../../api/lib-resumo';
 
 describe('custos do servidor batem com os do app', () => {
   it('frete, comissões e percentuais por vendedor são os mesmos', () => {

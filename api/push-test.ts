@@ -66,7 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (tipo === 'agendado' || tipo === 'pago') {
       try {
         // Import sob demanda: estático de módulo local derruba a função aqui.
-        const { avisoDoEvento } = await import('../server/push');
+        const { avisoDoEvento } = await import('./lib-push');
         const real = avisoDoEvento(
           tipo === 'pago' ? 'ORDER_PAID' : 'ORDER_CREATE',
           tipo === 'pago' ? 'pagos' : 'cadastrados',

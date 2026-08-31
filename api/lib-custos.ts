@@ -42,3 +42,9 @@ export function ehPago(status?: string | null): boolean {
   const s = (status ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
   return s === 'pagos' || s === 'pago';
 }
+
+// Este arquivo existe em /api só porque a Vercel empacota apenas o que
+// está aqui dentro. Não é uma rota de verdade: responde 404.
+export default function handler(_req: unknown, res: { status: (n: number) => { end: () => void } }) {
+  res.status(404).end();
+}

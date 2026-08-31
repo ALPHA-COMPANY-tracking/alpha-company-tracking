@@ -1,6 +1,6 @@
 // Texto das notificações de pedido pago / agendado.
 import { describe, expect, it } from 'vitest';
-import { avisoDoEvento, brl } from '../../server/push';
+import { avisoDoEvento, brl } from '../../api/lib-push';
 
 /** O Intl separa "R$" do número com espaço não-quebrável. */
 const norm = (s: string) => s.replace(/ /g, ' ');
