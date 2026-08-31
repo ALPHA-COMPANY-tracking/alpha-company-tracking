@@ -6,12 +6,23 @@ import { avisoDoEvento, brl } from '../../server/push';
 const norm = (s: string) => s.replace(/ /g, ' ');
 
 describe('avisoDoEvento', () => {
-  it('pagamento aprovado traz valor e o nome de quem vendeu', () => {
-    const a = avisoDoEvento('ORDER_PAID', 'pagos', 'PETER', 735)!;
+  it('pagamento aprovado traz o valor e o nome de quem pagou', () => {
+    const a = avisoDoEvento('ORDER_PAID', 'pagos', 'PETER', 735, 'YOLANDA DE GOIS')!;
     expect(norm(a.titulo)).toContain('R$ 735,00');
     expect(a.titulo).toContain('Pagamento aprovado');
-    expect(a.corpo).toContain('PETER');
+    expect(a.corpo).toBe('YOLANDA DE GOIS');
     expect(a.tag).toBe('pago');
+  });
+
+  it('pagamento sem o nome do cliente cai no vendedor', () => {
+    const a = avisoDoEvento('ORDER_PAID', 'pagos', 'PETER', 735)!;
+    expect(a.corpo).toContain('PETER');
+  });
+
+  it('o agendamento mostra o vendedor, não o cliente', () => {
+    const a = avisoDoEvento('ORDER_CREATE', 'cadastrados', 'MATHEUS', 735, 'YOLANDA DE GOIS')!;
+    expect(a.corpo).toContain('MATHEUS');
+    expect(a.corpo).not.toContain('YOLANDA');
   });
 
   it('agendamento novo traz valor e vendedor', () => {

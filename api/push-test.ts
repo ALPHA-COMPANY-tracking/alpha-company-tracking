@@ -72,6 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           tipo === 'pago' ? 'pagos' : 'cadastrados',
           vendedor,
           valor,
+          typeof corpo.cliente === 'string' ? corpo.cliente : null,
         );
         if (real) aviso = { titulo: real.titulo, corpo: real.corpo, tag: real.tag ?? tipo };
       } catch {

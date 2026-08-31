@@ -179,11 +179,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let notificados = 0;
   try {
     const { avisoDoEvento, enviarPush } = await import('../server/push');
+    // Nome do cliente só para escrever a mensagem — não vai para o banco
+    // nem para o log (semDadosPessoais remove o bloco inteiro).
+    const cliente = (body.customer ?? body.cliente ?? {}) as Record<string, unknown>;
     const aviso = avisoDoEvento(
       String(body.event ?? ''),
       String(pedido.status ?? ''),
       (pedido.vendedor as string) ?? null,
       Number(pedido.valor ?? pedido.valor_agendado ?? 0),
+      txt(pick(cliente, 'name', 'nome')) ?? null,
     );
     if (aviso) notificados = await enviarPush(supabase(), userId, aviso);
   } catch {

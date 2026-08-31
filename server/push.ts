@@ -33,14 +33,21 @@ export function brl(v: number): string {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-/** Monta o aviso do evento, ou null se o evento não merece notificação. */
+/**
+ * Monta o aviso do evento, ou null se o evento não merece notificação.
+ *
+ * `cliente` vem direto do evento e é usado só para escrever a mensagem —
+ * nunca é gravado no banco (ver semDadosPessoais no webhook).
+ */
 export function avisoDoEvento(
   evento: string,
   status: string,
   vendedor: string | null,
   valor: number,
+  cliente?: string | null,
 ): Aviso | null {
-  const nome = (vendedor ?? '').trim() || 'Sem atendente';
+  const nomeVendedor = (vendedor ?? '').trim() || 'Sem atendente';
+  const nomeCliente = (cliente ?? '').trim();
   const st = (status ?? '')
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
@@ -49,14 +56,15 @@ export function avisoDoEvento(
   if (st === 'pagos' || st === 'pago') {
     return {
       titulo: `💰 Pagamento aprovado · ${brl(valor)}`,
-      corpo: `${nome} recebeu o pagamento. O lucro do dia já foi atualizado.`,
+      // Quem pagou é a informação útil aqui; sem o nome, cai no vendedor.
+      corpo: nomeCliente || `${nomeVendedor} recebeu o pagamento.`,
       tag: 'pago',
     };
   }
   if (evento === 'ORDER_CREATE') {
     return {
       titulo: `🗓️ Novo agendamento · ${brl(valor)}`,
-      corpo: `${nome} acabou de agendar um pedido.`,
+      corpo: `${nomeVendedor} acabou de agendar um pedido.`,
       tag: 'agendado',
     };
   }
