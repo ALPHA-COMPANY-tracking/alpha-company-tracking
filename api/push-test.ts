@@ -7,7 +7,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
-import { enviarPush } from './_push';
+import { enviarPush } from '../server/push';
 
 let _db: SupabaseClient | null = null;
 function supabase(): SupabaseClient {

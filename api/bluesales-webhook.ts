@@ -13,7 +13,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
-import { avisoDoEvento } from './_push';
+import { avisoDoEvento } from '../server/push';
 
 // Criado sob demanda: importar este módulo (nos testes) não deve exigir
 // as variáveis de ambiente do servidor.
@@ -187,7 +187,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       // Import sob demanda: o envio depende de `web-push`, e uma falha
       // ao carregá-lo não pode impedir o pedido de ser gravado.
-      const { enviarPush } = await import('./_push');
+      const { enviarPush } = await import('../server/push');
       notificados = await enviarPush(supabase(), userId, aviso);
     } catch {
       notificados = 0;
