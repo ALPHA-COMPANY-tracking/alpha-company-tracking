@@ -77,8 +77,10 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
       </aside>
 
       {/* ───────── Cabeçalho fixo do celular ───────── */}
-      <header className="lg:hidden sticky top-0 z-40 bg-bg/95 backdrop-blur-md border-b border-line">
-        <div className="flex items-center justify-between gap-2 px-4 h-14">
+      {/* pt-safe: instalado na tela inicial, o app ocupa a tela toda e o
+          relógio/bateria ficariam por cima dos botões. */}
+      <header className="lg:hidden sticky top-0 z-40 bg-bg/95 backdrop-blur-md border-b border-line pt-[env(safe-area-inset-top)]">
+        <div className="flex items-center justify-between gap-1.5 px-3 h-[52px]">
           <div className="flex items-center gap-2.5 min-w-0">
             <LogoMark size={30} />
             <span className="text-gold-metal font-extrabold text-[13px] tracking-[0.04em] leading-none truncate">
@@ -92,7 +94,7 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
               onClick={atualizar}
               disabled={atualizando}
               aria-label="Atualizar"
-              className="grid place-items-center w-9 h-9 rounded-full border border-line2 text-tx active:bg-white/5 disabled:opacity-60"
+              className="grid place-items-center w-10 h-10 rounded-full border border-line2 text-tx active:bg-white/5 disabled:opacity-60"
             >
               <RefreshCw size={16} className={atualizando ? 'animate-spin' : ''} />
             </button>
@@ -100,7 +102,7 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
               <button
                 onClick={onLogout}
                 aria-label="Sair"
-                className="grid place-items-center w-9 h-9 rounded-full border border-line2 text-dim2 active:bg-white/5"
+                className="grid place-items-center w-10 h-10 rounded-full border border-line2 text-dim2 active:bg-white/5"
               >
                 <LogOut size={15} />
               </button>

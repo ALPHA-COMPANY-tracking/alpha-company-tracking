@@ -72,7 +72,7 @@ export function BotaoNotificacoes({
         disabled={ocupado || bloqueado}
         title={titulo}
         aria-label={titulo}
-        className={`grid place-items-center w-9 h-9 rounded-full border active:bg-white/5 disabled:opacity-60 ${
+        className={`grid place-items-center w-10 h-10 rounded-full border active:bg-white/5 disabled:opacity-60 ${
           ligado ? 'border-gold/50 text-gold' : 'border-line2 text-dim2'
         }`}
       >

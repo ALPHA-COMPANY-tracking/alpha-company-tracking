@@ -30,7 +30,7 @@ export function RodapeConta({
     <div className="mt-6 pt-4 border-t border-line/70">
       {/* Quem está logado */}
       <div className="flex items-center gap-2.5 px-1 mb-3" title={email}>
-        <span className="grid place-items-center w-9 h-9 rounded-full bg-chip border border-line2 text-[12px] font-bold text-dim shrink-0">
+        <span className="grid place-items-center w-10 h-10 rounded-full bg-chip border border-line2 text-[12px] font-bold text-dim shrink-0">
           {iniciais(nome)}
         </span>
         <span className="min-w-0">
@@ -64,7 +64,7 @@ export function BotaoTemaCompacto() {
       onClick={alternar}
       aria-label={claro ? 'Modo escuro' : 'Modo claro'}
       title={claro ? 'Modo escuro' : 'Modo claro'}
-      className="grid place-items-center w-9 h-9 rounded-full border border-line2 text-dim2 active:bg-tx/5"
+      className="grid place-items-center w-10 h-10 rounded-full border border-line2 text-dim2 active:bg-tx/5"
     >
       <Icone size={16} />
     </button>
