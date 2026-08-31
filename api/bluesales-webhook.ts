@@ -13,7 +13,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
-import { avisoDoEvento } from '../server/push';
 
 // Criado sob demanda: importar este módulo (nos testes) não deve exigir
 // as variáveis de ambiente do servidor.
@@ -174,24 +173,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: error.message });
   }
 
-  // Notificação no celular. Só para venda nova e pagamento; se falhar,
-  // não afeta o pedido — ele já está gravado.
+  // Notificação no celular. TUDO aqui é opcional: o pedido já está
+  // gravado, e nenhuma falha de push pode transformar isso num erro.
+  // Por isso o módulo é carregado sob demanda, dentro do try.
   let notificados = 0;
-  const aviso = avisoDoEvento(
-    String(body.event ?? ''),
-    String(pedido.status ?? ''),
-    (pedido.vendedor as string) ?? null,
-    Number(pedido.valor ?? pedido.valor_agendado ?? 0),
-  );
-  if (aviso) {
-    try {
-      // Import sob demanda: o envio depende de `web-push`, e uma falha
-      // ao carregá-lo não pode impedir o pedido de ser gravado.
-      const { enviarPush } = await import('../server/push');
-      notificados = await enviarPush(supabase(), userId, aviso);
-    } catch {
-      notificados = 0;
-    }
+  try {
+    const { avisoDoEvento, enviarPush } = await import('../server/push');
+    const aviso = avisoDoEvento(
+      String(body.event ?? ''),
+      String(pedido.status ?? ''),
+      (pedido.vendedor as string) ?? null,
+      Number(pedido.valor ?? pedido.valor_agendado ?? 0),
+    );
+    if (aviso) notificados = await enviarPush(supabase(), userId, aviso);
+  } catch {
+    notificados = 0;
   }
 
   return res.status(200).json({ ok: true, id: pedido.id, status: pedido.status, notificados });
