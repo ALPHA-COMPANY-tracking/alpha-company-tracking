@@ -1,13 +1,12 @@
 // ─────────────────────────────────────────────────────────────
 // Backend Supabase. RLS garante que cada query só vê os dados do
-// usuário logado. Atendentes/plataformas seguem de exemplo até o
-// webhook do Afterpay entrar (Etapa 8).
+// usuário logado. Atendentes e plataformas saem dos pedidos reais.
 // ─────────────────────────────────────────────────────────────
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AfterpayDaily, CategoriaCusto, CustoVariavel } from '@/types';
 import type { Dataset } from '@/data/db';
-import { SEED_ATENDENTES, SEED_CATEGORIAS, SEED_PLATAFORMAS } from '@/data/seed';
+import { SEED_CATEGORIAS } from '@/data/seed';
 import type { Backend } from '@/data/backend';
 
 const N = (v: unknown) => Number(v ?? 0);
@@ -112,8 +111,8 @@ export class SupabaseBackend implements Backend {
       categorias,
       dailies: dailiesMap,
       custos: custosMap,
-      atendentes: SEED_ATENDENTES,
-      plataformas: SEED_PLATAFORMAS,
+      atendentes: [],
+      plataformas: [],
       pedidos: pedidosMap,
       ultimoSync,
     };

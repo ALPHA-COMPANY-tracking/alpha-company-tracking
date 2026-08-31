@@ -4,27 +4,11 @@
 // são só ponto de partida — tudo é editável na interface.
 // ─────────────────────────────────────────────────────────────
 
-import type { AfterpayDaily, AtendenteStat, CategoriaCusto, CustoVariavel, PlataformaStat } from '@/types';
+import type { AfterpayDaily, CategoriaCusto, CustoVariavel } from '@/types';
 import { addDias, hojeIso } from '@/lib/dates';
 
-/** Atendentes (dados de exemplo, iguais ao mockup). */
-export const SEED_ATENDENTES: AtendenteStat[] = [
-  { nome: 'Robert', valor_agendado: 198800, pedidos: 142 },
-  { nome: 'Paulo', valor_agendado: 56100, pedidos: 103 },
-  { nome: 'Guilherme', valor_agendado: 34900, pedidos: 78 },
-  { nome: 'Marcos', valor_agendado: 28900, pedidos: 64 },
-  { nome: 'Carolina', valor_agendado: 21400, pedidos: 41 },
-  { nome: 'Felipe', valor_agendado: 15300, pedidos: 29 },
-  { nome: 'Ana', valor_agendado: 12600, pedidos: 18 },
-];
-
-/** Plataformas de origem do lead (dados de exemplo). */
-export const SEED_PLATAFORMAS: PlataformaStat[] = [
-  { nome: 'WhatsApp', pedidos: 148 },
-  { nome: 'Instagram DM', pedidos: 42 },
-  { nome: 'Direct Ads', pedidos: 23 },
-  { nome: 'Indicação', pedidos: 11 },
-];
+// Atendentes e plataformas NÃO têm semente: saem dos pedidos reais do
+// BlueSales. Nomes de exemplo já apareceram na tela por engano.
 
 export const SEED_CATEGORIAS: CategoriaCusto[] = [
   { id: 'cat-chips', nome: 'Chips / Números WhatsApp', icone: 'smartphone', cor: '#22d3ee', ativo: true, ordem: 0 },

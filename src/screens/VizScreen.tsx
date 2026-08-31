@@ -13,30 +13,23 @@ import { DonutCategorias } from '@/components/viz/DonutCategorias';
 import { Funil } from '@/components/viz/Funil';
 
 export function VizScreen({ periodo }: { periodo: Periodo }) {
-  const { dailies, custos, categorias, atendentes, plataformas, pedidos } = useData();
+  const { dailies, custos, categorias, pedidos } = useData();
   const catMap = new Map(categorias.map((c) => [c.id, c]));
 
   const pnl = useMemo(() => calcularPnl(dailies, custos, periodo, {}, pedidos), [dailies, custos, periodo, pedidos]);
   const agg = useMemo(() => agregarPedidos(pedidos, periodo), [pedidos, periodo]);
-  const temPedidos = agg.qtd_agendados > 0;
 
-  // Com pedidos reais do BlueSales, usa-os; senão, dados de exemplo.
-  const atendentesFonte = temPedidos
-    ? agg.porAtendente.map((a) => ({ nome: a.nome, valor_agendado: a.valor_agendado, pedidos: a.pedidos }))
-    : atendentes;
-
-  const barrasAgendado = [...atendentesFonte]
+  // Só dados reais do BlueSales. Sem pedidos no período, o gráfico fica
+  // vazio — nunca com nomes de exemplo.
+  const barrasAgendado = [...agg.porAtendente]
     .sort((a, b) => b.valor_agendado - a.valor_agendado)
     .map((a) => ({ label: a.nome, value: a.valor_agendado, display: formatBRLCompact(reaisToCents(a.valor_agendado)) }));
 
-  const barrasPedidos = [...atendentesFonte]
+  const barrasPedidos = [...agg.porAtendente]
     .sort((a, b) => b.pedidos - a.pedidos)
     .map((a) => ({ label: a.nome, value: a.pedidos, display: String(a.pedidos) }));
 
-  const plataformaFonte = temPedidos
-    ? agg.porMetodo.map((m) => ({ nome: m.nome, pedidos: m.pedidos }))
-    : plataformas;
-  const barrasPlataforma = [...plataformaFonte]
+  const barrasPlataforma = [...agg.porMetodo]
     .sort((a, b) => b.pedidos - a.pedidos)
     .map((p) => ({ label: p.nome, value: p.pedidos, display: String(p.pedidos) }));
 
@@ -101,15 +94,15 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
       {/* Vendedor: valor e quantidade lado a lado */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Panel title="Valor Agendado por Atendente" hint="período · R$">
-          <BarsVertical data={barrasAgendado} gradId="ga-atend" />
+          {barrasAgendado.length > 0 ? <BarsVertical data={barrasAgendado} gradId="ga-atend" /> : <SemDados />}
         </Panel>
         <Panel title="Pedidos por Atendente" hint="quantidade">
-          <BarsVertical data={barrasPedidos} gradId="ga-ped" />
+          {barrasPedidos.length > 0 ? <BarsVertical data={barrasPedidos} gradId="ga-ped" /> : <SemDados />}
         </Panel>
       </div>
 
       <Panel title="Vendas por Plataforma" hint="origem do lead">
-        <BarsVertical data={barrasPlataforma} gradId="ga-plat" />
+        {barrasPlataforma.length > 0 ? <BarsVertical data={barrasPlataforma} gradId="ga-plat" /> : <SemDados />}
       </Panel>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -122,4 +115,9 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
       </div>
     </div>
   );
+}
+
+/** Nenhum pedido no período — melhor vazio do que número inventado. */
+function SemDados() {
+  return <div className="p-10 text-center text-[13px] text-dim2">Nenhum pedido neste período.</div>;
 }

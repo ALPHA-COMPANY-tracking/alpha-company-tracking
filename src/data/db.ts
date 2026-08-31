@@ -5,9 +5,7 @@
 
 import type { AfterpayDaily, AtendenteStat, CategoriaCusto, CustoVariavel, Pedido, PlataformaStat } from '@/types';
 import {
-  SEED_ATENDENTES,
   SEED_CATEGORIAS,
-  SEED_PLATAFORMAS,
   gerarCustos,
   gerarDailies,
 } from '@/data/seed';
@@ -29,8 +27,8 @@ function seedInicial(): Dataset {
     categorias: SEED_CATEGORIAS,
     dailies: gerarDailies(),
     custos: gerarCustos(),
-    atendentes: SEED_ATENDENTES,
-    plataformas: SEED_PLATAFORMAS,
+    atendentes: [],
+    plataformas: [],
     pedidos: [],
     ultimoSync: null,
   };
@@ -49,8 +47,8 @@ export function carregar(): Dataset {
       categorias: parsed.categorias ?? SEED_CATEGORIAS,
       dailies: parsed.dailies ?? [],
       custos: parsed.custos ?? [],
-      atendentes: parsed.atendentes ?? SEED_ATENDENTES,
-      plataformas: parsed.plataformas ?? SEED_PLATAFORMAS,
+      atendentes: parsed.atendentes ?? [],
+      plataformas: parsed.plataformas ?? [],
       pedidos: parsed.pedidos ?? [],
       ultimoSync: parsed.ultimoSync ?? null,
     };
