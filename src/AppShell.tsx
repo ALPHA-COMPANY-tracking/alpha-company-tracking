@@ -6,6 +6,7 @@ import { useData } from '@/store/DataProvider';
 import { usePeriodo } from '@/store/usePeriodo';
 import { PeriodSelector } from '@/components/pnl/PeriodSelector';
 import { CustoModal } from '@/components/CustoModal';
+import { BotaoNotificacoes } from '@/components/BotaoNotificacoes';
 import { PnlScreen } from '@/screens/PnlScreen';
 import { CustosScreen } from '@/screens/CustosScreen';
 import { FrustradosScreen } from '@/screens/FrustradosScreen';
@@ -80,6 +81,7 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
             )}
           </span>
           <span className="text-dim">Olá, <b className="text-tx font-semibold">{nome}</b></span>
+          <BotaoNotificacoes />
           {onLogout && (
             <button
               onClick={onLogout}
@@ -102,6 +104,7 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
             </span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            <BotaoNotificacoes compacto />
             <button
               onClick={atualizar}
               disabled={atualizando}

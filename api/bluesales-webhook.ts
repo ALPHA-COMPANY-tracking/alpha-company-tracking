@@ -13,6 +13,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
+import { avisoDoEvento, enviarPush } from './_push';
 
 // Criado sob demanda: importar este módulo (nos testes) não deve exigir
 // as variáveis de ambiente do servidor.
@@ -173,7 +174,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: error.message });
   }
 
-  return res.status(200).json({ ok: true, id: pedido.id, status: pedido.status });
+  // Notificação no celular. Só para venda nova e pagamento; se falhar,
+  // não afeta o pedido — ele já está gravado.
+  let notificados = 0;
+  const aviso = avisoDoEvento(
+    String(body.event ?? ''),
+    String(pedido.status ?? ''),
+    (pedido.vendedor as string) ?? null,
+    Number(pedido.valor ?? pedido.valor_agendado ?? 0),
+  );
+  if (aviso) {
+    try {
+      notificados = await enviarPush(supabase(), userId, aviso);
+    } catch {
+      notificados = 0;
+    }
+  }
+
+  return res.status(200).json({ ok: true, id: pedido.id, status: pedido.status, notificados });
 }
 
 function safeParse(s: string): Record<string, unknown> | null {

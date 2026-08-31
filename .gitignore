@@ -29,3 +29,6 @@ dist-ssr
 *.sw?
 dist
 dev.log
+
+# Chaves do push geradas localmente
+CHAVES-PUSH.local.txt
