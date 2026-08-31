@@ -22,10 +22,12 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
   // Só dados reais do BlueSales. Sem pedidos no período, o gráfico fica
   // vazio — nunca com nomes de exemplo.
   const barrasAgendado = [...agg.porAtendente]
+    .filter((a) => a.valor_agendado > 0)
     .sort((a, b) => b.valor_agendado - a.valor_agendado)
     .map((a) => ({ label: a.nome, value: a.valor_agendado, display: formatBRLCompact(reaisToCents(a.valor_agendado)) }));
 
   const barrasPedidos = [...agg.porAtendente]
+    .filter((a) => a.pedidos > 0)
     .sort((a, b) => b.pedidos - a.pedidos)
     .map((a) => ({ label: a.nome, value: a.pedidos, display: String(a.pedidos) }));
 

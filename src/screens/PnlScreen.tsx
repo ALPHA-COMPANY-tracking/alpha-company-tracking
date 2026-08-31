@@ -44,9 +44,12 @@ export function PnlScreen({
 
   // Desempenho por vendedor no período (fonte: pedidos do BlueSales).
   const agg = useMemo(() => agregarPedidos(pedidos, periodo), [pedidos, periodo]);
+  // Filtra quem ficou zerado: um vendedor entra na lista só por ter tido
+  // pagamento no período, e apareceria como barra vazia.
   const barrasAgendado = useMemo(
     () =>
       [...agg.porAtendente]
+        .filter((a) => a.valor_agendado > 0)
         .sort((a, b) => b.valor_agendado - a.valor_agendado)
         .map((a) => ({ label: a.nome, value: a.valor_agendado, display: formatBRLCompact(reaisToCents(a.valor_agendado)) })),
     [agg],
@@ -54,6 +57,7 @@ export function PnlScreen({
   const barrasPedidos = useMemo(
     () =>
       [...agg.porAtendente]
+        .filter((a) => a.pedidos > 0)
         .sort((a, b) => b.pedidos - a.pedidos)
         .map((a) => ({ label: a.nome, value: a.pedidos, display: String(a.pedidos) })),
     [agg],

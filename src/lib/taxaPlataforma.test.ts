@@ -94,6 +94,36 @@ describe('taxa de plataforma (lançada por dia)', () => {
     expect(pnl.lucro_real).toBe(11_292); // BlueSales: R$ 112,92 ✓
   });
 
+  it('conta o pagamento mesmo sem nenhum agendamento no dia (caso 30/08)', () => {
+    // BLV-NDZ5YZX4Z8: agendado em 24/08 e pago em 30/08. No dia 30 não
+    // houve venda nova — o P&L ignorava o pagamento e mostrava tudo zerado.
+    const periodo: Periodo = { inicio: '2026-08-30', fim: '2026-08-30' };
+    const pedidos: Pedido[] = [
+      {
+        id: 'BLV-NDZ5YZX4Z8',
+        status: 'pagos',
+        data: '2026-08-24', // agendado noutro dia
+        data_aprovacao: '2026-08-30', // pago hoje
+        valor: 735,
+        valor_bruto: 735,
+        valor_agendado: 735,
+        produto_plano: 'DERMAX PREMIUM - 6 POTE',
+        vendedor: 'PETER',
+        metodo_pagamento: 'pix',
+      },
+    ];
+    const pnl = calcularPnl([], [], periodo, {}, pedidos);
+
+    expect(pnl.receita_aprovada).toBe(73_500); // R$ 735,00
+    expect(pnl.qtd_pagamentos).toBe(1);
+    expect(pnl.valor_agendado).toBe(0); // nada foi agendado no dia
+    expect(pnl.custo_produtos).toBe(8_300); // R$ 83,00
+    expect(pnl.frete).toBe(3_300); // R$ 33,00
+    expect(pnl.comissoes_vendedor).toBe(3_675); // 5% de 735
+    expect(pnl.comissoes_cobranca).toBe(735); // 1% de 735
+    expect(pnl.lucro_real).toBe(57_490); // BlueSales: R$ 574,90 ✓
+  });
+
   it('soma as taxas de vários dias do período', () => {
     const periodo: Periodo = { inicio: '2026-08-14', fim: '2026-08-15' };
     const pedidos = [

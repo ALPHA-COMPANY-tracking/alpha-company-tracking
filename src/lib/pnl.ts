@@ -235,7 +235,11 @@ export function calcularPnl(
   let qtd_agendados = somaI((r) => r.qtd_agendados);
 
   const agg = pedidos.length ? agregarPedidos(pedidos, periodo) : null;
-  if (agg && agg.qtd_agendados > 0) {
+  // Um dia pode ter pagamento sem nenhum agendamento novo (venda de outro
+  // dia que foi paga hoje). Checar só os agendados fazia o P&L ignorar
+  // esse pagamento e mostrar o período como vazio.
+  const temMovimento = !!agg && (agg.qtd_agendados > 0 || agg.qtd_pagamentos > 0 || agg.qtd_frustrados > 0);
+  if (agg && temMovimento) {
     receita_aprovada = reaisToCents(agg.receita_aprovada);
     qtd_pagamentos = agg.qtd_pagamentos;
     valor_frustrado = reaisToCents(agg.valor_frustrado);
@@ -257,7 +261,7 @@ export function calcularPnl(
 
   // Com pedidos do BlueSales: custo de produto/frete/taxas/comissões vêm da
   // config (mesmas regras do P&L do BlueSales). Ads segue manual (Meta).
-  if (agg && agg.qtd_agendados > 0) {
+  if (agg && temMovimento) {
     const cc = custosDePedidos(pedidos, periodo);
     custo_produtos = cc.custo_produtos;
     frete = cc.frete;
