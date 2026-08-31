@@ -1,0 +1,30 @@
+# Notificação com o resumo do dia.
+# A Vercel (plano Hobby) só permite agendamento 1x por dia, por isso o
+# disparo vem daqui. Horários em UTC — Brasília é UTC-3.
+name: Resumo do dia
+
+on:
+  schedule:
+    # Parciais: 9h, 11h, 13h, 15h, 17h e 19h de Brasília
+    - cron: '0 12,14,16,18,20,22 * * *'
+    # Fechamento: 21h de Brasília (00h UTC do dia seguinte)
+    - cron: '0 0 * * *'
+  workflow_dispatch: # permite disparar na mão pelo GitHub
+
+jobs:
+  notificar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enviar resumo
+        env:
+          CRON_TOKEN: ${{ secrets.CRON_TOKEN }}
+        run: |
+          # O agendamento das 00h UTC é o fechamento; os demais, parciais.
+          if [ "${{ github.event.schedule }}" = "0 0 * * *" ]; then TIPO=final; else TIPO=parcial; fi
+          echo "Enviando resumo: $TIPO"
+          RESPOSTA=$(curl -s -m 30 -X POST \
+            -H "Authorization: Bearer $CRON_TOKEN" \
+            "https://alpha-company-tracking-eight.vercel.app/api/resumo-dia?tipo=$TIPO")
+          echo "$RESPOSTA"
+          # Falha o job se a API não confirmou, para aparecer no GitHub.
+          echo "$RESPOSTA" | grep -q '"ok":true' || echo "::warning::resumo não enviado"
