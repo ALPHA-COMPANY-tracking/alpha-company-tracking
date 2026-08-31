@@ -62,14 +62,17 @@ export function KpiCard({
   sub?: ReactNode;
 }) {
   return (
-    <div className="bg-card border border-line rounded-kpi px-4 py-[15px] flex items-center gap-[13px]">
-      <IconSquare Icon={Icon} color={color} />
+    <div className="bg-card border border-line rounded-kpi px-3 lg:px-4 py-3 lg:py-[15px] flex items-center gap-2.5 lg:gap-[13px]">
+      {/* No celular o ícone encolhe para sobrar largura ao número */}
+      <span className="hidden xs:block">
+        <IconSquare Icon={Icon} color={color} />
+      </span>
       <div className="min-w-0">
-        <div className="text-[11px] text-dim font-medium mb-[3px]">{label}</div>
-        <div className="mono text-[21px] font-extrabold tracking-tight leading-tight" style={{ color }}>
+        <div className="text-[10.5px] lg:text-[11px] text-dim font-medium mb-[3px] leading-tight">{label}</div>
+        <div className="mono text-[17px] lg:text-[21px] font-extrabold tracking-tight leading-tight truncate" style={{ color }}>
           {value}
         </div>
-        {sub && <div className="text-[10.5px] text-dim2 mt-[3px] truncate">{sub}</div>}
+        {sub && <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px] truncate">{sub}</div>}
       </div>
     </div>
   );

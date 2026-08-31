@@ -52,28 +52,28 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
   return (
     <div className="flex flex-col gap-5 w-full">
       <div>
-        <h1 className="text-[26px] font-extrabold text-tx tracking-tight">Frustrados</h1>
+        <h1 className="text-[21px] lg:text-[26px] font-extrabold text-tx tracking-tight">Frustrados</h1>
         <p className="text-[13px] text-dim mt-0.5">
           Quanto os pedidos não pagos realmente custaram — produto enviado + frete, não o valor da venda
         </p>
       </div>
 
       {/* Resumo */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-[14px]">
-        <div className="bg-card border border-line rounded-kpi px-4 py-[15px]">
-          <div className="text-[11px] text-dim font-medium mb-[3px]">Pedidos frustrados</div>
-          <div className="mono text-[21px] font-extrabold text-yel">{frustrados.length}</div>
-          <div className="text-[10.5px] text-dim2 mt-[3px]">no período</div>
+      <div className="grid grid-cols-3 gap-2 lg:gap-[14px]">
+        <div className="bg-card border border-line rounded-kpi px-2.5 lg:px-4 py-3 lg:py-[15px]">
+          <div className="text-[10px] lg:text-[11px] text-dim font-medium mb-[3px] leading-tight">Pedidos frustrados</div>
+          <div className="mono text-[16px] lg:text-[21px] font-extrabold text-yel">{frustrados.length}</div>
+          <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px]">no período</div>
         </div>
-        <div className="bg-card border border-line rounded-kpi px-4 py-[15px]">
-          <div className="text-[11px] text-dim font-medium mb-[3px]">Valor dos pedidos</div>
-          <div className="mono text-[21px] font-extrabold text-dim">{formatBRL(reaisToCents(totalPedidos))}</div>
-          <div className="text-[10.5px] text-dim2 mt-[3px]">receita que não entrou</div>
+        <div className="bg-card border border-line rounded-kpi px-2.5 lg:px-4 py-3 lg:py-[15px]">
+          <div className="text-[10px] lg:text-[11px] text-dim font-medium mb-[3px] leading-tight">Valor dos pedidos</div>
+          <div className="mono text-[16px] lg:text-[21px] font-extrabold text-dim truncate">{formatBRL(reaisToCents(totalPedidos))}</div>
+          <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px]">não entrou</div>
         </div>
-        <div className="bg-card border border-red/30 rounded-kpi px-4 py-[15px]">
-          <div className="text-[11px] text-dim font-medium mb-[3px]">Perda real</div>
-          <div className="mono text-[21px] font-extrabold text-red">{formatBRL(reaisToCents(totalPerda))}</div>
-          <div className="text-[10.5px] text-dim2 mt-[3px]">o que saiu do caixa</div>
+        <div className="bg-card border border-red/30 rounded-kpi px-2.5 lg:px-4 py-3 lg:py-[15px]">
+          <div className="text-[10px] lg:text-[11px] text-dim font-medium mb-[3px] leading-tight">Perda real</div>
+          <div className="mono text-[16px] lg:text-[21px] font-extrabold text-red truncate">{formatBRL(reaisToCents(totalPerda))}</div>
+          <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px]">saiu do caixa</div>
         </div>
       </div>
 
@@ -82,12 +82,12 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
           <table className="w-full text-[13px] min-w-[720px]">
             <thead>
               <tr className="text-dim2 text-[11px] uppercase tracking-wide">
-                <th className="text-left font-semibold px-5 py-3">Data</th>
-                <th className="text-left font-semibold px-5 py-3">Pedido</th>
-                <th className="text-left font-semibold px-5 py-3">Plano</th>
-                <th className="text-right font-semibold px-5 py-3">Valor do pedido</th>
-                <th className="text-right font-semibold px-5 py-3">Perda real</th>
-                <th className="text-right font-semibold px-5 py-3">Ações</th>
+                <th className="text-left font-semibold px-3 lg:px-5 py-3">Data</th>
+                <th className="text-left font-semibold px-3 lg:px-5 py-3">Pedido</th>
+                <th className="text-left font-semibold px-3 lg:px-5 py-3">Plano</th>
+                <th className="text-right font-semibold px-3 lg:px-5 py-3">Valor do pedido</th>
+                <th className="text-right font-semibold px-3 lg:px-5 py-3">Perda real</th>
+                <th className="text-right font-semibold px-3 lg:px-5 py-3">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -105,11 +105,11 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
                   const emEdicao = editando === p.id;
                   return (
                     <tr key={p.id} className="border-t border-line/70 hover:bg-white/[0.015]">
-                      <td className="px-5 py-4 text-tx font-medium whitespace-nowrap">{diaMes(p.data)}</td>
-                      <td className="px-5 py-4 text-dim mono text-[12px]">{p.id}</td>
-                      <td className="px-5 py-4 text-dim">{planoCurto(p.produto_plano)}</td>
-                      <td className="px-5 py-4 text-right text-dim mono">{formatBRL(reaisToCents(Number(p.valor) || 0))}</td>
-                      <td className="px-5 py-4 text-right">
+                      <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-tx font-medium whitespace-nowrap">{diaMes(p.data)}</td>
+                      <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-dim mono text-[12px]">{p.id}</td>
+                      <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-dim">{planoCurto(p.produto_plano)}</td>
+                      <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-right text-dim mono">{formatBRL(reaisToCents(Number(p.valor) || 0))}</td>
+                      <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-right">
                         {emEdicao ? (
                           <div className="w-[140px] ml-auto">
                             <MoneyInput cents={rascunho} onChange={setRascunho} autoFocus />
@@ -125,7 +125,7 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
                           </div>
                         )}
                       </td>
-                      <td className="px-5 py-4 text-right whitespace-nowrap">
+                      <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-right whitespace-nowrap">
                         {emEdicao ? (
                           <div className="inline-flex gap-1">
                             <button

@@ -3,6 +3,9 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      // Celulares bem estreitos: abaixo disso alguns elementos encolhem
+      // (ex.: o ícone do KPI some para o número caber inteiro).
+      screens: { xs: '400px' },
       colors: {
         bg: '#141419',
         card: '#1c1c24',

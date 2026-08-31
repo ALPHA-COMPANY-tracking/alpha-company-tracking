@@ -14,23 +14,24 @@ export function PeriodSelector({
   onCustom: (p: Periodo) => void;
 }) {
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold text-grn tracking-[0.14em] mr-0.5">
+    <div className="flex items-center gap-2 lg:flex-wrap min-w-0">
+      {/* No celular fica só o pontinho: o texto roubaria espaço dos períodos */}
+      <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold text-grn tracking-[0.14em] mr-0.5 shrink-0">
         <span className="relative flex w-2 h-2">
           <span className="absolute inline-flex w-full h-full rounded-full bg-grn opacity-60 animate-ping" />
           <span className="relative inline-flex w-2 h-2 rounded-full bg-grn" />
         </span>
-        AO VIVO
+        <span className="hidden lg:inline">AO VIVO</span>
       </span>
 
-      <div className="flex items-center gap-1 bg-card border border-line2 rounded-full p-1 overflow-x-auto max-w-full [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex items-center gap-1 bg-card border border-line2 rounded-full p-1 overflow-x-auto max-w-full min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {PRESETS.map((p) => {
           const ativo = preset === p.id;
           return (
             <button
               key={p.id}
               onClick={() => onPreset(p.id)}
-              className={`inline-flex items-center gap-1.5 px-[16px] py-[8px] rounded-full text-[13.5px] font-semibold whitespace-nowrap shrink-0 transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-[13px] lg:px-[16px] py-[7px] lg:py-[8px] rounded-full text-[13px] lg:text-[13.5px] font-semibold whitespace-nowrap shrink-0 transition-colors ${
                 ativo ? 'bg-tx text-[#141419]' : 'text-dim hover:text-tx'
               }`}
             >

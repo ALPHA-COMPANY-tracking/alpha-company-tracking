@@ -66,31 +66,31 @@ export function PnlScreen({
   return (
     <div className="flex flex-col gap-4">
       {/* Herói — Faturamento Agendado (esquerda) · Lucro Real (direita) */}
-      <div className="w-full bg-card border border-line rounded-card px-[22px] py-[18px] grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-line">
-        <div className="flex items-center gap-4 justify-center pb-4 sm:pb-0 sm:pr-6">
-          <div className="w-[42px] h-[42px] rounded-[12px] grid place-items-center bg-pur/[0.13] text-pur2 shrink-0">
+      <div className="w-full bg-card border border-line rounded-card px-4 lg:px-[22px] py-3.5 lg:py-[18px] grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-line">
+        <div className="flex items-center gap-3 lg:gap-4 sm:justify-center pb-3 sm:pb-0 sm:pr-6">
+          <div className="w-[38px] h-[38px] lg:w-[42px] lg:h-[42px] rounded-[12px] grid place-items-center bg-pur/[0.13] text-pur2 shrink-0">
             <CalendarClock size={20} strokeWidth={1.9} />
           </div>
-          <div>
-            <div className="text-[12px] text-dim font-medium">Faturamento Agendado</div>
-            <div className="mono text-[30px] font-extrabold text-pur2 tracking-tight leading-tight">{formatBRL(pnl.valor_agendado)}</div>
+          <div className="min-w-0">
+            <div className="text-[11.5px] lg:text-[12px] text-dim font-medium">Faturamento Agendado</div>
+            <div className="mono text-[25px] lg:text-[30px] font-extrabold text-pur2 tracking-tight leading-tight truncate">{formatBRL(pnl.valor_agendado)}</div>
             <div className="text-[10.5px] text-dim2 mt-0.5">{pnl.qtd_agendados} pedidos no período</div>
           </div>
         </div>
-        <div className="flex items-center gap-4 justify-center pt-4 sm:pt-0 sm:pl-6">
+        <div className="flex items-center gap-3 lg:gap-4 sm:justify-center pt-3 sm:pt-0 sm:pl-6">
           <div
-            className={`w-[42px] h-[42px] rounded-[12px] grid place-items-center shrink-0 ${
+            className={`w-[38px] h-[38px] lg:w-[42px] lg:h-[42px] rounded-[12px] grid place-items-center shrink-0 ${
               lucroPositivo ? 'bg-grn/[0.13] text-grn' : 'bg-red/[0.13] text-red'
             }`}
           >
             {lucroPositivo ? <TrendingUp size={20} strokeWidth={1.9} /> : <TrendingDown size={20} strokeWidth={1.9} />}
           </div>
-          <div>
-            <div className="text-[12px] text-dim font-medium">
+          <div className="min-w-0">
+            <div className="text-[11.5px] lg:text-[12px] text-dim font-medium">
               {lucroPositivo ? 'Lucro Real (período)' : 'Prejuízo Real (período)'}
             </div>
             <div
-              className={`mono text-[30px] font-extrabold tracking-tight leading-tight ${
+              className={`mono text-[25px] lg:text-[30px] font-extrabold tracking-tight leading-tight truncate ${
                 lucroPositivo ? 'text-grn' : 'text-red'
               }`}
             >
@@ -142,7 +142,7 @@ export function PnlScreen({
       ) : (
         <>
           {/* KPIs linha 1 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[14px]">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-[14px]">
             <KpiCard Icon={Banknote} color="#34d399" label="Receita Aprovada" value={formatBRL(pnl.receita_aprovada)} sub={`${pnl.qtd_pagamentos} pagamentos`} />
             <KpiCard
               Icon={TrendingDown}
@@ -162,7 +162,7 @@ export function PnlScreen({
           </div>
 
           {/* KPIs linha 2 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[14px]">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-[14px]">
             <KpiCard Icon={ShoppingCart} color="#c084fc" label="Total de Pedidos" value={String(pnl.qtd_agendados)} sub="agendados no período" />
             <KpiCard Icon={BadgeCheck} color="#34d399" label="Ticket Médio" value={formatBRL(pnl.ticket_medio)} sub="sobre pedidos aprovados" />
             <KpiCard Icon={Megaphone} color="#60a5fa" label="CPA" value={formatBRL(pnl.cpa)} sub={`${formatBRL(pnl.investimento_ads)} em Ads`} />

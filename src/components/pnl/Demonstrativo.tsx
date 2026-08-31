@@ -20,7 +20,7 @@ import { COMISSAO_COBRANCA, RESPONSAVEL_COBRANCA } from '@/lib/custosConfig';
 function Sec({ children, hl = false }: { children: React.ReactNode; hl?: boolean }) {
   return (
     <div
-      className={`px-[18px] pt-[16px] pb-[7px] text-[9.5px] tracking-[0.16em] uppercase font-bold ${
+      className={`px-3 lg:px-[18px] pt-[14px] lg:pt-[16px] pb-[7px] text-[9.5px] tracking-[0.16em] uppercase font-bold ${
         hl ? 'text-pur2' : 'text-dim2'
       }`}
     >
@@ -51,7 +51,7 @@ function LinhaCusto({
   const pct = safeDiv(cents, receita);
   const barW = cents > 0 ? Math.max(1.5, Math.min(100, pct * 100)) : 0;
   return (
-    <div className="group px-[18px] py-[10px] border-b border-[#212129] hover:bg-[#1e1e27] transition-colors">
+    <div className="group px-3 lg:px-[18px] py-[10px] border-b border-[#212129] hover:bg-[#1e1e27] transition-colors">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-[11px] min-w-0">
           <span className="w-[30px] h-[30px] rounded-[9px] bg-[#23232c] grid place-items-center text-dim2 shrink-0 group-hover:text-dim transition-colors">
@@ -157,13 +157,13 @@ export function Demonstrativo({
 
   return (
     <div className="bg-card border border-line rounded-card overflow-hidden">
-      <div className="px-[18px] py-[15px] border-b border-line">
+      <div className="px-3 lg:px-[18px] py-[13px] lg:py-[15px] border-b border-line">
         <h2 className="m-0 text-[14.5px] font-bold">Demonstrativo P&amp;L</h2>
       </div>
 
       {/* RECEITA — destaque */}
       <Sec>Receita</Sec>
-      <div className="mx-[18px] mb-1 rounded-[12px] border border-grn/20 bg-grn/[0.06] px-4 py-[13px] flex items-center justify-between">
+      <div className="mx-3 lg:mx-[18px] mb-1 rounded-[12px] border border-grn/20 bg-grn/[0.06] px-4 py-[13px] flex items-center justify-between">
         <div className="flex items-center gap-[11px]">
           <span className="w-[34px] h-[34px] rounded-[10px] bg-grn/15 grid place-items-center text-grn shrink-0">
             <DollarSign size={17} strokeWidth={2} />
@@ -231,7 +231,7 @@ export function Demonstrativo({
 
       {/* CUSTOS VARIÁVEIS */}
       <Sec hl>Custos variáveis · lançados por você</Sec>
-      <div className="mx-[18px] mb-2 rounded-[12px] border border-pur/25 bg-pur/[0.05] overflow-hidden">
+      <div className="mx-3 lg:mx-[18px] mb-2 rounded-[12px] border border-pur/25 bg-pur/[0.05] overflow-hidden">
         <div className="px-4 py-[13px]">
           <div className="flex items-center justify-between mb-[10px]">
             <div className="flex items-center gap-2">
@@ -316,7 +316,7 @@ export function Demonstrativo({
 
       {/* PERDAS — valor do pedido (informativo) e perda real (esta desconta) */}
       <Sec>Perdas · pedidos frustrados</Sec>
-      <div className="mx-[18px] mb-3 rounded-[12px] border border-yel/25 bg-yel/[0.04] overflow-hidden">
+      <div className="mx-3 lg:mx-[18px] mb-3 rounded-[12px] border border-yel/25 bg-yel/[0.04] overflow-hidden">
         {/* Valor cheio dos pedidos — sempre informativo */}
         <div className="px-4 py-[13px] flex items-center justify-between gap-3 border-b border-yel/15">
           <div className="min-w-0">
@@ -379,7 +379,7 @@ export function Demonstrativo({
       </div>
 
       {/* PARA ONDE FOI CADA REAL */}
-      <div className="mx-[18px] mb-2 rounded-[12px] bg-[#17171e] border border-line px-4 py-[14px]">
+      <div className="mx-3 lg:mx-[18px] mb-2 rounded-[12px] bg-[#17171e] border border-line px-4 py-[14px]">
         <div className="text-[9.5px] tracking-[0.16em] uppercase font-bold text-dim2 mb-[10px]">Para onde foi cada real do faturamento</div>
         <div className="flex h-[10px] rounded-full overflow-hidden gap-[2px]">
           {composicao.map((s, i) => (
@@ -437,7 +437,7 @@ export function Demonstrativo({
       </div>
 
       {/* COMPARAÇÃO AFTERPAY */}
-      <div className="px-[18px] py-[13px] flex items-center justify-between flex-wrap gap-2 bg-[#141319] border-t border-[#22222b] text-[12px] text-dim">
+      <div className="px-3 lg:px-[18px] py-[13px] flex items-center justify-between flex-wrap gap-2 bg-[#141319] border-t border-[#22222b] text-[12px] text-dim">
         <div>
           Lucro segundo o Afterpay: <b className="text-[#cfcfdd] font-semibold mono">{formatBRL(pnl.lucro_afterpay)}</b>{' '}
           <span className="text-dim2">(margem {formatPercent(pnl.margem_afterpay)})</span>

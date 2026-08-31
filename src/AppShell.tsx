@@ -15,13 +15,14 @@ import { AdsScreen } from '@/screens/AdsScreen';
 
 type Tab = 'pnl' | 'ads' | 'custos' | 'frustrados' | 'viz' | 'export';
 
-const TABS: { id: Tab; label: string; Icon: LucideIcon }[] = [
-  { id: 'pnl', label: 'Demonstração de Resultados', Icon: BarChart3 },
-  { id: 'ads', label: 'Anúncios (Meta)', Icon: Megaphone },
-  { id: 'custos', label: 'Custos Variáveis', Icon: Wallet },
-  { id: 'frustrados', label: 'Frustrados', Icon: TriangleAlert },
-  { id: 'viz', label: 'Visualização', Icon: PieChart },
-  { id: 'export', label: 'Exportador', Icon: Download },
+/** `curto` é o rótulo da barra inferior no celular, onde só cabe uma palavra. */
+const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
+  { id: 'pnl', label: 'Demonstração de Resultados', curto: 'P&L', Icon: BarChart3 },
+  { id: 'ads', label: 'Anúncios (Meta)', curto: 'Ads', Icon: Megaphone },
+  { id: 'custos', label: 'Custos Variáveis', curto: 'Custos', Icon: Wallet },
+  { id: 'frustrados', label: 'Frustrados', curto: 'Perdas', Icon: TriangleAlert },
+  { id: 'viz', label: 'Visualização', curto: 'Gráficos', Icon: PieChart },
+  { id: 'export', label: 'Exportador', curto: 'Exportar', Icon: Download },
 ];
 
 export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: string }) {
@@ -43,13 +44,13 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
   return (
     <div className="min-h-screen w-full lg:flex">
       {/* ───────── Menu lateral esquerdo ───────── */}
-      <aside className="lg:w-[250px] lg:shrink-0 lg:min-h-screen lg:border-r border-line/70 lg:bg-card/40 px-4 pt-5 lg:sticky lg:top-0 lg:self-start">
+      <aside className="hidden lg:block lg:w-[250px] lg:shrink-0 lg:min-h-screen lg:border-r border-line/70 lg:bg-card/40 px-4 pt-5 lg:sticky lg:top-0 lg:self-start">
         <div className="flex items-center gap-3 pb-4 mb-3 border-b border-line/70 lg:border-0 lg:mb-4">
           <LogoMark size={42} />
           <Wordmark />
         </div>
 
-        <nav className="flex lg:flex-col gap-1.5 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <nav className="flex lg:flex-col gap-1.5">
           {TABS.map(({ id, label, Icon }) => {
             const ativo = tab === id;
             return (
@@ -91,14 +92,48 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
         </div>
       </aside>
 
-      {/* ───────── Área principal ───────── */}
-      <main className="flex-1 min-w-0 px-4 sm:px-6 py-5 pb-16">
-        {/* Barra de filtros: seletor centralizado, ações à direita.
-            Os dois lados usam flex-1 para o seletor ficar no meio de verdade. */}
-        <div className="flex items-center gap-3 flex-wrap justify-center lg:flex-nowrap mb-5">
-          <div className="hidden lg:block flex-1" />
+      {/* ───────── Cabeçalho fixo do celular ───────── */}
+      <header className="lg:hidden sticky top-0 z-40 bg-[#141419]/95 backdrop-blur-md border-b border-line">
+        <div className="flex items-center justify-between gap-2 px-4 h-14">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <LogoMark size={30} />
+            <span className="text-gold-metal font-extrabold text-[13px] tracking-[0.04em] leading-none truncate">
+              AJ ALPHA COMPANY
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={atualizar}
+              disabled={atualizando}
+              aria-label="Atualizar"
+              className="grid place-items-center w-9 h-9 rounded-full border border-line2 text-tx active:bg-white/5 disabled:opacity-60"
+            >
+              <RefreshCw size={16} className={atualizando ? 'animate-spin' : ''} />
+            </button>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                aria-label="Sair"
+                className="grid place-items-center w-9 h-9 rounded-full border border-line2 text-dim2 active:bg-white/5"
+              >
+                <LogOut size={15} />
+              </button>
+            )}
+          </div>
+        </div>
+        {/* Períodos deslizam colados na borda, como numa aba de app */}
+        <div className="px-4 pb-2.5">
           <PeriodSelector preset={preset} periodo={periodo} onPreset={selecionarPreset} onCustom={definirPersonalizado} />
-          <div className="flex items-center gap-2 lg:flex-1 lg:justify-end shrink-0">
+        </div>
+      </header>
+
+      {/* ───────── Área principal ───────── */}
+      <main className="flex-1 min-w-0 px-3 lg:px-6 py-3 lg:py-5 pb-[92px] lg:pb-16">
+        {/* Barra de filtros do desktop: seletor centralizado, ações à direita. */}
+        <div className="hidden lg:flex items-center gap-3 flex-nowrap mb-5">
+          <div className="flex-1" />
+          <PeriodSelector preset={preset} periodo={periodo} onPreset={selecionarPreset} onCustom={definirPersonalizado} />
+          <div className="flex items-center gap-2 flex-1 justify-end">
             <button
               onClick={atualizar}
               disabled={atualizando}
@@ -107,16 +142,6 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
             >
               <RefreshCw size={15} className={atualizando ? 'animate-spin' : ''} /> Atualizar
             </button>
-            {/* Conta no mobile */}
-            {onLogout && (
-              <button
-                onClick={onLogout}
-                className="lg:hidden inline-flex items-center gap-1.5 text-[12px] text-dim2 hover:text-red border border-line2 rounded-lg px-2.5 py-[9px]"
-                title={email}
-              >
-                <LogOut size={14} /> Sair
-              </button>
-            )}
           </div>
         </div>
 
@@ -127,6 +152,28 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
         {tab === 'viz' && <VizScreen periodo={periodo} />}
         {tab === 'export' && <ExportScreen periodo={periodo} />}
       </main>
+
+      {/* ───────── Barra de navegação inferior (celular) ───────── */}
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-[#17171e]/97 backdrop-blur-md border-t border-line2 pb-[env(safe-area-inset-bottom)]">
+        <div className="grid grid-cols-6">
+          {TABS.map(({ id, curto, Icon }) => {
+            const ativo = tab === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setTab(id)}
+                aria-current={ativo ? 'page' : undefined}
+                className={`flex flex-col items-center justify-center gap-[3px] py-2 min-h-[54px] transition-colors ${
+                  ativo ? 'text-gold' : 'text-dim2 active:text-dim'
+                }`}
+              >
+                <Icon size={19} strokeWidth={ativo ? 2.3 : 1.9} />
+                <span className={`text-[9.5px] leading-none ${ativo ? 'font-bold' : 'font-medium'}`}>{curto}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
 
       <CustoModal aberto={modal} onClose={() => setModal(false)} />
     </div>
