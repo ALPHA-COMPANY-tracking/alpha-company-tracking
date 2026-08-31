@@ -82,8 +82,12 @@ export interface ComissaoVendedor {
   nome: string;
   /** Percentual dele (0,05 = 5%). */
   pct: number;
-  /** Receita aprovada atribuída a ele. */
+  /** Receita aprovada atribuída a ele — base da comissão. */
   receita: Cents;
+  /** O que ele agendou no período (mesmo que ainda não tenha sido pago). */
+  agendado: Cents;
+  /** Quantos pedidos ele agendou no período. */
+  qtd_agendados: number;
   comissao: Cents;
 }
 
@@ -183,7 +187,7 @@ export function serieDiaria(
  *   Σ pct·(receita_v − taxas·receita_v/receita) = pct·(receita − taxas)
  */
 function comissaoVendedores(
-  porAtendente: { nome: string; receita: number }[],
+  porAtendente: { nome: string; receita: number; valor_agendado: number; pedidos: number }[],
   receitaTotal: Cents,
   taxas: Cents,
 ): ComissaoVendedor[] {
@@ -196,7 +200,8 @@ function comissaoVendedores(
       .trim()
       .toUpperCase();
 
-  const porPessoa = new Map<string, { nome: string; receita: Cents }>();
+  type Acc = { nome: string; receita: Cents; agendado: Cents; qtd_agendados: number };
+  const porPessoa = new Map<string, Acc>();
   for (const a of porAtendente) {
     const nome = a.nome.trim() || 'Sem atendente';
     const k = chave(nome);
@@ -204,23 +209,26 @@ function comissaoVendedores(
     porPessoa.set(k, {
       nome: atual?.nome ?? nome, // mantém o nome como veio do BlueSales
       receita: (atual?.receita ?? 0) + reaisToCents(a.receita),
+      agendado: (atual?.agendado ?? 0) + reaisToCents(a.valor_agendado),
+      qtd_agendados: (atual?.qtd_agendados ?? 0) + a.pedidos,
     });
   }
   // Quem tem percentual configurado aparece mesmo sem venda no período,
   // para a taxa combinada ficar sempre visível.
   for (const nome of Object.keys(COMISSAO_POR_VENDEDOR)) {
     const k = chave(nome);
-    if (!porPessoa.has(k)) porPessoa.set(k, { nome, receita: 0 });
+    if (!porPessoa.has(k)) porPessoa.set(k, { nome, receita: 0, agendado: 0, qtd_agendados: 0 });
   }
 
   return [...porPessoa.values()]
-    .map(({ nome, receita }) => {
+    .map(({ nome, receita, agendado, qtd_agendados }) => {
       const pct = comissaoDoVendedor(nome);
       const taxasV = receitaTotal > 0 ? Math.round(taxas * (receita / receitaTotal)) : 0;
       const comissao = receita > 0 ? Math.round((receita - taxasV) * pct) : 0;
-      return { nome, pct, receita, comissao };
+      return { nome, pct, receita, agendado, qtd_agendados, comissao };
     })
-    .sort((a, b) => b.comissao - a.comissao || a.nome.localeCompare(b.nome));
+    // Quem mais recebe primeiro; empate, quem mais agendou.
+    .sort((a, b) => b.comissao - a.comissao || b.agendado - a.agendado || a.nome.localeCompare(b.nome));
 }
 
 export function calcularPnl(

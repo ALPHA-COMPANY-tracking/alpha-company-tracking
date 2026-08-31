@@ -189,15 +189,22 @@ export function Demonstrativo({
         receita={receita}
         detalhe={
           pnl.comissoes_por_vendedor.length > 0 && (
-            <div className="flex flex-col gap-[5px]">
+            <div className="flex flex-col gap-[9px]">
               {pnl.comissoes_por_vendedor.map((v) => (
-                <div key={v.nome} className="flex items-center justify-between gap-3 text-[11.5px]">
-                  <span className="flex items-center gap-[7px] min-w-0">
-                    <span className="text-tx2 truncate">{v.nome}</span>
-                    <span className="mono text-[10px] font-bold text-blu border border-blu/30 bg-blu/10 rounded-full px-[6px] py-[1px] shrink-0">
-                      {formatPercent(v.pct)}
+                <div key={v.nome} className="flex items-start justify-between gap-3 text-[11.5px]">
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-[7px] min-w-0">
+                      <span className="text-tx2 truncate">{v.nome}</span>
+                      <span className="mono text-[10px] font-bold text-blu border border-blu/30 bg-blu/10 rounded-full px-[6px] py-[1px] shrink-0">
+                        {formatPercent(v.pct)}
+                      </span>
                     </span>
-                    <span className="text-dim2 shrink-0">de {formatBRL(v.receita)}</span>
+                    {/* Agendado explica o "R$ 0,00": vendeu, mas ainda não
+                        recebeu — a comissão só entra com o pagamento. */}
+                    <span className="block text-[10.5px] text-dim2 mt-[2px]">
+                      agendou {formatBRL(v.agendado)}
+                      {v.qtd_agendados > 0 && ` (${v.qtd_agendados})`} · aprovado {formatBRL(v.receita)}
+                    </span>
                   </span>
                   <span className="mono text-dim shrink-0">{formatBRL(v.comissao)}</span>
                 </div>

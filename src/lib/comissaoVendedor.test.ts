@@ -99,6 +99,29 @@ describe('comissão no P&L', () => {
     expect(doMatheus[0].pct).toBe(0.06);
   });
 
+  it('mostra o que o vendedor agendou, mesmo sem pagamento ainda', () => {
+    // Caso real: MATHEUS agendou e o pedido ainda não foi pago.
+    const pedidos: Pedido[] = [
+      pago('p1', 1000, 'PETER'),
+      {
+        id: 'agendado-matheus',
+        status: 'cadastrados',
+        data: '2026-08-10',
+        valor: 683.1,
+        valor_bruto: 683.1,
+        valor_agendado: 683.1,
+        produto_plano: 'DERMAX PREMIUM - 6 POTE',
+        vendedor: 'Matheus',
+      },
+    ];
+    const pnl = calcularPnl([], [], periodo, {}, pedidos);
+    const m = pnl.comissoes_por_vendedor.find((v) => v.nome === 'Matheus')!;
+    expect(m.agendado).toBe(68_310); // R$ 683,10 agendado
+    expect(m.qtd_agendados).toBe(1);
+    expect(m.receita).toBe(0); // ainda não pagou
+    expect(m.comissao).toBe(0); // comissão só com o pagamento
+  });
+
   it('vendedor configurado aparece com o % mesmo sem venda no período', () => {
     // MATHEUS começa 31/08: antes disso precisa aparecer zerado, com os 6%.
     const pnl = calcularPnl([], [], periodo, {}, [pago('p1', 1000, 'PETER')]);
