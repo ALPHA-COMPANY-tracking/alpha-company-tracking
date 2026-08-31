@@ -66,37 +66,45 @@ export function PnlScreen({
   return (
     <div className="flex flex-col gap-4">
       {/* Herói — Faturamento Agendado (esquerda) · Lucro Real (direita) */}
-      <div className="w-full bg-card border border-line rounded-card px-4 lg:px-[22px] py-3.5 lg:py-[18px] grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-line">
-        <div className="flex items-center gap-3 lg:gap-4 sm:justify-center pb-3 sm:pb-0 sm:pr-6">
-          <div className="w-[38px] h-[38px] lg:w-[42px] lg:h-[42px] rounded-[12px] grid place-items-center bg-pur/[0.13] text-pur2 shrink-0">
-            <CalendarClock size={20} strokeWidth={1.9} />
+      {/* No celular cada metade vira um bloco centralizado, com o ícone
+          acima e o número grande; no desktop volta a ser ícone ao lado. */}
+      <div className="w-full bg-card border border-line rounded-card px-4 lg:px-[22px] py-5 lg:py-[18px] grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-line">
+        <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 lg:gap-4 sm:justify-center text-center sm:text-left pb-5 sm:pb-0 sm:pr-6">
+          <div className="w-[46px] h-[46px] sm:w-[38px] sm:h-[38px] lg:w-[42px] lg:h-[42px] rounded-[14px] sm:rounded-[12px] grid place-items-center bg-pur/[0.13] text-pur2 shrink-0">
+            <CalendarClock className="w-6 h-6 sm:w-5 sm:h-5" strokeWidth={1.9} />
           </div>
-          <div className="min-w-0">
-            <div className="text-[11.5px] lg:text-[12px] text-dim font-medium">Faturamento Agendado</div>
-            <div className="mono text-[25px] lg:text-[30px] font-extrabold text-pur2 tracking-tight leading-tight truncate">{formatBRL(pnl.valor_agendado)}</div>
-            <div className="text-[10.5px] text-dim2 mt-0.5">{pnl.qtd_agendados} pedidos no período</div>
+          <div className="min-w-0 w-full sm:w-auto">
+            <div className="text-[13px] sm:text-[11.5px] lg:text-[12px] text-dim font-medium">Faturamento Agendado</div>
+            <div className="mono text-[34px] sm:text-[25px] lg:text-[30px] font-extrabold text-pur2 tracking-tight leading-tight truncate mt-0.5 sm:mt-0">
+              {formatBRL(pnl.valor_agendado)}
+            </div>
+            <div className="text-[12px] sm:text-[10.5px] text-dim2 mt-1 sm:mt-0.5">{pnl.qtd_agendados} pedidos no período</div>
           </div>
         </div>
-        <div className="flex items-center gap-3 lg:gap-4 sm:justify-center pt-3 sm:pt-0 sm:pl-6">
+        <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 lg:gap-4 sm:justify-center text-center sm:text-left pt-5 sm:pt-0 sm:pl-6">
           <div
-            className={`w-[38px] h-[38px] lg:w-[42px] lg:h-[42px] rounded-[12px] grid place-items-center shrink-0 ${
+            className={`w-[46px] h-[46px] sm:w-[38px] sm:h-[38px] lg:w-[42px] lg:h-[42px] rounded-[14px] sm:rounded-[12px] grid place-items-center shrink-0 ${
               lucroPositivo ? 'bg-grn/[0.13] text-grn' : 'bg-red/[0.13] text-red'
             }`}
           >
-            {lucroPositivo ? <TrendingUp size={20} strokeWidth={1.9} /> : <TrendingDown size={20} strokeWidth={1.9} />}
+            {lucroPositivo ? (
+              <TrendingUp className="w-6 h-6 sm:w-5 sm:h-5" strokeWidth={1.9} />
+            ) : (
+              <TrendingDown className="w-6 h-6 sm:w-5 sm:h-5" strokeWidth={1.9} />
+            )}
           </div>
-          <div className="min-w-0">
-            <div className="text-[11.5px] lg:text-[12px] text-dim font-medium">
+          <div className="min-w-0 w-full sm:w-auto">
+            <div className="text-[13px] sm:text-[11.5px] lg:text-[12px] text-dim font-medium">
               {lucroPositivo ? 'Lucro Real (período)' : 'Prejuízo Real (período)'}
             </div>
             <div
-              className={`mono text-[25px] lg:text-[30px] font-extrabold tracking-tight leading-tight truncate ${
+              className={`mono text-[34px] sm:text-[25px] lg:text-[30px] font-extrabold tracking-tight leading-tight truncate mt-0.5 sm:mt-0 ${
                 lucroPositivo ? 'text-grn' : 'text-red'
               }`}
             >
               {formatBRL(pnl.lucro_real)}
             </div>
-            <div className="text-[10.5px] text-dim2 mt-0.5">Margem {formatPercent(pnl.margem_real)}</div>
+            <div className="text-[12px] sm:text-[10.5px] text-dim2 mt-1 sm:mt-0.5">Margem {formatPercent(pnl.margem_real)}</div>
           </div>
         </div>
       </div>
