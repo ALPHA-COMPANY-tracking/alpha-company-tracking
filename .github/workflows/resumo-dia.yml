@@ -5,11 +5,26 @@ name: Resumo do dia
 
 on:
   schedule:
-    # Parciais: 9h, 11h, 13h, 15h, 17h e 19h de Brasília
-    - cron: '0 12,14,16,18,20,22 * * *'
     # Fechamento: 21h de Brasília (00h UTC do dia seguinte)
     - cron: '0 0 * * *'
+
+    # ── PARCIAIS DESLIGADOS ────────────────────────────────────
+    # Só fazem sentido quando o gasto diário do Meta chegar sozinho
+    # (hoje o Ads é lançado à mão, então o ROAS do meio do dia sairia
+    # sem base). Para religar, basta descomentar a linha abaixo:
+    # parciais às 9h, 11h, 13h, 15h, 17h e 19h de Brasília.
+    #
+    # - cron: '0 12,14,16,18,20,22 * * *'
+    # ───────────────────────────────────────────────────────────
+
   workflow_dispatch: # permite disparar na mão pelo GitHub
+    inputs:
+      tipo:
+        description: 'Tipo do resumo'
+        required: false
+        default: final
+        type: choice
+        options: [final, parcial]
 
 jobs:
   notificar:
@@ -19,12 +34,18 @@ jobs:
         env:
           CRON_TOKEN: ${{ secrets.CRON_TOKEN }}
         run: |
-          # O agendamento das 00h UTC é o fechamento; os demais, parciais.
-          if [ "${{ github.event.schedule }}" = "0 0 * * *" ]; then TIPO=final; else TIPO=parcial; fi
+          # Só o agendamento das 00h UTC está ativo hoje (fechamento).
+          # Se os parciais forem religados, eles caem no else.
+          if [ -n "${{ github.event.inputs.tipo }}" ]; then
+            TIPO="${{ github.event.inputs.tipo }}"
+          elif [ "${{ github.event.schedule }}" = "0 0 * * *" ]; then
+            TIPO=final
+          else
+            TIPO=parcial
+          fi
           echo "Enviando resumo: $TIPO"
           RESPOSTA=$(curl -s -m 30 -X POST \
             -H "Authorization: Bearer $CRON_TOKEN" \
             "https://alpha-company-tracking-eight.vercel.app/api/resumo-dia?tipo=$TIPO")
           echo "$RESPOSTA"
-          # Falha o job se a API não confirmou, para aparecer no GitHub.
           echo "$RESPOSTA" | grep -q '"ok":true' || echo "::warning::resumo não enviado"
