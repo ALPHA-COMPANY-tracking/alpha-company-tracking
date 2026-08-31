@@ -94,7 +94,7 @@ export function CustoModal({
                 type="date"
                 value={form.data}
                 onChange={(e) => setForm({ ...form, data: e.target.value })}
-                className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx text-[13px] outline-none focus:border-pur [color-scheme:dark]"
+                className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx text-[13px] outline-none focus:border-pur "
               />
             </Campo>
             <Campo label="Valor">
@@ -134,7 +134,7 @@ export function CustoModal({
               checked={form.mensal}
               onChange={(e) => setForm({ ...form, mensal: e.target.checked })}
             />
-            <span className="w-[29px] h-4 rounded-full bg-[#2f2f3b] relative transition-colors peer-checked:bg-pur3 after:content-[''] after:absolute after:top-[2.5px] after:left-[2.5px] after:w-[11px] after:h-[11px] after:rounded-full after:bg-[#75758a] after:transition-all peer-checked:after:left-[15px] peer-checked:after:bg-white" />
+            <span className="w-[29px] h-4 rounded-full bg-line2 relative transition-colors peer-checked:bg-pur3 after:content-[''] after:absolute after:top-[2.5px] after:left-[2.5px] after:w-[11px] after:h-[11px] after:rounded-full after:bg-dim2 after:transition-all peer-checked:after:left-[15px] peer-checked:after:bg-white" />
             Repete todo mês (rateia pelos dias do período)
           </label>
 

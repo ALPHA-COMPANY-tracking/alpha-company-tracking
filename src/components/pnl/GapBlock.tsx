@@ -41,7 +41,7 @@ export function GapBlock({ pnl }: { pnl: PnlResult }) {
         />
       </div>
 
-      <div className="h-[10px] bg-[#22222b] rounded-full overflow-hidden">
+      <div className="h-[10px] bg-trilha rounded-full overflow-hidden">
         <div className="h-full rounded-full bg-gradient-to-r from-grn/70 to-grn" style={{ width: `${pct}%` }} />
       </div>
 

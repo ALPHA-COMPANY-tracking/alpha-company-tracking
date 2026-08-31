@@ -98,7 +98,7 @@ export function ImportCsvModal({ aberto, onClose }: { aberto: boolean; onClose: 
                 {linhas.map((l, i) => (
                   <div
                     key={i}
-                    className={`px-3 py-[7px] text-[11.5px] flex items-center justify-between border-b border-[#22222b] last:border-b-0 ${
+                    className={`px-3 py-[7px] text-[11.5px] flex items-center justify-between border-b border-trilha last:border-b-0 ${
                       l.ok ? 'text-dim' : 'text-red bg-red/[0.05]'
                     }`}
                   >

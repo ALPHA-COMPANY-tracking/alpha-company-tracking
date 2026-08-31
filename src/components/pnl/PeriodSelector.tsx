@@ -32,7 +32,7 @@ export function PeriodSelector({
               key={p.id}
               onClick={() => onPreset(p.id)}
               className={`inline-flex items-center gap-1.5 px-[13px] lg:px-[16px] py-[7px] lg:py-[8px] rounded-full text-[13px] lg:text-[13.5px] font-semibold whitespace-nowrap shrink-0 transition-colors ${
-                ativo ? 'bg-tx text-[#141419]' : 'text-dim hover:text-tx'
+                ativo ? 'bg-tx text-bg' : 'text-dim hover:text-tx'
               }`}
             >
               {p.id === 'personalizado' && <CalendarDays size={13} />}
@@ -49,7 +49,7 @@ export function PeriodSelector({
             value={periodo.inicio}
             max={periodo.fim}
             onChange={(e) => onCustom({ ...periodo, inicio: e.target.value })}
-            className="bg-transparent text-[12.5px] text-tx outline-none [color-scheme:dark]"
+            className="bg-transparent text-[12.5px] text-tx outline-none "
           />
           <span className="text-dim2 text-xs">→</span>
           <input
@@ -57,7 +57,7 @@ export function PeriodSelector({
             value={periodo.fim}
             min={periodo.inicio}
             onChange={(e) => onCustom({ ...periodo, fim: e.target.value })}
-            className="bg-transparent text-[12.5px] text-tx outline-none [color-scheme:dark]"
+            className="bg-transparent text-[12.5px] text-tx outline-none "
           />
         </div>
       )}

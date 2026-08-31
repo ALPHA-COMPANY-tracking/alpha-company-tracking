@@ -5,9 +5,44 @@
 @tailwind utilities;
 
 @layer base {
+  /* Tons neutros do tema. Em RGB puro para o Tailwind poder aplicar
+     opacidade (bg-card/40). O escuro é exatamente a paleta de sempre. */
   :root {
     color-scheme: dark;
+    --bg: 20 20 25; /* #141419 */
+    --card: 28 28 36; /* #1c1c24 */
+    --card2: 32 32 42; /* #20202a */
+    --card3: 23 23 30; /* #17171e — painéis internos */
+    --chip: 35 35 44; /* #23232c — quadradinho do ícone */
+    --trilha: 34 34 43; /* #22222b — fundo de barra de progresso */
+    --hover: 30 30 39; /* #1e1e27 */
+    --line: 42 42 53; /* #2a2a35 */
+    --line2: 51 51 63; /* #33333f */
+    --tx: 234 234 242; /* #eaeaf2 */
+    --tx2: 220 220 230; /* #dcdce6 */
+    --dim: 154 154 171; /* #9a9aab */
+    --dim2: 107 107 124; /* #6b6b7c */
   }
+
+  /* Modo claro: mesma estrutura, tons invertidos. As cores de destaque
+     (verde, roxo, dourado…) valem para os dois temas. */
+  :root.tema-claro {
+    color-scheme: light;
+    --bg: 244 245 248;
+    --card: 255 255 255;
+    --card2: 248 249 251;
+    --card3: 241 242 246;
+    --chip: 236 238 243;
+    --trilha: 228 230 237;
+    --hover: 240 241 245;
+    --line: 223 225 232;
+    --line2: 205 208 218;
+    --tx: 24 25 32;
+    --tx2: 44 46 56;
+    --dim: 92 96 110;
+    --dim2: 128 132 146;
+  }
+
   html,
   body,
   #root {
@@ -15,10 +50,12 @@
   }
   body {
     margin: 0;
-    background: #141419;
-    color: #eaeaf2;
+    background: rgb(var(--bg));
+    color: rgb(var(--tx));
     font-family: Inter, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+    /* Sem transition aqui: quando a cor vem de variável CSS, o navegador
+       segura o valor antigo e o fundo não acompanha a troca de tema. */
   }
   * {
     box-sizing: border-box;

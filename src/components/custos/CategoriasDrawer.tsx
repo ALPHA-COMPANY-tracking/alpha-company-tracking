@@ -124,7 +124,7 @@ export function CategoriasDrawer({ aberto, onClose }: { aberto: boolean; onClose
                     checked={cat.ativo}
                     onChange={(e) => updateCategoria(cat.id, { ativo: e.target.checked })}
                   />
-                  <span className="w-[29px] h-4 rounded-full bg-[#2f2f3b] relative transition-colors peer-checked:bg-grn/70 after:content-[''] after:absolute after:top-[2.5px] after:left-[2.5px] after:w-[11px] after:h-[11px] after:rounded-full after:bg-[#75758a] after:transition-all peer-checked:after:left-[15px] peer-checked:after:bg-white" />
+                  <span className="w-[29px] h-4 rounded-full bg-line2 relative transition-colors peer-checked:bg-grn/70 after:content-[''] after:absolute after:top-[2.5px] after:left-[2.5px] after:w-[11px] after:h-[11px] after:rounded-full after:bg-dim2 after:transition-all peer-checked:after:left-[15px] peer-checked:after:bg-white" />
                 </label>
                 <button
                   onClick={() => setConfirmar(cat.id)}

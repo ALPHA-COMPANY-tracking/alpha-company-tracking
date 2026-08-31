@@ -93,7 +93,7 @@ export function AdsScreen(_props: { periodo: Periodo }) {
                 type="date"
                 value={data}
                 onChange={(e) => selecionarData(e.target.value)}
-                className="w-full lg:w-auto bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-[13px] text-tx outline-none [color-scheme:dark] focus:border-gold/50"
+                className="w-full lg:w-auto bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-[13px] text-tx outline-none focus:border-gold/50"
               />
             </label>
 
@@ -125,7 +125,7 @@ export function AdsScreen(_props: { periodo: Periodo }) {
             <button
               onClick={salvar}
               className={`col-span-2 lg:col-span-1 inline-flex items-center justify-center gap-2 px-5 py-[11px] rounded-[10px] text-[13px] font-semibold transition-colors ${
-                salvo ? 'bg-grn/15 text-grn border border-grn/40' : 'bg-white text-[#141419] active:bg-white/90'
+                salvo ? 'bg-grn/15 text-grn border border-grn/40' : 'bg-white text-bg active:bg-white/90'
               }`}
             >
               {salvo ? <><Check size={16} /> Salvo</> : <><Save size={16} /> Salvar</>}

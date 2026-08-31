@@ -136,26 +136,26 @@ export function CustosScreen({ periodo }: { periodo: Periodo }) {
                   const cat = catMap.get(c.categoria_id ?? '');
                   return (
                     <tr key={c.id} className="hover:bg-card2 group">
-                      <td className="px-4 py-3 border-b border-[#22222b] mono text-dim whitespace-nowrap">{fmtData(c.data)}</td>
-                      <td className="px-4 py-3 border-b border-[#22222b] whitespace-nowrap">
+                      <td className="px-4 py-3 border-b border-trilha mono text-dim whitespace-nowrap">{fmtData(c.data)}</td>
+                      <td className="px-4 py-3 border-b border-trilha whitespace-nowrap">
                         <span className="inline-flex items-center gap-2">
                           <span className="w-[8px] h-[8px] rounded-full" style={{ background: cat?.cor ?? '#6b7280' }} />
-                          <span className="text-[#dcdce6]">{cat?.nome ?? 'Sem categoria'}</span>
+                          <span className="text-tx2">{cat?.nome ?? 'Sem categoria'}</span>
                         </span>
                       </td>
-                      <td className="px-4 py-3 border-b border-[#22222b] text-[#dcdce6]">{c.descricao}</td>
-                      <td className="px-4 py-3 border-b border-[#22222b] text-right mono font-semibold text-red whitespace-nowrap">
+                      <td className="px-4 py-3 border-b border-trilha text-tx2">{c.descricao}</td>
+                      <td className="px-4 py-3 border-b border-trilha text-right mono font-semibold text-red whitespace-nowrap">
                         {formatBRL(valor)}
                         {c.recorrencia === 'mensal' && <div className="text-[10px] text-dim2 font-normal">de {formatBRL(Math.round(c.valor * 100))}/mês</div>}
                       </td>
-                      <td className="px-4 py-3 border-b border-[#22222b]">
+                      <td className="px-4 py-3 border-b border-trilha">
                         {c.recorrencia === 'mensal' ? (
                           <span className="text-[10px] font-semibold rounded-md px-2 py-[3px] bg-pur/15 text-pur2">Mensal</span>
                         ) : (
                           <span className="text-[10px] font-semibold rounded-md px-2 py-[3px] bg-[#26262f] text-dim">Único</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 border-b border-[#22222b] text-right whitespace-nowrap">
+                      <td className="px-4 py-3 border-b border-trilha text-right whitespace-nowrap">
                         <button onClick={() => abrirEdit(c)} className="text-dim2 hover:text-blu p-1" title="Editar">
                           <Pencil size={15} />
                         </button>

@@ -51,13 +51,13 @@ function LinhaCusto({
   const pct = safeDiv(cents, receita);
   const barW = cents > 0 ? Math.max(1.5, Math.min(100, pct * 100)) : 0;
   return (
-    <div className="group px-3 lg:px-[18px] py-[10px] border-b border-[#212129] hover:bg-[#1e1e27] transition-colors">
+    <div className="group px-3 lg:px-[18px] py-[10px] border-b border-line hover:bg-hover transition-colors">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-[11px] min-w-0">
-          <span className="w-[30px] h-[30px] rounded-[9px] bg-[#23232c] grid place-items-center text-dim2 shrink-0 group-hover:text-dim transition-colors">
+          <span className="w-[30px] h-[30px] rounded-[9px] bg-chip grid place-items-center text-dim2 shrink-0 group-hover:text-dim transition-colors">
             <Icon size={15} strokeWidth={1.9} />
           </span>
-          <span className="text-[13.5px] text-[#dcdce6] truncate">
+          <span className="text-[13.5px] text-tx2 truncate">
             {label}
             {note && <span className="block text-[10.5px] text-dim2 mt-0.5">{note}</span>}
           </span>
@@ -69,7 +69,7 @@ function LinhaCusto({
           <div className="text-[10px] text-dim2 mono mt-0.5">{formatPercent(pct)} da receita</div>
         </div>
       </div>
-      <div className="mt-[9px] ml-[41px] h-[3px] rounded-full bg-[#22222b] overflow-hidden">
+      <div className="mt-[9px] ml-[41px] h-[3px] rounded-full bg-trilha overflow-hidden">
         <div className="h-full rounded-full bg-gradient-to-r from-red/40 to-red" style={{ width: `${barW}%` }} />
       </div>
       {detalhe && <div className="ml-[41px] mt-[10px]">{detalhe}</div>}
@@ -94,7 +94,7 @@ function BarraSegmentada({
 }) {
   const soma = segmentos.reduce((a, s) => a + s.total, 0) || 1;
   return (
-    <div className="flex h-[7px] rounded-full overflow-hidden gap-[2px] bg-[#22222b]">
+    <div className="flex h-[7px] rounded-full overflow-hidden gap-[2px] bg-trilha">
       {segmentos.map((s, i) => (
         <div key={i} style={{ width: `${(s.total / soma) * 100}%`, background: s.cor }} className="h-full first:rounded-l-full last:rounded-r-full" />
       ))}
@@ -193,7 +193,7 @@ export function Demonstrativo({
               {pnl.comissoes_por_vendedor.map((v) => (
                 <div key={v.nome} className="flex items-center justify-between gap-3 text-[11.5px]">
                   <span className="flex items-center gap-[7px] min-w-0">
-                    <span className="text-[#c8c8d6] truncate">{v.nome}</span>
+                    <span className="text-tx2 truncate">{v.nome}</span>
                     <span className="mono text-[10px] font-bold text-blu border border-blu/30 bg-blu/10 rounded-full px-[6px] py-[1px] shrink-0">
                       {formatPercent(v.pct)}
                     </span>
@@ -214,7 +214,7 @@ export function Demonstrativo({
         detalhe={
           <div className="flex items-center justify-between gap-3 text-[11.5px]">
             <span className="flex items-center gap-[7px] min-w-0">
-              <span className="text-[#c8c8d6] truncate">{RESPONSAVEL_COBRANCA}</span>
+              <span className="text-tx2 truncate">{RESPONSAVEL_COBRANCA}</span>
               <span className="mono text-[10px] font-bold text-blu border border-blu/30 bg-blu/10 rounded-full px-[6px] py-[1px] shrink-0">
                 {formatPercent(COMISSAO_COBRANCA)}
               </span>
@@ -271,7 +271,7 @@ export function Demonstrativo({
                     <span className="flex items-center gap-[9px] min-w-0">
                       {isOpen ? <ChevronDown size={13} className="text-dim2 shrink-0" /> : <ChevronRight size={13} className="text-dim2 shrink-0" />}
                       <span className="w-[9px] h-[9px] rounded-full inline-block shrink-0" style={{ background: cor }} />
-                      <span className="text-[13.5px] text-[#dcdce6] truncate">{nome}</span>
+                      <span className="text-[13.5px] text-tx2 truncate">{nome}</span>
                       <span className="text-[9.5px] text-dim2 border border-line2 rounded-full px-[7px] py-[1.5px] shrink-0">{agg.qtd} lanç.</span>
                     </span>
                     <span className="text-right shrink-0">
@@ -279,7 +279,7 @@ export function Demonstrativo({
                       <span className="text-[10px] text-dim2 mono">{formatPercent(shareVar)} dos variáveis</span>
                     </span>
                   </div>
-                  <div className="mt-[9px] ml-[27px] h-[3px] rounded-full bg-[#22222b] overflow-hidden">
+                  <div className="mt-[9px] ml-[27px] h-[3px] rounded-full bg-trilha overflow-hidden">
                     <div className="h-full rounded-full" style={{ width: `${Math.max(2, shareVar * 100)}%`, background: cor }} />
                   </div>
                 </button>
@@ -322,7 +322,7 @@ export function Demonstrativo({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <TriangleAlert size={15} className="text-yel shrink-0" />
-              <span className="text-[13.5px] text-[#dcdce6]">Valor perdido</span>
+              <span className="text-[13.5px] text-tx2">Valor perdido</span>
               <span className="text-[9.5px] text-dim2 border border-line2 rounded-full px-[7px] py-[1.5px] shrink-0">
                 {pnl.qtd_frustrados} pedidos
               </span>
@@ -337,7 +337,7 @@ export function Demonstrativo({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <TriangleAlert size={15} className={modoFrustrados === 'real' ? 'text-red shrink-0' : 'text-yel shrink-0'} />
-              <span className={`text-[13.5px] ${modoFrustrados === 'real' ? 'font-semibold text-tx' : 'text-[#dcdce6]'}`}>
+              <span className={`text-[13.5px] ${modoFrustrados === 'real' ? 'font-semibold text-tx' : 'text-tx2'}`}>
                 Valor real perdido
               </span>
               {modoFrustrados === 'real' && <Chip>descontando</Chip>}
@@ -350,7 +350,7 @@ export function Demonstrativo({
         </div>
 
         {/* O que os frustrados descontam do Lucro Real */}
-        <div className="px-4 py-[12px] border-t border-yel/15 bg-[#17171e]">
+        <div className="px-4 py-[12px] border-t border-yel/15 bg-card3">
           <div className="text-[11px] text-dim2 mb-[8px]">Descontar do Lucro Real:</div>
           <div className="flex flex-wrap gap-[6px]">
             {opcoesFrustrados.map((op) => {
@@ -379,7 +379,7 @@ export function Demonstrativo({
       </div>
 
       {/* PARA ONDE FOI CADA REAL */}
-      <div className="mx-3 lg:mx-[18px] mb-2 rounded-[12px] bg-[#17171e] border border-line px-4 py-[14px]">
+      <div className="mx-3 lg:mx-[18px] mb-2 rounded-[12px] bg-card3 border border-line px-4 py-[14px]">
         <div className="text-[9.5px] tracking-[0.16em] uppercase font-bold text-dim2 mb-[10px]">Para onde foi cada real do faturamento</div>
         <div className="flex h-[10px] rounded-full overflow-hidden gap-[2px]">
           {composicao.map((s, i) => (
@@ -437,9 +437,9 @@ export function Demonstrativo({
       </div>
 
       {/* COMPARAÇÃO AFTERPAY */}
-      <div className="px-3 lg:px-[18px] py-[13px] flex items-center justify-between flex-wrap gap-2 bg-[#141319] border-t border-[#22222b] text-[12px] text-dim">
+      <div className="px-3 lg:px-[18px] py-[13px] flex items-center justify-between flex-wrap gap-2 bg-[#141319] border-t border-trilha text-[12px] text-dim">
         <div>
-          Lucro segundo o Afterpay: <b className="text-[#cfcfdd] font-semibold mono">{formatBRL(pnl.lucro_afterpay)}</b>{' '}
+          Lucro segundo o Afterpay: <b className="text-tx2 font-semibold mono">{formatBRL(pnl.lucro_afterpay)}</b>{' '}
           <span className="text-dim2">(margem {formatPercent(pnl.margem_afterpay)})</span>
         </div>
         <div className="flex items-center gap-2">

@@ -7,6 +7,7 @@ import { usePeriodo } from '@/store/usePeriodo';
 import { PeriodSelector } from '@/components/pnl/PeriodSelector';
 import { CustoModal } from '@/components/CustoModal';
 import { BotaoNotificacoes } from '@/components/BotaoNotificacoes';
+import { BotaoTemaCompacto, RodapeConta } from '@/components/RodapeConta';
 import { PnlScreen } from '@/screens/PnlScreen';
 import { CustosScreen } from '@/screens/CustosScreen';
 import { FrustradosScreen } from '@/screens/FrustradosScreen';
@@ -71,31 +72,12 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
           })}
         </nav>
 
-        {/* Rodapé do menu: conta (só desktop) */}
-        <div className="hidden lg:flex flex-col gap-3 mt-6 pt-4 border-t border-line/70 text-[12px]">
-          <span className="text-dim">
-            {onLogout ? (
-              <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-grn" /> Nuvem</span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-dim2" /> Modo local</span>
-            )}
-          </span>
-          <span className="text-dim">Olá, <b className="text-tx font-semibold">{nome}</b></span>
-          <BotaoNotificacoes />
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              className="inline-flex items-center gap-1.5 text-[12px] text-dim2 hover:text-red border border-line2 rounded-lg px-2.5 py-1.5 w-fit"
-              title={email}
-            >
-              <LogOut size={14} /> Sair
-            </button>
-          )}
-        </div>
+        {/* Conta, tema, notificações e sair */}
+        <RodapeConta nome={nome} email={email} nuvem={!!onLogout} onLogout={onLogout} />
       </aside>
 
       {/* ───────── Cabeçalho fixo do celular ───────── */}
-      <header className="lg:hidden sticky top-0 z-40 bg-[#141419]/95 backdrop-blur-md border-b border-line">
+      <header className="lg:hidden sticky top-0 z-40 bg-bg/95 backdrop-blur-md border-b border-line">
         <div className="flex items-center justify-between gap-2 px-4 h-14">
           <div className="flex items-center gap-2.5 min-w-0">
             <LogoMark size={30} />
@@ -104,6 +86,7 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
             </span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            <BotaoTemaCompacto />
             <BotaoNotificacoes compacto />
             <button
               onClick={atualizar}
@@ -157,7 +140,7 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
       </main>
 
       {/* ───────── Barra de navegação inferior (celular) ───────── */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-[#17171e]/97 backdrop-blur-md border-t border-line2 pb-[env(safe-area-inset-bottom)]">
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card3/97 backdrop-blur-md border-t border-line2 pb-[env(safe-area-inset-bottom)]">
         <div className="grid grid-cols-6">
           {TABS.map(({ id, curto, Icon }) => {
             const ativo = tab === id;

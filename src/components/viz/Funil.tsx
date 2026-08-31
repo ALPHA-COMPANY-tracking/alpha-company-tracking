@@ -18,7 +18,7 @@ export function Funil({ pnl }: { pnl: PnlResult }) {
               <span>{l.rotulo}</span>
               <span className="mono">{l.qtd} pedidos</span>
             </div>
-            <div className="relative h-[30px] bg-[#22222b] rounded-lg overflow-hidden">
+            <div className="relative h-[30px] bg-trilha rounded-lg overflow-hidden">
               <div
                 className="h-full rounded-lg"
                 style={{ width: `${Math.max(2, Math.min(100, l.pct))}%`, background: `linear-gradient(90deg, ${l.cor}aa, ${l.cor})` }}
@@ -30,7 +30,7 @@ export function Funil({ pnl }: { pnl: PnlResult }) {
           </div>
         ))}
       </div>
-      <div className="px-[18px] py-[13px] flex items-center justify-between bg-[#17171e] border-t border-[#22222b] text-[12px]">
+      <div className="px-[18px] py-[13px] flex items-center justify-between bg-card3 border-t border-trilha text-[12px]">
         <span className="text-dim">Pendente de aprovação</span>
         <span>
           <b className="mono text-yel">{formatBRL(pnl.valor_pendente)}</b>{' '}

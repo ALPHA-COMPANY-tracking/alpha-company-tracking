@@ -1,12 +1,20 @@
 import { useEffect, useState } from 'react';
 import { Bell, BellOff, BellRing, Loader2 } from 'lucide-react';
 import { type EstadoPush, desligarPush, estadoPush, ligarPush, pushSuportado } from '@/lib/push';
+import { ItemMenu } from '@/components/RodapeConta';
 
 /**
  * Liga/desliga as notificações de pedido pago e agendado neste aparelho.
  * Some quando o navegador não suporta push.
  */
-export function BotaoNotificacoes({ compacto = false }: { compacto?: boolean }) {
+export function BotaoNotificacoes({
+  compacto = false,
+  formato = 'botao',
+}: {
+  compacto?: boolean;
+  /** 'menu' = linha do menu lateral; 'botao' = botão com moldura. */
+  formato?: 'botao' | 'menu';
+}) {
   const [estado, setEstado] = useState<EstadoPush>('indisponivel');
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -40,6 +48,22 @@ export function BotaoNotificacoes({ compacto = false }: { compacto?: boolean }) 
       : 'Receber aviso de pedido pago e agendado';
 
   const Icone = ocupado ? Loader2 : bloqueado ? BellOff : ligado ? BellRing : Bell;
+
+  if (formato === 'menu') {
+    return (
+      <>
+        <ItemMenu
+          Icon={Icone}
+          rotulo={bloqueado ? 'Notificações bloqueadas' : ligado ? 'Notificações Ativas' : 'Ativar notificações'}
+          onClick={alternar}
+          ativo={ligado}
+          desabilitado={ocupado || bloqueado}
+          girando={ocupado}
+        />
+        {erro && <span className="px-1 text-[11px] text-red">{erro}</span>}
+      </>
+    );
+  }
 
   if (compacto) {
     return (
