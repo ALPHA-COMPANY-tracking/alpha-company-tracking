@@ -50,12 +50,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       hour: '2-digit',
       minute: '2-digit',
     });
-    const carga = JSON.stringify({
+
+    // 'agendado' e 'pago' simulam o aviso real, com o mesmo texto que o
+    // webhook usa — serve para ver como fica antes de acontecer de verdade.
+    const corpo = (typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body) ?? {};
+    const tipo = String(corpo.tipo ?? 'teste');
+    const vendedor = String(corpo.vendedor ?? 'PETER');
+    const valor = Number(corpo.valor ?? 735);
+
+    let aviso = {
       titulo: '🔔 Notificação de teste',
       corpo: `Está tudo funcionando. Enviado às ${hora}.`,
       tag: 'teste',
-      url: '/',
-    });
+    };
+    if (tipo === 'agendado' || tipo === 'pago') {
+      try {
+        // Import sob demanda: estático de módulo local derruba a função aqui.
+        const { avisoDoEvento } = await import('../server/push');
+        const real = avisoDoEvento(
+          tipo === 'pago' ? 'ORDER_PAID' : 'ORDER_CREATE',
+          tipo === 'pago' ? 'pagos' : 'cadastrados',
+          vendedor,
+          valor,
+        );
+        if (real) aviso = { titulo: real.titulo, corpo: real.corpo, tag: real.tag ?? tipo };
+      } catch {
+        // Sem o módulo, manda o texto de teste mesmo — melhor que falhar.
+      }
+    }
+
+    const carga = JSON.stringify({ ...aviso, url: '/' });
 
     let enviados = 0;
     const falhas: string[] = [];
