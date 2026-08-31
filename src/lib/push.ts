@@ -81,6 +81,21 @@ export async function ligarPush(): Promise<EstadoPush> {
   return 'ligado';
 }
 
+/** Pede ao servidor uma notificação de teste. Devolve o texto do resultado. */
+export async function enviarTeste(): Promise<string> {
+  const resp = await fetch('/api/push-test', { method: 'POST' });
+  const dados = (await resp.json().catch(() => ({}))) as {
+    ok?: boolean;
+    enviados?: number;
+    aviso?: string;
+    error?: string;
+  };
+  if (!resp.ok) throw new Error(dados.error ?? 'Falha ao enviar o teste.');
+  if (!dados.ok) throw new Error(dados.aviso ?? 'Nenhum aparelho recebeu.');
+  const n = dados.enviados ?? 0;
+  return n > 1 ? `Enviado para ${n} aparelhos` : 'Enviado! Veja a notificação';
+}
+
 /** Cancela a inscrição deste aparelho. */
 export async function desligarPush(): Promise<EstadoPush> {
   const reg = await navigator.serviceWorker.getRegistration();
