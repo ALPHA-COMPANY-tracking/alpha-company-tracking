@@ -89,6 +89,16 @@ describe('comissão no P&L', () => {
     expect(soma).toBe(pnl.comissoes_vendedor);
   });
 
+  it('não duplica quem está configurado com outra caixa (Matheus/MATHEUS)', () => {
+    // O BlueSales manda "Matheus"; a configuração usa "MATHEUS".
+    const pnl = calcularPnl([], [], periodo, {}, [pago('m1', 500, 'Matheus'), pago('p1', 1000, 'PETER')]);
+    const doMatheus = pnl.comissoes_por_vendedor.filter((v) => v.nome.toUpperCase() === 'MATHEUS');
+    expect(doMatheus).toHaveLength(1);
+    expect(doMatheus[0].nome).toBe('Matheus'); // mostra como veio do BlueSales
+    expect(doMatheus[0].receita).toBe(50_000);
+    expect(doMatheus[0].pct).toBe(0.06);
+  });
+
   it('vendedor configurado aparece com o % mesmo sem venda no período', () => {
     // MATHEUS começa 31/08: antes disso precisa aparecer zerado, com os 6%.
     const pnl = calcularPnl([], [], periodo, {}, [pago('p1', 1000, 'PETER')]);

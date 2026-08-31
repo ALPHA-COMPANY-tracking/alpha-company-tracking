@@ -187,19 +187,34 @@ function comissaoVendedores(
   receitaTotal: Cents,
   taxas: Cents,
 ): ComissaoVendedor[] {
-  const receitaPorNome = new Map<string, Cents>();
+  // Agrupa ignorando maiúsculas e acentos: o BlueSales manda "Matheus" e a
+  // configuração usa "MATHEUS" — sem isso a mesma pessoa vira duas linhas.
+  const chave = (s: string) =>
+    s
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .trim()
+      .toUpperCase();
+
+  const porPessoa = new Map<string, { nome: string; receita: Cents }>();
   for (const a of porAtendente) {
     const nome = a.nome.trim() || 'Sem atendente';
-    receitaPorNome.set(nome, (receitaPorNome.get(nome) ?? 0) + reaisToCents(a.receita));
+    const k = chave(nome);
+    const atual = porPessoa.get(k);
+    porPessoa.set(k, {
+      nome: atual?.nome ?? nome, // mantém o nome como veio do BlueSales
+      receita: (atual?.receita ?? 0) + reaisToCents(a.receita),
+    });
   }
   // Quem tem percentual configurado aparece mesmo sem venda no período,
   // para a taxa combinada ficar sempre visível.
   for (const nome of Object.keys(COMISSAO_POR_VENDEDOR)) {
-    if (!receitaPorNome.has(nome)) receitaPorNome.set(nome, 0);
+    const k = chave(nome);
+    if (!porPessoa.has(k)) porPessoa.set(k, { nome, receita: 0 });
   }
 
-  return [...receitaPorNome.entries()]
-    .map(([nome, receita]) => {
+  return [...porPessoa.values()]
+    .map(({ nome, receita }) => {
       const pct = comissaoDoVendedor(nome);
       const taxasV = receitaTotal > 0 ? Math.round(taxas * (receita / receitaTotal)) : 0;
       const comissao = receita > 0 ? Math.round((receita - taxasV) * pct) : 0;
