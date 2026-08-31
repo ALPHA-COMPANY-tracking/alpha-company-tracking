@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const [{ createClient }, { hojeSP, montarResumo, avisoDoResumo }] = await Promise.all([
       import('@supabase/supabase-js'),
-      import('./lib-resumo'),
+      import('./lib-resumo.js'),
     ]);
 
     const db = createClient(process.env.SUPABASE_URL ?? '', process.env.SUPABASE_SERVICE_ROLE_KEY ?? '', {

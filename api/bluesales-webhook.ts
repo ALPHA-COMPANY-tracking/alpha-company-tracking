@@ -178,7 +178,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Por isso o módulo é carregado sob demanda, dentro do try.
   let notificados = 0;
   try {
-    const { avisoDoEvento, enviarPush } = await import('./lib-push');
+    const { avisoDoEvento, enviarPush } = await import('./lib-push.js');
     // Nome do cliente só para escrever a mensagem — não vai para o banco
     // nem para o log (semDadosPessoais remove o bloco inteiro).
     const cliente = (body.customer ?? body.cliente ?? {}) as Record<string, unknown>;

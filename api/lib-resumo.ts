@@ -3,7 +3,7 @@
 // Mesmas regras do P&L da tela (ver src/lib/pnl.ts).
 // ─────────────────────────────────────────────────────────────
 
-import { COMISSAO_COBRANCA, FRETE_POR_PEDIDO, comissaoDoVendedor, custoProdutoDoPlano, ehPago } from './lib-custos';
+import { COMISSAO_COBRANCA, FRETE_POR_PEDIDO, comissaoDoVendedor, custoProdutoDoPlano, ehPago } from './lib-custos.js';
 
 export interface ResumoDia {
   data: string;
