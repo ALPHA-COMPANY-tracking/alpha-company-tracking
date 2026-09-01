@@ -185,6 +185,10 @@ export function Demonstrativo({
       <LinhaCusto
         Icon={Users}
         label="Comissões Vendedor"
+        // A base não é a receita cheia: o BlueSales tira a taxa de plataforma
+        // antes de comissionar. Mostrar a base deixa qualquer divergência
+        // com o BlueSales visível na hora.
+        note={`sobre ${formatBRL(receita - pnl.taxas_plataforma)} (receita − taxas de plataforma)`}
         cents={pnl.comissoes_vendedor}
         receita={receita}
         detalhe={

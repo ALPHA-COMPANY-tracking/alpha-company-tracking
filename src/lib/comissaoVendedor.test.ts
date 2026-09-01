@@ -122,6 +122,15 @@ describe('comissão no P&L', () => {
     expect(m.comissao).toBe(0); // comissão só com o pagamento
   });
 
+  it('a taxa do dia muda a comissão: R$ 1.170,00 dá 58,50 sem taxa e 58,25 com R$ 5,00', () => {
+    // Caso real de divergência com o BlueSales: 2 pagamentos somando
+    // R$ 1.170,00. Sem a taxa lançada dava R$ 58,50; o BlueSales mostrava
+    // R$ 58,25 porque já tinha descontado os R$ 5,00 do dia.
+    const pedidos = [pago('p1', 735, 'PETER'), pago('p2', 435, 'PETER')];
+    expect(calcularPnl([], [], periodo, {}, pedidos).comissoes_vendedor).toBe(5_850);
+    expect(calcularPnl([daily('2026-08-10', 5)], [], periodo, {}, pedidos).comissoes_vendedor).toBe(5_825);
+  });
+
   it('vendedor configurado aparece com o % mesmo sem venda no período', () => {
     // MATHEUS começa 31/08: antes disso precisa aparecer zerado, com os 6%.
     const pnl = calcularPnl([], [], periodo, {}, [pago('p1', 1000, 'PETER')]);
