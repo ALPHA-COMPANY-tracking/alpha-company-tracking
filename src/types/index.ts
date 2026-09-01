@@ -17,6 +17,9 @@ export interface AfterpayDaily {
 
   // Deduções
   taxas_plataforma: number;
+  /** A taxa do dia já foi conferida no BlueSales? Separa "cobrou R$ 0,00"
+   *  de "ninguém olhou ainda" — as duas gravam 0 acima. */
+  taxa_conferida?: boolean;
 
   // Custos operacionais
   custo_produtos: number;
@@ -101,6 +104,9 @@ export interface Pedido {
   /** Perda real deste pedido quando frustrado (ajuste manual).
    *  null = calcular automaticamente (custo do produto + frete). */
   perda_real?: number | null;
+  /** Taxa de plataforma cobrada pelo BlueSales neste pagamento.
+   *  null = não informada; o dia cai no valor de afterpay_daily. */
+  taxa_plataforma?: number | null;
   produto_nome?: string | null;
   produto_plano?: string | null;
   codigo_plano?: string | null;

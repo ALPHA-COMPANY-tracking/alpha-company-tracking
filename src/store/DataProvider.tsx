@@ -32,6 +32,7 @@ interface DataContextValue {
 
   /** Ajusta a perda real de um frustrado; null volta ao cálculo automático. */
   definirPerdaPedido: (id: string, perda: number | null) => void;
+  definirTaxaPedido: (id: string, taxa: number | null) => void;
   lancarDaily: (daily: AfterpayDaily) => void;
   lancarDailies: (dailies: AfterpayDaily[]) => void;
   marcarSync: () => void;
@@ -170,6 +171,16 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
     [aplicar],
   );
 
+  const definirTaxaPedido = useCallback<DataContextValue['definirTaxaPedido']>(
+    (id, taxa) => {
+      aplicar(
+        (d) => ({ ...d, pedidos: d.pedidos.map((p) => (p.id === id ? { ...p, taxa_plataforma: taxa } : p)) }),
+        (b) => b.definirTaxaPedido(id, taxa),
+      );
+    },
+    [aplicar],
+  );
+
   const lancarDaily = useCallback<DataContextValue['lancarDaily']>(
     (daily) => {
       aplicar(
@@ -232,12 +243,13 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
       updateCategoria,
       deleteCategoria,
       definirPerdaPedido,
+      definirTaxaPedido,
       lancarDaily,
       lancarDailies,
       marcarSync,
       recarregar,
     };
-  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, definirPerdaPedido, lancarDaily, lancarDailies, marcarSync, recarregar]);
+  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, definirPerdaPedido, definirTaxaPedido, lancarDaily, lancarDailies, marcarSync, recarregar]);
 
   if (!value) {
     return (

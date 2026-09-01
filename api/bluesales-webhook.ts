@@ -118,6 +118,25 @@ export function mapearPedido(
   if (codPlano) pedido.codigo_plano = codPlano;
   const metodo = txt(pick(pagamento, 'method', 'método', 'metodo', 'label'));
   if (metodo) pedido.metodo_pagamento = metodo;
+
+  // Taxa de plataforma deste pagamento, se o BlueSales mandar. Só chaves
+  // que significam taxa sem ambiguidade — 'tax'/'imposto' ficam de fora
+  // de propósito, para não injetar um valor errado no P&L. Sem isso o dia
+  // cai no total lançado na tela Taxas.
+  const taxaBruta = pick(
+    pagamento,
+    'platform_fee',
+    'gateway_fee',
+    'fee',
+    'fees',
+    'taxa_plataforma',
+    'taxa_da_plataforma',
+    'taxa',
+  );
+  if (taxaBruta !== undefined) {
+    const t = num(taxaBruta);
+    if (t >= 0) pedido.taxa_plataforma = t;
+  }
   const vend = txt(pick(vendedor, 'name', 'nome'));
   if (vend) pedido.vendedor = vend;
   const rastreio = txt(pick(envio, 'tracking_code', 'código_de_rastreamento', 'codigo_de_rastreamento'));

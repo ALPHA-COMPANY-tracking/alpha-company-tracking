@@ -17,6 +17,7 @@ function mapDaily(r: Record<string, unknown>): AfterpayDaily {
     receita_aprovada: N(r.receita_aprovada),
     qtd_pagamentos: N(r.qtd_pagamentos),
     taxas_plataforma: N(r.taxas_plataforma),
+    taxa_conferida: Boolean(r.taxa_conferida),
     custo_produtos: N(r.custo_produtos),
     frete: N(r.frete),
     comissoes_vendedor: N(r.comissoes_vendedor),
@@ -99,6 +100,7 @@ export class SupabaseBackend implements Backend {
       valor_bruto: r.valor_bruto != null ? N(r.valor_bruto) : null,
       valor_agendado: r.valor_agendado != null ? N(r.valor_agendado) : null,
       perda_real: r.perda_real != null ? N(r.perda_real) : null,
+      taxa_plataforma: r.taxa_plataforma != null ? N(r.taxa_plataforma) : null,
       produto_nome: r.produto_nome ?? null,
       produto_plano: r.produto_plano ?? null,
       codigo_plano: r.codigo_plano ?? null,
@@ -157,6 +159,14 @@ export class SupabaseBackend implements Backend {
     const { error } = await this.db
       .from('bluesales_pedidos')
       .update({ perda_real: perda })
+      .eq('id', id)
+      .eq('user_id', this.userId);
+    if (error) throw error;
+  }
+  async definirTaxaPedido(id: string, taxa: number | null) {
+    const { error } = await this.db
+      .from('bluesales_pedidos')
+      .update({ taxa_plataforma: taxa })
       .eq('id', id)
       .eq('user_id', this.userId);
     if (error) throw error;

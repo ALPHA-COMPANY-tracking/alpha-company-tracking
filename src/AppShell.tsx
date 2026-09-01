@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BarChart3, Download, LogOut, Megaphone, PieChart, RefreshCw, TriangleAlert, Wallet } from 'lucide-react';
+import { BarChart3, Download, LogOut, Megaphone, PieChart, Receipt, RefreshCw, TriangleAlert, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { useData } from '@/store/DataProvider';
@@ -14,14 +14,16 @@ import { FrustradosScreen } from '@/screens/FrustradosScreen';
 import { VizScreen } from '@/screens/VizScreen';
 import { ExportScreen } from '@/screens/ExportScreen';
 import { AdsScreen } from '@/screens/AdsScreen';
+import { TaxasScreen } from '@/screens/TaxasScreen';
 
-type Tab = 'pnl' | 'ads' | 'custos' | 'frustrados' | 'viz' | 'export';
+type Tab = 'pnl' | 'ads' | 'custos' | 'taxas' | 'frustrados' | 'viz' | 'export';
 
 /** `curto` é o rótulo da barra inferior no celular, onde só cabe uma palavra. */
 const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
   { id: 'pnl', label: 'Demonstração de Resultados', curto: 'P&L', Icon: BarChart3 },
   { id: 'ads', label: 'Anúncios (Meta)', curto: 'Ads', Icon: Megaphone },
   { id: 'custos', label: 'Custos Variáveis', curto: 'Custos', Icon: Wallet },
+  { id: 'taxas', label: 'Taxas de Plataforma', curto: 'Taxas', Icon: Receipt },
   { id: 'frustrados', label: 'Frustrados', curto: 'Perdas', Icon: TriangleAlert },
   { id: 'viz', label: 'Visualização', curto: 'Gráficos', Icon: PieChart },
   { id: 'export', label: 'Exportador', curto: 'Exportar', Icon: Download },
@@ -136,6 +138,7 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
         {tab === 'pnl' && <PnlScreen periodo={periodo} onAddCusto={() => setModal(true)} onLancarManual={() => setTab('ads')} />}
         {tab === 'ads' && <AdsScreen periodo={periodo} />}
         {tab === 'custos' && <CustosScreen periodo={periodo} />}
+        {tab === 'taxas' && <TaxasScreen periodo={periodo} />}
         {tab === 'frustrados' && <FrustradosScreen periodo={periodo} />}
         {tab === 'viz' && <VizScreen periodo={periodo} />}
         {tab === 'export' && <ExportScreen periodo={periodo} />}
@@ -143,7 +146,7 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
 
       {/* ───────── Barra de navegação inferior (celular) ───────── */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card3/97 backdrop-blur-md border-t border-line2 pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-6">
+        <div className="grid grid-cols-7">
           {TABS.map(({ id, curto, Icon }) => {
             const ativo = tab === id;
             return (
