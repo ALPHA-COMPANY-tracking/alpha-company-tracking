@@ -168,19 +168,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const body = (typeof req.body === 'string' ? safeParse(req.body) : req.body) ?? {};
 
   // Log bruto SEM dados pessoais do cliente (LGPD): nome, e-mail, telefone,
-  // CPF e endereço nunca são guardados.
-  await supabase()
-    .from('webhook_logs')
-    .insert({
-      user_id: userId,
-      evento: body.event ?? null,
-      payload: semDadosPessoais(body as Record<string, unknown>),
-      processado: false,
-    })
-    .then(() => undefined, () => undefined);
+  // CPF e endereço nunca são guardados. Guardamos o id para anotar depois
+  // o que aconteceu com a notificação deste evento.
+  let logId: string | null = null;
+  try {
+    const { data } = await supabase()
+      .from('webhook_logs')
+      .insert({
+        user_id: userId,
+        evento: body.event ?? null,
+        payload: semDadosPessoais(body as Record<string, unknown>),
+        processado: false,
+      })
+      .select('id')
+      .single();
+    logId = (data?.id as string) ?? null;
+  } catch {
+    logId = null; // o log é diagnóstico; nunca pode derrubar o pedido
+  }
+
+  const anotar = async (patch: Record<string, unknown>) => {
+    if (!logId) return;
+    await supabase()
+      .from('webhook_logs')
+      .update(patch)
+      .eq('id', logId)
+      .then(() => undefined, () => undefined);
+  };
 
   const pedido = mapearPedido(body as Record<string, unknown>, userId);
   if (!pedido) {
+    await anotar({ push: 'ignorado: evento sem order.id' });
     return res.status(200).json({ ok: true, ignorado: 'sem order.id' });
   }
 
@@ -188,32 +206,115 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .from('bluesales_pedidos')
     .upsert(pedido, { onConflict: 'user_id,id' });
 
-  if (error) {
-    return res.status(500).json({ error: error.message });
-  }
+  // A notificação NÃO depende da gravação ter dado certo: são coisas
+  // independentes, e você precisa saber da venda mesmo que o banco falhe.
+  // Antes um erro de banco retornava aqui e o celular nunca tocava.
+  const push = await notificar(body as Record<string, unknown>, pedido, userId);
+  await anotar({ processado: !error, push });
 
-  // Notificação no celular. TUDO aqui é opcional: o pedido já está
-  // gravado, e nenhuma falha de push pode transformar isso num erro.
-  // Por isso o módulo é carregado sob demanda, dentro do try.
-  let notificados = 0;
+  if (error) {
+    return res.status(500).json({ error: error.message, push });
+  }
+  return res.status(200).json({ ok: true, id: pedido.id, status: pedido.status, push });
+}
+
+/**
+ * Manda o aviso e devolve um resumo curto do que aconteceu — é ele que
+ * vai para `webhook_logs.push`.
+ *
+ * O envio é feito AQUI, e não via lib-push: os dois endpoints que
+ * comprovadamente entregam (push-test e resumo-dia) mandam inline, e este
+ * era o único que delegava — e o único que nunca entregou. Esta
+ * hospedagem já derrubou funções por causa de módulo local duas vezes.
+ * Só o texto do aviso vem de lá, com cópia local caso o import falhe.
+ */
+async function notificar(
+  body: Record<string, unknown>,
+  pedido: Record<string, unknown>,
+  userId: string,
+): Promise<string> {
   try {
-    const { avisoDoEvento, enviarPush } = await import('./lib-push.js');
+    const publica = process.env.VAPID_PUBLIC_KEY;
+    const privada = process.env.VAPID_PRIVATE_KEY;
+    if (!publica || !privada) return 'chaves VAPID não configuradas';
+
+    const evento = String(body.event ?? '');
+    const status = String(pedido.status ?? '');
+    const vendedor = (pedido.vendedor as string) ?? null;
+    const valor = Number(pedido.valor ?? pedido.valor_agendado ?? 0);
     // Nome do cliente só para escrever a mensagem — não vai para o banco
     // nem para o log (semDadosPessoais remove o bloco inteiro).
     const cliente = (body.customer ?? body.cliente ?? {}) as Record<string, unknown>;
-    const aviso = avisoDoEvento(
-      String(body.event ?? ''),
-      String(pedido.status ?? ''),
-      (pedido.vendedor as string) ?? null,
-      Number(pedido.valor ?? pedido.valor_agendado ?? 0),
-      txt(pick(cliente, 'name', 'nome')) ?? null,
-    );
-    if (aviso) notificados = await enviarPush(supabase(), userId, aviso);
-  } catch {
-    notificados = 0;
-  }
+    const nomeCliente = txt(pick(cliente, 'name', 'nome')) ?? null;
 
-  return res.status(200).json({ ok: true, id: pedido.id, status: pedido.status, notificados });
+    const aviso = await montarAviso(evento, status, vendedor, valor, nomeCliente);
+    if (!aviso) return `sem aviso para ${evento || 'evento sem nome'} (${status})`;
+
+    const db = supabase();
+    const { data, error } = await db
+      .from('push_subscriptions')
+      .select('endpoint,p256dh,auth')
+      .eq('user_id', userId);
+    if (error) return 'banco: ' + error.message;
+    if (!data?.length) return 'nenhum aparelho inscrito';
+
+    const mod = await import('web-push');
+    const webpush = ((mod as unknown as { default?: unknown }).default ?? mod) as {
+      setVapidDetails: (s: string, pub: string, priv: string) => void;
+      sendNotification: (sub: unknown, payload: string) => Promise<unknown>;
+    };
+    webpush.setVapidDetails(process.env.VAPID_SUBJECT ?? 'mailto:contato@ajalpha.com', publica, privada);
+
+    const carga = JSON.stringify({ ...aviso, url: '/' });
+    let enviados = 0;
+    const falhas: string[] = [];
+    for (const s of data) {
+      try {
+        await webpush.sendNotification(
+          { endpoint: s.endpoint as string, keys: { p256dh: s.p256dh as string, auth: s.auth as string } },
+          carga,
+        );
+        enviados++;
+      } catch (e) {
+        const err = e as { statusCode?: number; body?: string };
+        falhas.push(`${err.statusCode ?? '?'}: ${String(err.body ?? e).slice(0, 100)}`);
+        // 404/410 = o aparelho desinstalou o app ou revogou a permissão.
+        if (err.statusCode === 404 || err.statusCode === 410) {
+          await db.from('push_subscriptions').delete().eq('endpoint', s.endpoint as string);
+        }
+      }
+    }
+    const resumo = `enviados ${enviados}/${data.length}`;
+    return falhas.length ? `${resumo} | ${falhas.join(' | ')}` : resumo;
+  } catch (e) {
+    return 'erro: ' + (e instanceof Error ? `${e.message}` : String(e));
+  }
+}
+
+/** Texto do aviso. Vem de lib-push; se o import falhar, usa a cópia local
+ *  em vez de deixar a venda passar sem avisar. */
+async function montarAviso(
+  evento: string,
+  status: string,
+  vendedor: string | null,
+  valor: number,
+  cliente: string | null,
+): Promise<{ titulo: string; corpo: string; tag?: string } | null> {
+  try {
+    const { avisoDoEvento } = await import('./lib-push.js');
+    return avisoDoEvento(evento, status, vendedor, valor, cliente);
+  } catch {
+    const brl = valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const nome = (vendedor ?? '').trim() || 'Sem atendente';
+    const st = (status ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    if (st === 'pagos' || st === 'pago') {
+      return { titulo: `💰 Pagamento aprovado · ${brl}`, corpo: (cliente ?? '').trim() || `${nome} recebeu o pagamento.`, tag: 'pago' };
+    }
+    if (evento === 'ORDER_CREATE') {
+      return { titulo: `🗓️ Novo agendamento · ${brl}`, corpo: `${nome} acabou de agendar um pedido.`, tag: 'agendado' };
+    }
+    return null;
+  }
 }
 
 function safeParse(s: string): Record<string, unknown> | null {

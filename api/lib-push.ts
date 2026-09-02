@@ -1,25 +1,12 @@
 // ─────────────────────────────────────────────────────────────
-// Envio das notificações. Usado pelo webhook quando um pedido é
-// criado ou pago. Nunca lança: se o push falhar, o pedido já foi
-// gravado e é isso que importa.
+// TEXTO das notificações — uma fonte só para o webhook e para o
+// botão de teste, para os dois não divergirem.
 //
-// Env vars: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
+// O ENVIO não mora aqui de propósito: cada endpoint manda inline.
+// Esta hospedagem já derrubou função por causa de módulo local duas
+// vezes, e o webhook (o único que delegava o envio) foi justamente o
+// único que nunca entregou. Texto é barato de importar; entrega, não.
 // ─────────────────────────────────────────────────────────────
-
-import type { SupabaseClient } from '@supabase/supabase-js';
-
-/**
- * `web-push` é CommonJS: importar no topo derrubava a função inteira na
- * Vercel (o webhook passou a responder 500 e os pedidos pararam de
- * entrar). Carregamos sob demanda e só dentro do try do envio.
- */
-async function libWebPush() {
-  const mod = await import('web-push');
-  return ((mod as unknown as { default?: unknown }).default ?? mod) as {
-    setVapidDetails: (s: string, pub: string, priv: string) => void;
-    sendNotification: (sub: unknown, payload: string) => Promise<unknown>;
-  };
-}
 
 export interface Aviso {
   titulo: string;
@@ -69,45 +56,6 @@ export function avisoDoEvento(
     };
   }
   return null; // envio, cobrança etc. não viram notificação
-}
-
-/** Dispara o aviso para todos os aparelhos inscritos. */
-export async function enviarPush(db: SupabaseClient, userId: string, aviso: Aviso): Promise<number> {
-  const publica = process.env.VAPID_PUBLIC_KEY;
-  const privada = process.env.VAPID_PRIVATE_KEY;
-  if (!publica || !privada) return 0; // push não configurado ainda
-
-  const { data } = await db
-    .from('push_subscriptions')
-    .select('endpoint,p256dh,auth')
-    .eq('user_id', userId);
-  if (!data?.length) return 0;
-
-  const webpush = await libWebPush();
-  webpush.setVapidDetails(process.env.VAPID_SUBJECT ?? 'mailto:contato@ajalpha.com', publica, privada);
-
-  const carga = JSON.stringify({ ...aviso, url: aviso.url ?? '/' });
-  let enviados = 0;
-
-  await Promise.all(
-    data.map(async (s) => {
-      try {
-        await webpush.sendNotification(
-          { endpoint: s.endpoint as string, keys: { p256dh: s.p256dh as string, auth: s.auth as string } },
-          carga,
-        );
-        enviados++;
-      } catch (e) {
-        // 404/410 = aparelho desinstalou o app ou revogou: limpa o registro.
-        const status = (e as { statusCode?: number }).statusCode;
-        if (status === 404 || status === 410) {
-          await db.from('push_subscriptions').delete().eq('endpoint', s.endpoint as string);
-        }
-      }
-    }),
-  );
-
-  return enviados;
 }
 
 // Este arquivo existe em /api só porque a Vercel empacota apenas o que
