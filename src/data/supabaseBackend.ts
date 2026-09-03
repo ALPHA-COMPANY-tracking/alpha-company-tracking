@@ -182,6 +182,14 @@ export class SupabaseBackend implements Backend {
       .eq('user_id', this.userId);
     if (error) throw error;
   }
+  async definirClientePedido(id: string, nome: string | null) {
+    const { error } = await this.db
+      .from('bluesales_pedidos')
+      .update({ cliente: nome })
+      .eq('id', id)
+      .eq('user_id', this.userId);
+    if (error) throw error;
+  }
   async lancarDaily(d: AfterpayDaily) {
     const { error } = await this.db
       .from('afterpay_daily')

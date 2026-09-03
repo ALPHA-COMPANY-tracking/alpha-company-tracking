@@ -31,8 +31,16 @@ function selo(p: Pedido): { texto: string; classe: string } {
 }
 
 export function VendasScreen({ periodo }: { periodo: Periodo }) {
-  const { pedidos, removerPedido } = useData();
+  const { pedidos, removerPedido, definirClientePedido } = useData();
   const [confirmando, setConfirmando] = useState<string | null>(null);
+  const [editando, setEditando] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState('');
+
+  function salvarNome(id: string) {
+    const nome = rascunho.trim();
+    definirClientePedido(id, nome || null);
+    setEditando(null);
+  }
 
   // Pela data de CRIAÇÃO: é a lista do que foi agendado no período,
   // independente de já ter sido pago.
@@ -65,11 +73,36 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
       <tr key={p.id} className={`border-t border-line/70 hover:bg-white/[0.015] ${removido ? 'opacity-55' : ''}`}>
         <td className="px-2 sm:px-3 lg:px-5 py-3.5 lg:py-4 text-tx font-medium whitespace-nowrap">{diaMes(p.data)}</td>
         <td className="px-2 sm:px-3 lg:px-5 py-3.5 lg:py-4">
-          {/* O nome só existe para vendas que entraram depois de 03/09;
-              antes disso nada do cliente era guardado. */}
-          <div className={`truncate max-w-[125px] sm:max-w-[220px] ${p.cliente ? 'text-tx' : 'text-dim2 italic'}`}>
-            {p.cliente ?? 'sem nome registrado'}
-          </div>
+          {/* O nome chega sozinho nas vendas novas. Nas antigas não há de
+              onde tirar — o log descarta o bloco do cliente —, então dá
+              para escrever aqui, clicando no nome. */}
+          {editando === p.id ? (
+            <input
+              autoFocus
+              value={rascunho}
+              onChange={(e) => setRascunho(e.target.value)}
+              onBlur={() => salvarNome(p.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') salvarNome(p.id);
+                if (e.key === 'Escape') setEditando(null);
+              }}
+              placeholder="Nome do cliente"
+              className="w-[150px] sm:w-[220px] lg:w-[340px] bg-card2 border border-gold/50 rounded-[8px] px-2 py-[5px] text-[12.5px] text-tx outline-none"
+            />
+          ) : (
+            <button
+              onClick={() => {
+                setRascunho(p.cliente ?? '');
+                setEditando(p.id);
+              }}
+              title="Clique para escrever o nome"
+              className={`block text-left truncate max-w-[125px] sm:max-w-[220px] lg:max-w-[340px] hover:text-gold transition-colors ${
+                p.cliente ? 'text-tx' : 'text-dim2 italic'
+              }`}
+            >
+              {p.cliente ?? 'escrever nome'}
+            </button>
+          )}
           {/* O número do BlueSales (#528) é o que aparece na lista de lá —
               é por ele que se casa uma venda daqui com uma de lá. */}
           <div className="text-[10px] mono mt-[2px]">
@@ -219,8 +252,9 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
       <div className="flex items-start gap-3 rounded-[12px] border border-line2 bg-card2 px-4 py-[13px]">
         <ShoppingBag size={16} className="text-blu shrink-0 mt-[2px]" />
         <p className="m-0 text-[12.5px] text-dim leading-relaxed">
-          O nome do cliente só aparece nas vendas que entraram a partir de <b className="text-dim">03/09/2026</b>. Antes
-          disso nenhum dado do cliente era guardado. Nas vendas antigas, confira pelo código do pedido.
+          Nas vendas novas o nome entra sozinho. Nas anteriores a <b className="text-dim">03/09/2026</b> não há de onde
+          tirar — nenhum dado do cliente era guardado até então. Clique em <b className="text-dim">escrever nome</b> para
+          preencher à mão; case pelo <b className="text-dim">#número</b>, que é o mesmo do BlueSales.
         </p>
       </div>
     </div>

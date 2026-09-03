@@ -21,6 +21,8 @@ export interface Backend {
   definirTaxaPedido(id: string, taxa: number | null): Promise<void>;
   /** Tira (ou devolve) uma venda da plataforma, sem apagar do banco. */
   removerPedido(id: string, removido: boolean): Promise<void>;
+  /** Nome do cliente da venda (null = apagar o que estava lá). */
+  definirClientePedido(id: string, nome: string | null): Promise<void>;
   lancarDaily(d: AfterpayDaily): Promise<void>;
   lancarDailies(ds: AfterpayDaily[]): Promise<void>;
   marcarSync(iso: string): Promise<void>;
@@ -78,6 +80,12 @@ export class LocalBackend implements Backend {
     this.mut((ds) => ({
       ...ds,
       pedidos: ds.pedidos.map((p) => (p.id === id ? { ...p, removido_em: quando } : p)),
+    }));
+  }
+  async definirClientePedido(id: string, nome: string | null) {
+    this.mut((ds) => ({
+      ...ds,
+      pedidos: ds.pedidos.map((p) => (p.id === id ? { ...p, cliente: nome } : p)),
     }));
   }
   async lancarDaily(d: AfterpayDaily) {

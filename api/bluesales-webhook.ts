@@ -143,8 +143,15 @@ export function mapearPedido(
   // SÓ o nome do cliente — é o que permite conferir a venda contra o
   // BlueSales e saber qual excluir. CPF, e-mail, telefone e endereço
   // continuam fora do banco (e o log inteiro segue sem o bloco).
+  //
+  // Procura em três lugares porque não está confirmado onde o BlueSales
+  // põe o nome: o log guardado já vem sem o bloco `customer`, então não
+  // dá para conferir olhando o histórico. O primeiro que vier, vale.
   const comprador = (body.customer ?? body.cliente ?? {}) as Record<string, unknown>;
-  const nomeCliente = txt(pick(comprador, 'name', 'nome', 'full_name'));
+  const nomeCliente =
+    txt(pick(comprador, 'name', 'nome', 'full_name', 'nome_completo')) ??
+    txt(pick(order, 'customer_name', 'client_name', 'nome_do_cliente')) ??
+    txt(pick(envio, 'recipient', 'recipient_name', 'name', 'nome', 'destinatario'));
   if (nomeCliente) pedido.cliente = nomeCliente;
   const rastreio = txt(pick(envio, 'tracking_code', 'código_de_rastreamento', 'codigo_de_rastreamento'));
   if (rastreio) pedido.rastreamento = rastreio;

@@ -35,6 +35,8 @@ interface DataContextValue {
   definirTaxaPedido: (id: string, taxa: number | null) => void;
   /** Tira (ou devolve) uma venda da plataforma. Sai de todos os cálculos. */
   removerPedido: (id: string, removido: boolean) => void;
+  /** Preenche o nome do cliente de uma venda antiga, à mão. */
+  definirClientePedido: (id: string, nome: string | null) => void;
   lancarDaily: (daily: AfterpayDaily) => void;
   lancarDailies: (dailies: AfterpayDaily[]) => void;
   marcarSync: () => void;
@@ -194,6 +196,16 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
     [aplicar],
   );
 
+  const definirClientePedido = useCallback<DataContextValue['definirClientePedido']>(
+    (id, nome) => {
+      aplicar(
+        (d) => ({ ...d, pedidos: d.pedidos.map((p) => (p.id === id ? { ...p, cliente: nome } : p)) }),
+        (b) => b.definirClientePedido(id, nome),
+      );
+    },
+    [aplicar],
+  );
+
   const lancarDaily = useCallback<DataContextValue['lancarDaily']>(
     (daily) => {
       aplicar(
@@ -258,12 +270,13 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
       definirPerdaPedido,
       definirTaxaPedido,
       removerPedido,
+      definirClientePedido,
       lancarDaily,
       lancarDailies,
       marcarSync,
       recarregar,
     };
-  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, definirPerdaPedido, definirTaxaPedido, removerPedido, lancarDaily, lancarDailies, marcarSync, recarregar]);
+  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, definirPerdaPedido, definirTaxaPedido, removerPedido, definirClientePedido, lancarDaily, lancarDailies, marcarSync, recarregar]);
 
   if (!value) {
     return (
