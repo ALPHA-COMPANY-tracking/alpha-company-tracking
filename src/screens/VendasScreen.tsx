@@ -40,7 +40,14 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
     () =>
       pedidos
         .filter((p) => isDentro(p.data, periodo.inicio, periodo.fim))
-        .sort((a, b) => b.data.localeCompare(a.data) || a.id.localeCompare(b.id)),
+        // Dentro do dia, pela numeração do BlueSales (#528, #529...):
+        // é a ordem cronológica e a mesma que aparece lá.
+        .sort(
+          (a, b) =>
+            b.data.localeCompare(a.data) ||
+            (b.internal_id ?? 0) - (a.internal_id ?? 0) ||
+            a.id.localeCompare(b.id),
+        ),
     [pedidos, periodo],
   );
 
@@ -63,7 +70,12 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
           <div className={`truncate max-w-[125px] sm:max-w-[220px] ${p.cliente ? 'text-tx' : 'text-dim2 italic'}`}>
             {p.cliente ?? 'sem nome registrado'}
           </div>
-          <div className="text-[10px] text-dim2 mono mt-[2px]">{p.id}</div>
+          {/* O número do BlueSales (#528) é o que aparece na lista de lá —
+              é por ele que se casa uma venda daqui com uma de lá. */}
+          <div className="text-[10px] mono mt-[2px]">
+            {p.internal_id != null && <span className="text-dim font-bold">#{p.internal_id}</span>}
+            <span className="hidden sm:inline text-dim2">{p.internal_id != null ? " · " : ""}{p.id}</span>
+          </div>
         </td>
         <td className="hidden sm:table-cell px-3 lg:px-5 py-3.5 lg:py-4 text-dim">{p.vendedor?.trim() || '—'}</td>
         <td className="hidden md:table-cell px-3 lg:px-5 py-3.5 lg:py-4 text-dim">{planoCurto(p.produto_plano)}</td>
