@@ -27,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const final = String(req.query.tipo ?? 'parcial') === 'final';
 
-    const [{ createClient }, { hojeSP, montarResumo, avisoDoResumo }] = await Promise.all([
+    const [{ createClient }, { diaDoResumo, montarResumo, avisoDoResumo }] = await Promise.all([
       import('@supabase/supabase-js'),
       import('./lib-resumo.js'),
     ]);
@@ -36,7 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       auth: { persistSession: false },
     });
 
-    const dia = hojeSP();
+    const dia = diaDoResumo();
 
     // Pedidos que podem entrar no dia: criados hoje OU pagos hoje.
     const { data: pedidos, error: erroPedidos } = await db

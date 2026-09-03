@@ -36,6 +36,37 @@ export function hojeSP(): string {
   }).format(new Date());
 }
 
+/** Data e hora em São Paulo, decompostas. */
+function agoraSP(quando: Date): { dia: string; hora: number } {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(quando);
+  const p = (t: string) => partes.find((x) => x.type === t)?.value ?? '';
+  return { dia: `${p('year')}-${p('month')}-${p('day')}`, hora: Number(p('hour')) };
+}
+
+/**
+ * De qual dia é o resumo.
+ *
+ * O disparo vem do agendamento do GitHub, que atrasa — às vezes mais de
+ * uma hora. Um fechamento das 23h que só rodasse à 00h30 pegaria o dia
+ * seguinte, recém-começado, e mandaria um relatório zerado no lugar do
+ * fechamento. Por isso o dia não é simplesmente "hoje": entre meia-noite
+ * e as 6h da manhã o que interessa é o dia que acabou de terminar.
+ */
+export function diaDoResumo(quando: Date = new Date()): string {
+  const { dia, hora } = agoraSP(quando);
+  if (hora >= 6) return dia;
+  const d = new Date(`${dia}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 /**
  * Monta o resumo de um dia.
  * - agendado: pedidos criados no dia (valor do agendamento)
@@ -107,6 +138,9 @@ function brl(v: number): string {
 /** Texto da notificação de resumo. `final` muda o tom da mensagem. */
 export function avisoDoResumo(r: ResumoDia, final: boolean): { titulo: string; corpo: string; tag: string } {
   const sinal = r.lucro >= 0 ? '📈' : '📉';
+  // Dizer o dia tira a dúvida quando a notificação chega perto da
+  // virada: "Fechamento de 03/09" não deixa confundir com o dia novo.
+  const [, mes, dia] = r.data.split('-');
   const roas = r.roas > 0 ? `${r.roas.toFixed(2).replace('.', ',')}x` : '—';
 
   const partes = [
@@ -117,7 +151,7 @@ export function avisoDoResumo(r: ResumoDia, final: boolean): { titulo: string; c
 
   return {
     titulo: final
-      ? `${sinal} Fechamento do dia · ${brl(r.lucro)}`
+      ? `${sinal} Fechamento de ${dia}/${mes} · ${brl(r.lucro)}`
       : `${sinal} Parcial de hoje · ${brl(r.lucro)}`,
     corpo: partes.join(' · '),
     // tags diferentes: o parcial se substitui, o fechamento fica separado

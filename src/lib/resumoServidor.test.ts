@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import * as servidor from '../../api/lib-custos';
 import * as app from '@/lib/custosConfig';
-import { avisoDoResumo, montarResumo } from '../../api/lib-resumo';
+import { avisoDoResumo, diaDoResumo, montarResumo } from '../../api/lib-resumo';
 
 describe('custos do servidor batem com os do app', () => {
   it('frete, comissões e percentuais por vendedor são os mesmos', () => {
@@ -86,7 +86,7 @@ describe('avisoDoResumo', () => {
     const fechamento = avisoDoResumo(r, true);
 
     expect(parcial.titulo).toContain('Parcial de hoje');
-    expect(fechamento.titulo).toContain('Fechamento do dia');
+    expect(fechamento.titulo).toContain('Fechamento de 31/08');
     expect(parcial.tag).not.toBe(fechamento.tag);
     expect(parcial.corpo).toContain('Agendado');
     expect(parcial.corpo).toContain('ROAS');
@@ -96,5 +96,37 @@ describe('avisoDoResumo', () => {
     const r = montarResumo(DIA, [pedido()], 5000, 0); // Ads alto = prejuízo
     expect(r.lucro).toBeLessThan(0);
     expect(avisoDoResumo(r, true).titulo).toContain('📉');
+  });
+});
+
+describe('diaDoResumo (fechamento não pode virar o dia)', () => {
+  // O agendador do GitHub atrasa. Se o fechamento das 23h rodar depois
+  // da meia-noite, ele tem que continuar falando do dia que terminou —
+  // senão manda um relatório zerado do dia recém-começado.
+  const emSP = (iso: string) => diaDoResumo(new Date(iso));
+
+  it('rodando no horário, é o próprio dia', () => {
+    expect(emSP('2026-09-04T01:50:00Z')).toBe('2026-09-03'); // 22h50 BRT
+    expect(emSP('2026-09-04T02:30:00Z')).toBe('2026-09-03'); // 23h30 BRT
+  });
+
+  it('atrasado para depois da meia-noite, ainda é o dia que terminou', () => {
+    expect(emSP('2026-09-04T03:10:00Z')).toBe('2026-09-03'); // 00h10 BRT
+    expect(emSP('2026-09-04T05:00:00Z')).toBe('2026-09-03'); // 02h BRT
+    expect(emSP('2026-09-04T08:30:00Z')).toBe('2026-09-03'); // 05h30 BRT
+  });
+
+  it('vira o dia a partir das 6h da manhã', () => {
+    expect(emSP('2026-09-04T09:00:00Z')).toBe('2026-09-04'); // 06h BRT
+    expect(emSP('2026-09-04T15:00:00Z')).toBe('2026-09-04'); // meio-dia
+  });
+
+  it('atravessa a virada de mês sem tropeçar', () => {
+    expect(emSP('2026-10-01T03:10:00Z')).toBe('2026-09-30'); // 00h10 BRT
+  });
+
+  it('o título diz de que dia é o fechamento', () => {
+    const r = montarResumo('2026-09-03', [], 0, 0);
+    expect(avisoDoResumo(r, true).titulo).toContain('Fechamento de 03/09');
   });
 });

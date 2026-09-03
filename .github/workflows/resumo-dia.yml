@@ -5,8 +5,14 @@ name: Resumo do dia
 
 on:
   schedule:
-    # Fechamento: 21h de Brasília (00h UTC do dia seguinte)
-    - cron: '0 0 * * *'
+    # Fechamento do dia, por volta das 23h de Brasília.
+    #
+    # Os :00 em ponto — e 00h UTC em especial — são os horários mais
+    # disputados do agendador do GitHub, e é lá que ele mais atrasa.
+    # Era o que fazia o fechamento das 21h chegar depois da meia-noite.
+    # Os :50 saem da fila cheia; o resumo sabe se virar se atrasar mesmo
+    # assim (ver diaDoResumo em api/lib-resumo.ts).
+    - cron: '50 1 * * *'
 
     # ── PARCIAIS DESLIGADOS ────────────────────────────────────
     # Só fazem sentido quando o gasto diário do Meta chegar sozinho
@@ -34,11 +40,11 @@ jobs:
         env:
           CRON_TOKEN: ${{ secrets.CRON_TOKEN }}
         run: |
-          # Só o agendamento das 00h UTC está ativo hoje (fechamento).
+          # Só o agendamento de 01h50 UTC está ativo hoje (fechamento).
           # Se os parciais forem religados, eles caem no else.
           if [ -n "${{ github.event.inputs.tipo }}" ]; then
             TIPO="${{ github.event.inputs.tipo }}"
-          elif [ "${{ github.event.schedule }}" = "0 0 * * *" ]; then
+          elif [ "${{ github.event.schedule }}" = "50 1 * * *" ]; then
             TIPO=final
           else
             TIPO=parcial
