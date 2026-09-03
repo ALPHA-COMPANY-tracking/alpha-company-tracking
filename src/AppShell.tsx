@@ -33,12 +33,35 @@ const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
   { id: 'export', label: 'Exportador', curto: 'CSV', Icon: Download },
 ];
 
+const KEY_ABA = 'afterpay-pnl:aba';
+
+/** Aba salva da última visita. O botão Atualizar recarrega a página
+ *  inteira (F5 de verdade), e sem isso o app sempre voltava para o P&L
+ *  em vez de recarregar a tela em que você estava. */
+function abaInicial(): Tab {
+  try {
+    const salva = localStorage.getItem(KEY_ABA);
+    if (salva && TABS.some((t) => t.id === salva)) return salva as Tab;
+  } catch {
+    /* ignora */
+  }
+  return 'pnl';
+}
+
 export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: string }) {
   const { ultimoSync } = useData();
   const { preset, periodo, selecionarPreset, definirPersonalizado } = usePeriodo();
-  const [tab, setTab] = useState<Tab>('pnl');
+  const [tab, setTab] = useState<Tab>(abaInicial);
   const [modal, setModal] = useState(false);
   const [atualizando, setAtualizando] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(KEY_ABA, tab);
+    } catch {
+      /* ignora */
+    }
+  }, [tab]);
 
   // A barra de baixo desliza (são 9 destinos, não cabem fixos a 375px).
   // Ao trocar de tela, traz o item ativo para a vista — senão a aba
