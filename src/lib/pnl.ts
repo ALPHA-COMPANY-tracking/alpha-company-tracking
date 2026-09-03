@@ -155,6 +155,7 @@ export interface PnlResult {
 
   // Indicadores derivados
   ticket_medio: Cents;
+  /** Custo por agendamento: Ads ÷ pedidos AGENDADOS (não pagamentos). */
   cpa: Cents;
   roas: number;
   roi_real: number;
@@ -344,7 +345,10 @@ export function calcularPnl(
   const conversao_agendado = safeDiv(qtd_pagamentos, qtd_agendados);
 
   const ticket_medio = qtd_pagamentos ? Math.round(receita_aprovada / qtd_pagamentos) : 0;
-  const cpa = qtd_pagamentos ? Math.round(investimento_ads / qtd_pagamentos) : 0;
+  // CPA por AGENDAMENTO: o anúncio entrega a venda agendada; o pagamento
+  // vem depois e às vezes em outro dia. Dividir pelos pagamentos misturava
+  // o gasto de hoje com venda fechada semanas atrás e inflava o custo.
+  const cpa = qtd_agendados ? Math.round(investimento_ads / qtd_agendados) : 0;
   const roas = safeDiv(receita_aprovada, investimento_ads);
   const roi_real = safeDiv(lucro_real, investimento_ads);
   const custo_por_real = safeDiv(custos_totais_reais, receita_aprovada);

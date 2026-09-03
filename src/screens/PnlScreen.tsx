@@ -173,7 +173,13 @@ export function PnlScreen({
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-[14px]">
             <KpiCard Icon={ShoppingCart} color="#c084fc" label="Total de Pedidos" value={String(pnl.qtd_agendados)} sub="agendados no período" />
             <KpiCard Icon={BadgeCheck} color="#34d399" label="Ticket Médio" value={formatBRL(pnl.ticket_medio)} sub="sobre pedidos aprovados" />
-            <KpiCard Icon={Megaphone} color="#60a5fa" label="CPA" value={formatBRL(pnl.cpa)} sub={`${formatBRL(pnl.investimento_ads)} em Ads`} />
+            <KpiCard
+              Icon={Megaphone}
+              color="#60a5fa"
+              label="CPA por agendamento"
+              value={formatBRL(pnl.cpa)}
+              sub={`${formatBRL(pnl.investimento_ads)} em Ads · ${pnl.qtd_agendados} agendamento${pnl.qtd_agendados === 1 ? '' : 's'}`}
+            />
             <KpiCard Icon={BarChart3} color="#f472b6" label="ROAS" value={formatMultiplier(pnl.roas)} sub={`ROI real ${formatPercent(pnl.roi_real)}`} />
           </div>
 
