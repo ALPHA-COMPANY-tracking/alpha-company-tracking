@@ -65,10 +65,57 @@ function txt(v: unknown): string | undefined {
   return s ? s : undefined;
 }
 
-/** Remove os dados pessoais do cliente antes de guardar o log (LGPD). */
+// Blocos que são do cliente, não do pedido: saem inteiros do log.
+const BLOCOS_PESSOAIS = new Set([
+  'customer', 'cliente',
+  'buyer', 'comprador',
+  'recipient', 'destinatario', 'destinatário',
+  'address', 'endereco', 'endereço',
+  'billing', 'cobranca', 'cobrança',
+]);
+
+// Do bloco de envio o log só precisa do rastreio e do transporte. Tudo
+// que não estiver aqui é descartado — allowlist, e não lista de proibidos,
+// porque se o BlueSales passar a mandar endereço amanhã a lista de
+// proibidos deixaria passar em silêncio.
+const ENVIO_PERMITIDO = new Set([
+  'tracking_code', 'codigo_de_rastreamento', 'código_de_rastreamento', 'tracking',
+  'carrier', 'transportadora', 'service', 'servico', 'serviço',
+  'status', 'shipped_at', 'delivered_at', 'estimated_delivery',
+]);
+
+/**
+ * Remove os dados pessoais do cliente antes de guardar o log (LGPD).
+ *
+ * O nome vai para `bluesales_pedidos.cliente`, que é onde ele serve para
+ * alguma coisa; CPF, e-mail, telefone e endereço não são guardados em
+ * lugar nenhum.
+ *
+ * Quando algo é descartado do envio, ficam registrados os NOMES das
+ * chaves (nunca o conteúdo) em `_descartado`: assim dá para perceber que
+ * o BlueSales começou a mandar campo novo, sem guardar o valor dele.
+ */
 export function semDadosPessoais(body: Record<string, unknown>): Record<string, unknown> {
-  const { customer: _c, cliente: _cl, ...resto } = body;
-  return resto;
+  const limpo: Record<string, unknown> = {};
+  for (const [chave, valor] of Object.entries(body)) {
+    if (BLOCOS_PESSOAIS.has(chave.toLowerCase())) continue;
+    limpo[chave] = valor;
+  }
+
+  const envio = limpo.shipping ?? limpo.envio;
+  if (envio && typeof envio === 'object' && !Array.isArray(envio)) {
+    const mantido: Record<string, unknown> = {};
+    const descartado: string[] = [];
+    for (const [chave, valor] of Object.entries(envio as Record<string, unknown>)) {
+      if (ENVIO_PERMITIDO.has(chave.toLowerCase())) mantido[chave] = valor;
+      else descartado.push(chave);
+    }
+    if (descartado.length) mantido._descartado = descartado;
+    if ('shipping' in limpo) limpo.shipping = mantido;
+    else limpo.envio = mantido;
+  }
+
+  return limpo;
 }
 
 /**

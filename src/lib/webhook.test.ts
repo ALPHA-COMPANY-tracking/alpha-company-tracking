@@ -88,4 +88,58 @@ describe('semDadosPessoais (LGPD)', () => {
     expect(JSON.stringify(log)).not.toContain('000.000.000-00');
     expect((log.order as { id: string }).id).toBe('BLV-VE7RUD88Y3'); // resto preservado
   });
+
+  it('o rastreio do envio é preservado — é o que serve para diagnóstico', () => {
+    const log = semDadosPessoais({
+      ...ORDER_CREATE,
+      shipping: { tracking_code: 'AP435660319BR', carrier: 'Correios' },
+    } as Record<string, unknown>);
+    expect(log.shipping).toEqual({ tracking_code: 'AP435660319BR', carrier: 'Correios' });
+  });
+
+  it('se o BlueSales passar a mandar endereço, ele não entra no log', () => {
+    // Allowlist: campo novo é descartado por padrão, e não guardado por
+    // padrão. Fica só o NOME da chave, para percebermos a mudança.
+    const log = semDadosPessoais({
+      ...ORDER_CREATE,
+      shipping: {
+        tracking_code: 'AP435660319BR',
+        address: 'Rua das Flores, 123',
+        zip_code: '29100-000',
+        phone: '(28) 99947-5005',
+      },
+    } as Record<string, unknown>);
+    const envio = log.shipping as Record<string, unknown>;
+    expect(envio.tracking_code).toBe('AP435660319BR');
+    expect(JSON.stringify(log)).not.toContain('Rua das Flores');
+    expect(JSON.stringify(log)).not.toContain('29100-000');
+    expect(JSON.stringify(log)).not.toContain('99947-5005');
+    expect(envio._descartado).toEqual(['address', 'zip_code', 'phone']);
+  });
+
+  it('bloco pessoal novo (buyer, address...) também sai inteiro', () => {
+    const log = semDadosPessoais({
+      ...ORDER_CREATE,
+      buyer: { name: 'FULANA', cpf: '111.111.111-11' },
+      address: { street: 'Rua X' },
+    } as Record<string, unknown>);
+    expect('buyer' in log).toBe(false);
+    expect('address' in log).toBe(false);
+    expect(JSON.stringify(log)).not.toContain('FULANA');
+  });
+});
+
+describe('nome do cliente', () => {
+  it('sai do payload real para a coluna cliente', () => {
+    // Confirmado no payload real: o nome vem em customer.name.
+    const p = mapearPedido(ORDER_CREATE, USER)!;
+    expect(p.cliente).toBe('YOLANDA DE GOIS');
+  });
+
+  it('guarda o nome e nada mais do cliente', () => {
+    const p = mapearPedido(ORDER_CREATE, USER)!;
+    const guardado = JSON.stringify(p);
+    expect(guardado).not.toContain('x@y.com');
+    expect(guardado).not.toContain('000.000.000-00');
+  });
 });
