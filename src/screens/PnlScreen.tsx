@@ -4,15 +4,15 @@ import {
   BarChart3,
   Banknote,
   CalendarClock,
+  Crosshair,
   Megaphone,
   ShoppingCart,
   Target,
   TrendingDown,
   TrendingUp,
-  Wallet,
 } from 'lucide-react';
 import type { Periodo } from '@/types';
-import { formatBRL, formatBRLCompact, formatMultiplier, formatPercent, reaisToCents } from '@/lib/money';
+import { formatBRL, formatBRLCompact, formatMultiplier, formatPercent, reaisToCents, safeDiv } from '@/lib/money';
 import { formatDiaMes } from '@/lib/dates';
 import { type DescontoFrustrados, calcularPnl } from '@/lib/pnl';
 import { agregarPedidos } from '@/lib/pedidos';
@@ -159,12 +159,19 @@ export function PnlScreen({
               value={formatBRL(pnl.custos_totais_reais)}
               sub={`Afterpay ${formatBRL(pnl.custos_afterpay)} + var. ${formatBRL(pnl.custos_variaveis_total)}`}
             />
+            {/* O gasto sai do que foi lançado na tela Marketing. A fatia é
+                sobre o AGENDADO: sobre o aprovado leria 0% de manhã, antes
+                de o primeiro pagamento entrar. */}
             <KpiCard
-              Icon={Wallet}
+              Icon={Megaphone}
               color="#c084fc"
-              label="Custos Variáveis"
-              value={formatBRL(pnl.custos_variaveis_total)}
-              sub={`${pnl.qtd_lancamentos} lançamentos · ${formatPercent(pnl.receita_aprovada ? pnl.custos_variaveis_total / pnl.receita_aprovada : 0)} da receita`}
+              label="Anúncios (gasto)"
+              value={formatBRL(pnl.investimento_ads)}
+              sub={
+                pnl.investimento_ads > 0
+                  ? `${formatPercent(safeDiv(pnl.investimento_ads, pnl.valor_agendado))} do agendado`
+                  : 'lance na tela Marketing'
+              }
             />
             <KpiCard Icon={Target} color="#60a5fa" label="Margem Real" value={formatPercent(pnl.margem_real)} sub={`Afterpay indica ${formatPercent(pnl.margem_afterpay)}`} />
           </div>
@@ -174,11 +181,11 @@ export function PnlScreen({
             <KpiCard Icon={ShoppingCart} color="#c084fc" label="Total de Pedidos" value={String(pnl.qtd_agendados)} sub="agendados no período" />
             <KpiCard Icon={BadgeCheck} color="#34d399" label="Ticket Médio" value={formatBRL(pnl.ticket_medio)} sub="sobre pedidos aprovados" />
             <KpiCard
-              Icon={Megaphone}
+              Icon={Crosshair}
               color="#60a5fa"
               label="CPA por agendamento"
               value={formatBRL(pnl.cpa)}
-              sub={`${formatBRL(pnl.investimento_ads)} em Ads · ${pnl.qtd_agendados} agendamento${pnl.qtd_agendados === 1 ? '' : 's'}`}
+              sub={`sobre ${pnl.qtd_agendados} agendamento${pnl.qtd_agendados === 1 ? '' : 's'}`}
             />
             <KpiCard Icon={BarChart3} color="#f472b6" label="ROAS agendado" value={formatMultiplier(pnl.roas)} sub={`${formatBRL(pnl.valor_agendado)} agendado · ROI real ${formatPercent(pnl.roi_real)}`} />
           </div>
