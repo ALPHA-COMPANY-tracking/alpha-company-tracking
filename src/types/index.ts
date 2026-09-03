@@ -107,6 +107,12 @@ export interface Pedido {
   /** Taxa de plataforma cobrada pelo BlueSales neste pagamento.
    *  null = não informada; o dia cai no valor de afterpay_daily. */
   taxa_plataforma?: number | null;
+  /** Nome do cliente. Só o nome — CPF, e-mail, telefone e endereço
+   *  continuam fora do banco. Serve para conferir contra o BlueSales. */
+  cliente?: string | null;
+  /** Venda tirada da plataforma à mão (cancelada e excluída no BlueSales).
+   *  null = ativa; preenchido = fora de todos os cálculos. */
+  removido_em?: string | null;
   produto_nome?: string | null;
   produto_plano?: string | null;
   codigo_plano?: string | null;

@@ -19,6 +19,8 @@ export interface Backend {
   definirPerdaPedido(id: string, perda: number | null): Promise<void>;
   /** Taxa de plataforma cobrada neste pagamento (null = não informada). */
   definirTaxaPedido(id: string, taxa: number | null): Promise<void>;
+  /** Tira (ou devolve) uma venda da plataforma, sem apagar do banco. */
+  removerPedido(id: string, removido: boolean): Promise<void>;
   lancarDaily(d: AfterpayDaily): Promise<void>;
   lancarDailies(ds: AfterpayDaily[]): Promise<void>;
   marcarSync(iso: string): Promise<void>;
@@ -69,6 +71,13 @@ export class LocalBackend implements Backend {
     this.mut((ds) => ({
       ...ds,
       pedidos: ds.pedidos.map((p) => (p.id === id ? { ...p, taxa_plataforma: taxa } : p)),
+    }));
+  }
+  async removerPedido(id: string, removido: boolean) {
+    const quando = removido ? new Date().toISOString() : null;
+    this.mut((ds) => ({
+      ...ds,
+      pedidos: ds.pedidos.map((p) => (p.id === id ? { ...p, removido_em: quando } : p)),
     }));
   }
   async lancarDaily(d: AfterpayDaily) {

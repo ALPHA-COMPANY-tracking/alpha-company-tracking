@@ -32,6 +32,15 @@ export function statusBucket(status: string | null | undefined): 'aprovado' | 'f
   return 'pipeline';
 }
 
+/**
+ * Tira as vendas removidas à mão (canceladas e excluídas no BlueSales).
+ * TODO cálculo passa por aqui — se ficasse só na tela, o Faturamento
+ * Agendado continuaria contando uma venda que não existe mais.
+ */
+export function pedidosAtivos(pedidos: Pedido[]): Pedido[] {
+  return pedidos.filter((p) => !p.removido_em);
+}
+
 export interface AtendenteAgg {
   nome: string;
   valor_agendado: number; // total de pedidos (pipeline inteiro)
@@ -64,7 +73,8 @@ export function dataAprovacaoPedido(p: Pedido): string {
  *  - Agendado e frustrado contam pela data de CRIAÇÃO (p.data).
  *  - Aprovado/receita conta pela data de PAGAMENTO (p.data_aprovacao ?? p.data),
  *    para bater com o "Faturamento Aprovado" do BlueSales. */
-export function agregarPedidos(pedidos: Pedido[], periodo: Periodo): RevenuePedidos {
+export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedidos {
+  const pedidos = pedidosAtivos(todos);
   const criacaoNoPeriodo = (p: Pedido) => isDentro(p.data, periodo.inicio, periodo.fim);
   const pagamentoNoPeriodo = (p: Pedido) => isDentro(dataAprovacaoPedido(p), periodo.inicio, periodo.fim);
 

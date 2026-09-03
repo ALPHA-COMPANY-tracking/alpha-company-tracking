@@ -101,6 +101,8 @@ export class SupabaseBackend implements Backend {
       valor_agendado: r.valor_agendado != null ? N(r.valor_agendado) : null,
       perda_real: r.perda_real != null ? N(r.perda_real) : null,
       taxa_plataforma: r.taxa_plataforma != null ? N(r.taxa_plataforma) : null,
+      cliente: r.cliente ?? null,
+      removido_em: r.removido_em != null ? String(r.removido_em) : null,
       produto_nome: r.produto_nome ?? null,
       produto_plano: r.produto_plano ?? null,
       codigo_plano: r.codigo_plano ?? null,
@@ -167,6 +169,15 @@ export class SupabaseBackend implements Backend {
     const { error } = await this.db
       .from('bluesales_pedidos')
       .update({ taxa_plataforma: taxa })
+      .eq('id', id)
+      .eq('user_id', this.userId);
+    if (error) throw error;
+  }
+  async removerPedido(id: string, removido: boolean) {
+    // Marca em vez de apagar: preserva o histórico e deixa desfazer.
+    const { error } = await this.db
+      .from('bluesales_pedidos')
+      .update({ removido_em: removido ? new Date().toISOString() : null })
       .eq('id', id)
       .eq('user_id', this.userId);
     if (error) throw error;

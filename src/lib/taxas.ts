@@ -20,7 +20,7 @@ import type { AfterpayDaily, Pedido, Periodo } from '@/types';
 import type { Cents } from '@/lib/money';
 import { reaisToCents } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
-import { dataAprovacaoPedido, statusBucket } from '@/lib/pedidos';
+import { dataAprovacaoPedido, pedidosAtivos, statusBucket } from '@/lib/pedidos';
 
 /** De onde saiu a taxa que está valendo para um dia. */
 export type FonteTaxa = 'pagamento' | 'dia' | 'ausente';
@@ -38,7 +38,7 @@ export interface TaxaDoDia {
 /** Pagamentos aprovados no período, agrupados pela data do pagamento. */
 export function pagamentosPorDia(pedidos: Pedido[], periodo: Periodo): Map<string, Pedido[]> {
   const mapa = new Map<string, Pedido[]>();
-  for (const p of pedidos) {
+  for (const p of pedidosAtivos(pedidos)) {
     if (statusBucket(p.status) !== 'aprovado') continue;
     const dia = dataAprovacaoPedido(p);
     if (!isDentro(dia, periodo.inicio, periodo.fim)) continue;

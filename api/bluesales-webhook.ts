@@ -139,6 +139,13 @@ export function mapearPedido(
   }
   const vend = txt(pick(vendedor, 'name', 'nome'));
   if (vend) pedido.vendedor = vend;
+
+  // SÓ o nome do cliente — é o que permite conferir a venda contra o
+  // BlueSales e saber qual excluir. CPF, e-mail, telefone e endereço
+  // continuam fora do banco (e o log inteiro segue sem o bloco).
+  const comprador = (body.customer ?? body.cliente ?? {}) as Record<string, unknown>;
+  const nomeCliente = txt(pick(comprador, 'name', 'nome', 'full_name'));
+  if (nomeCliente) pedido.cliente = nomeCliente;
   const rastreio = txt(pick(envio, 'tracking_code', 'código_de_rastreamento', 'codigo_de_rastreamento'));
   if (rastreio) pedido.rastreamento = rastreio;
 
@@ -242,10 +249,7 @@ async function notificar(
     const status = String(pedido.status ?? '');
     const vendedor = (pedido.vendedor as string) ?? null;
     const valor = Number(pedido.valor ?? pedido.valor_agendado ?? 0);
-    // Nome do cliente só para escrever a mensagem — não vai para o banco
-    // nem para o log (semDadosPessoais remove o bloco inteiro).
-    const cliente = (body.customer ?? body.cliente ?? {}) as Record<string, unknown>;
-    const nomeCliente = txt(pick(cliente, 'name', 'nome')) ?? null;
+    const nomeCliente = (pedido.cliente as string) ?? null;
 
     const aviso = await montarAviso(evento, status, vendedor, valor, nomeCliente);
     if (!aviso) return `sem aviso para ${evento || 'evento sem nome'} (${status})`;
