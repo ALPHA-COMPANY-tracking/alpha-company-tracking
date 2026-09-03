@@ -94,3 +94,14 @@
     background: transparent;
   }
 }
+
+@layer utilities {
+  /* Barra de navegação do celular: desliza, mas sem a barra de rolagem
+     à mostra — num app ela ficaria por cima dos rótulos. */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}

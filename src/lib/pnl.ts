@@ -187,7 +187,7 @@ export function serieDiaria(
  * quem já estava no padrão:
  *   Σ pct·(receita_v − taxas·receita_v/receita) = pct·(receita − taxas)
  */
-function comissaoVendedores(
+export function comissaoVendedores(
   porAtendente: { nome: string; receita: number; valor_agendado: number; pedidos: number }[],
   receitaTotal: Cents,
   taxas: Cents,

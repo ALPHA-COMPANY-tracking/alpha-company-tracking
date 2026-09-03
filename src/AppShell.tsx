@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { BarChart3, Download, LogOut, Megaphone, PieChart, Receipt, RefreshCw, ShoppingBag, TriangleAlert, Wallet } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { BarChart3, Download, LogOut, Megaphone, PieChart, Receipt, RefreshCw, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { useData } from '@/store/DataProvider';
@@ -16,13 +16,15 @@ import { ExportScreen } from '@/screens/ExportScreen';
 import { AdsScreen } from '@/screens/AdsScreen';
 import { TaxasScreen } from '@/screens/TaxasScreen';
 import { VendasScreen } from '@/screens/VendasScreen';
+import { RankingScreen } from '@/screens/RankingScreen';
 
-type Tab = 'pnl' | 'vendas' | 'ads' | 'custos' | 'taxas' | 'frustrados' | 'viz' | 'export';
+type Tab = 'pnl' | 'vendas' | 'ranking' | 'ads' | 'custos' | 'taxas' | 'frustrados' | 'viz' | 'export';
 
 /** `curto` é o rótulo da barra inferior no celular, onde só cabe uma palavra. */
 const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
   { id: 'pnl', label: 'Demonstração de Resultados', curto: 'P&L', Icon: BarChart3 },
   { id: 'vendas', label: 'Vendas Agendadas', curto: 'Vendas', Icon: ShoppingBag },
+  { id: 'ranking', label: 'Ranking de Vendas', curto: 'Ranking', Icon: Trophy },
   { id: 'ads', label: 'Anúncios (Meta)', curto: 'Ads', Icon: Megaphone },
   { id: 'custos', label: 'Custos Variáveis', curto: 'Custos', Icon: Wallet },
   { id: 'taxas', label: 'Taxas de Plataforma', curto: 'Taxas', Icon: Receipt },
@@ -37,6 +39,16 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
   const [tab, setTab] = useState<Tab>('pnl');
   const [modal, setModal] = useState(false);
   const [atualizando, setAtualizando] = useState(false);
+
+  // A barra de baixo desliza (são 9 destinos, não cabem fixos a 375px).
+  // Ao trocar de tela, traz o item ativo para a vista — senão a aba
+  // selecionada pode ficar fora do campo de visão.
+  const barraRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    barraRef.current
+      ?.querySelector('[aria-current="page"]')
+      ?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  }, [tab]);
 
   /** Recarrega a página inteira, como um F5 — nada de estado antigo em tela. */
   function atualizar() {
@@ -139,6 +151,7 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
 
         {tab === 'pnl' && <PnlScreen periodo={periodo} onAddCusto={() => setModal(true)} onLancarManual={() => setTab('ads')} />}
         {tab === 'vendas' && <VendasScreen periodo={periodo} />}
+        {tab === 'ranking' && <RankingScreen periodo={periodo} />}
         {tab === 'ads' && <AdsScreen periodo={periodo} />}
         {tab === 'custos' && <CustosScreen periodo={periodo} />}
         {tab === 'taxas' && <TaxasScreen periodo={periodo} />}
@@ -149,7 +162,7 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
 
       {/* ───────── Barra de navegação inferior (celular) ───────── */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card3/97 backdrop-blur-md border-t border-line2 pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-8">
+        <div ref={barraRef} className="flex overflow-x-auto no-scrollbar">
           {TABS.map(({ id, curto, Icon }) => {
             const ativo = tab === id;
             return (
@@ -157,7 +170,7 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
                 key={id}
                 onClick={() => setTab(id)}
                 aria-current={ativo ? 'page' : undefined}
-                className={`flex flex-col items-center justify-center gap-[3px] py-2 min-h-[54px] transition-colors ${
+                className={`flex flex-col items-center justify-center gap-[3px] py-2 min-h-[54px] flex-1 min-w-[62px] shrink-0 transition-colors ${
                   ativo ? 'text-gold' : 'text-dim2 active:text-dim'
                 }`}
               >
@@ -167,6 +180,8 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
             );
           })}
         </div>
+        {/* Sombra na borda: diz que a barra continua para o lado. */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-7 bg-gradient-to-l from-card3 to-transparent" />
       </nav>
 
       <CustoModal aberto={modal} onClose={() => setModal(false)} />
