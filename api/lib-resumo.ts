@@ -123,7 +123,9 @@ export function montarResumo(
     qtd_pagamentos,
     ads: arredondar(ads),
     lucro: arredondar(lucro),
-    roas: ads > 0 ? receita / ads : 0,
+    // Sobre o AGENDADO, igual à tela (ver src/lib/pnl.ts): se as duas
+    // divergirem, a notificação da noite contradiz o dashboard.
+    roas: ads > 0 ? valor_agendado / ads : 0,
   };
 }
 

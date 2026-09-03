@@ -180,7 +180,7 @@ export function PnlScreen({
               value={formatBRL(pnl.cpa)}
               sub={`${formatBRL(pnl.investimento_ads)} em Ads · ${pnl.qtd_agendados} agendamento${pnl.qtd_agendados === 1 ? '' : 's'}`}
             />
-            <KpiCard Icon={BarChart3} color="#f472b6" label="ROAS" value={formatMultiplier(pnl.roas)} sub={`ROI real ${formatPercent(pnl.roi_real)}`} />
+            <KpiCard Icon={BarChart3} color="#f472b6" label="ROAS agendado" value={formatMultiplier(pnl.roas)} sub={`${formatBRL(pnl.valor_agendado)} agendado · ROI real ${formatPercent(pnl.roi_real)}`} />
           </div>
 
           <Demonstrativo

@@ -65,6 +65,19 @@ describe('montarResumo', () => {
     expect(r.receita).toBe(735);
   });
 
+  it('o ROAS do resumo é o mesmo da tela: sobre o agendado', () => {
+    // Um pedido pago hoje mas agendado ONTEM, e um agendado hoje sem
+    // pagamento: aprovado e agendado ficam diferentes de propósito.
+    const pedidos = [
+      pedido({ data: '2026-08-20' }), // pago hoje, agendado noutro dia
+      pedido({ status: 'cadastrados', data_aprovacao: null, valor: 435, valor_agendado: 435 }),
+    ];
+    const r = montarResumo(DIA, pedidos, 100, 0);
+    expect(r.valor_agendado).toBe(435);
+    expect(r.receita).toBe(735);
+    expect(r.roas).toBeCloseTo(4.35, 2); // 435 / 100 — e não 7,35
+  });
+
   it('sem Ads o ROAS fica zerado em vez de infinito', () => {
     const r = montarResumo(DIA, [pedido()], 0, 0);
     expect(r.roas).toBe(0);

@@ -157,6 +157,7 @@ export interface PnlResult {
   ticket_medio: Cents;
   /** Custo por agendamento: Ads ÷ pedidos AGENDADOS (não pagamentos). */
   cpa: Cents;
+  /** Retorno sobre o anúncio: agendado ÷ Ads (não o aprovado). */
   roas: number;
   roi_real: number;
   custo_por_real: number;
@@ -349,7 +350,10 @@ export function calcularPnl(
   // vem depois e às vezes em outro dia. Dividir pelos pagamentos misturava
   // o gasto de hoje com venda fechada semanas atrás e inflava o custo.
   const cpa = qtd_agendados ? Math.round(investimento_ads / qtd_agendados) : 0;
-  const roas = safeDiv(receita_aprovada, investimento_ads);
+  // ROAS sobre o AGENDADO, pela mesma razão do CPA: o anúncio entrega a
+  // venda agendada. Medir pelo aprovado atrasa o retorno do dia — o que
+  // foi vendido hoje só aparece quando o cliente pagar, dias depois.
+  const roas = safeDiv(valor_agendado, investimento_ads);
   const roi_real = safeDiv(lucro_real, investimento_ads);
   const custo_por_real = safeDiv(custos_totais_reais, receita_aprovada);
 

@@ -99,14 +99,16 @@ describe('calcularPnl — critérios de aceite', () => {
 });
 
 describe('indicadores derivados', () => {
-  it('ticket médio 693,78 · CPA 146,06 · ROAS ~2,04', () => {
+  it('ticket médio 693,78 · CPA 146,06 · ROAS ~4,71', () => {
     const r = calcularPnl([dia], [], periodo);
     expect(r.ticket_medio).toBe(69_378); // R$ 693,78 — sobre os 30 pagamentos
     // CPA é por AGENDAMENTO: R$ 10.224,00 ÷ 70 agendados = R$ 146,06.
     // Pelos 30 pagamentos dava R$ 340,80 — o anúncio traz o agendamento,
     // o pagamento vem depois e às vezes em outro dia.
     expect(r.cpa).toBe(14_606);
-    expect(r.roas).toBeCloseTo(2.04, 2);
+    // ROAS sobre o AGENDADO: R$ 48.150,00 ÷ R$ 10.224,00 = 4,71x.
+    // Pelo aprovado dava 2,04x — mede o pagamento, não o anúncio.
+    expect(r.roas).toBeCloseTo(4.71, 2);
   });
 
   it('sem agendamento no período, o CPA não inventa número', () => {

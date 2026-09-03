@@ -45,7 +45,7 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
   const miniKpis = [
     { l: 'Ticket médio', v: formatBRL(pnl.ticket_medio) },
     { l: 'CPA', v: formatBRL(pnl.cpa) },
-    { l: 'ROAS', v: formatMultiplier(pnl.roas) },
+    { l: 'ROAS agendado', v: formatMultiplier(pnl.roas) },
     { l: 'ROI real', v: formatPercent(pnl.roi_real), cor: pnl.roi_real >= 0 ? '#34d399' : '#fb7185' },
     { l: 'Custo por R$ 1', v: formatBRL(Math.round(pnl.custo_por_real * 100)) },
     { l: 'Ads / receita', v: formatPercent(safeDiv(pnl.investimento_ads, pnl.receita_aprovada)), cor: '#fbbf24' },

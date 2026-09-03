@@ -89,7 +89,7 @@ export async function exportarXlsx(
   moeda('Frustrados (informativo)', pnl.valor_frustrado);
   moeda('Ticket Médio', pnl.ticket_medio);
   moeda('CPA por agendamento', pnl.cpa);
-  num('ROAS', Number(pnl.roas.toFixed(2)));
+  num('ROAS agendado', Number(pnl.roas.toFixed(2)));
   pct('ROI Real', pnl.roi_real);
   pct('Conversão Agendado→Aprovado', pnl.conversao_agendado);
   moeda('Valor Pendente', pnl.valor_pendente);
