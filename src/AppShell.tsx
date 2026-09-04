@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BarChart3, Download, LogOut, Megaphone, PieChart, Receipt, RefreshCw, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
+import { BarChart3, Camera, Download, LogOut, Megaphone, PieChart, Receipt, RefreshCw, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { useData } from '@/store/DataProvider';
@@ -17,14 +17,16 @@ import { AdsScreen } from '@/screens/AdsScreen';
 import { TaxasScreen } from '@/screens/TaxasScreen';
 import { VendasScreen } from '@/screens/VendasScreen';
 import { RankingScreen } from '@/screens/RankingScreen';
+import { InstagramScreen } from '@/screens/InstagramScreen';
 
-type Tab = 'pnl' | 'vendas' | 'ranking' | 'ads' | 'custos' | 'taxas' | 'frustrados' | 'viz' | 'export';
+type Tab = 'pnl' | 'vendas' | 'ranking' | 'instagram' | 'ads' | 'custos' | 'taxas' | 'frustrados' | 'viz' | 'export';
 
 /** `curto` é o rótulo da barra inferior no celular, onde só cabe uma palavra. */
 const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
   { id: 'pnl', label: 'Demonstração de Resultados', curto: 'P&L', Icon: BarChart3 },
   { id: 'vendas', label: 'Vendas Agendadas', curto: 'Vendas', Icon: ShoppingBag },
   { id: 'ranking', label: 'Ranking de Vendas', curto: 'Ranking', Icon: Trophy },
+  { id: 'instagram', label: 'Instagram', curto: 'Insta', Icon: Camera },
   { id: 'ads', label: 'Anúncios (Meta)', curto: 'Ads', Icon: Megaphone },
   { id: 'custos', label: 'Custos Variáveis', curto: 'Custos', Icon: Wallet },
   { id: 'taxas', label: 'Taxas de Plataforma', curto: 'Taxas', Icon: Receipt },
@@ -175,6 +177,7 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
         {tab === 'pnl' && <PnlScreen periodo={periodo} onAddCusto={() => setModal(true)} onLancarManual={() => setTab('ads')} />}
         {tab === 'vendas' && <VendasScreen periodo={periodo} />}
         {tab === 'ranking' && <RankingScreen periodo={periodo} />}
+        {tab === 'instagram' && <InstagramScreen periodo={periodo} />}
         {tab === 'ads' && <AdsScreen periodo={periodo} />}
         {tab === 'custos' && <CustosScreen periodo={periodo} />}
         {tab === 'taxas' && <TaxasScreen periodo={periodo} />}
