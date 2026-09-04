@@ -173,7 +173,16 @@ export function PnlScreen({
                   : 'lance na tela Marketing'
               }
             />
-            <KpiCard Icon={Target} color="#60a5fa" label="Margem Real" value={formatPercent(pnl.margem_real)} sub={`Afterpay indica ${formatPercent(pnl.margem_afterpay)}`} />
+            {/* Sobre a MESMA safra do CPA e do ROAS: o que foi agendado no
+                período e os custos que esses pedidos geram. É projeção — o
+                caixa de verdade fica no Lucro Real, lá em cima. */}
+            <KpiCard
+              Icon={Target}
+              color="#60a5fa"
+              label="Margem do agendado"
+              value={formatPercent(pnl.margem_agendado)}
+              sub={`${formatBRL(pnl.lucro_agendado)} de lucro projetado`}
+            />
           </div>
 
           {/* KPIs linha 2 */}

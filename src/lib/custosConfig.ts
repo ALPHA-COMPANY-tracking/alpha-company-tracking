@@ -72,6 +72,37 @@ export function perdaRealDePedido(p: Pedido): number {
   return custoProdutoDoPlano(p.produto_plano) + FRETE_POR_PEDIDO;
 }
 
+/**
+ * Custo de produto + frete do que foi AGENDADO no período (em centavos).
+ *
+ * Conta pela data de criação e ignora os frustrados — eles têm perda
+ * própria, com regra separada. Serve para projetar o resultado do que o
+ * vendedor fechou no dia, antes de o cliente pagar.
+ */
+export function custosDeAgendados(
+  pedidos: Pedido[],
+  periodo: Periodo,
+): { custo_produtos: Cents; frete: Cents; qtd: number; comissao_vendedor: Cents } {
+  const agendados = pedidosAtivos(pedidos).filter(
+    (p) => statusBucket(p.status) !== 'frustrado' && isDentro(p.data, periodo.inicio, periodo.fim),
+  );
+  let custo_produtos = 0;
+  let comissao_vendedor = 0;
+  for (const p of agendados) {
+    custo_produtos += reaisToCents(custoProdutoDoPlano(p.produto_plano));
+    // A comissão sai do mesmo laço, sobre os mesmos pedidos: separar em
+    // duas fontes é como se entra numa safra e sai noutra.
+    const valor = reaisToCents(Number(p.valor_agendado ?? p.valor) || 0);
+    comissao_vendedor += Math.round(valor * comissaoDoVendedor(p.vendedor));
+  }
+  return {
+    custo_produtos,
+    frete: reaisToCents(FRETE_POR_PEDIDO) * agendados.length,
+    qtd: agendados.length,
+    comissao_vendedor,
+  };
+}
+
 /** Custo de produto + frete dos pedidos APROVADOS do período (em centavos). */
 export function custosDePedidos(
   pedidos: Pedido[],

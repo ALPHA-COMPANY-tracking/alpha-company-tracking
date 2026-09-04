@@ -7,7 +7,13 @@
 import type { AfterpayDaily, CustoVariavel, IsoDate, Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
 import { agregarPedidos } from '@/lib/pedidos';
-import { COMISSAO_COBRANCA, COMISSAO_POR_VENDEDOR, comissaoDoVendedor, custosDePedidos } from '@/lib/custosConfig';
+import {
+  COMISSAO_COBRANCA,
+  COMISSAO_POR_VENDEDOR,
+  comissaoDoVendedor,
+  custosDeAgendados,
+  custosDePedidos,
+} from '@/lib/custosConfig';
 import { taxasDoPeriodo } from '@/lib/taxas';
 import {
   diasDoPeriodo,
@@ -152,6 +158,10 @@ export interface PnlResult {
   qtd_agendados: number;
   valor_pendente: Cents;
   conversao_agendado: number;
+  /** Resultado PROJETADO do que foi agendado no período (se tudo for pago). */
+  lucro_agendado: Cents;
+  /** lucro_agendado ÷ valor_agendado. Mede a safra do dia, não o caixa. */
+  margem_agendado: number;
 
   // Indicadores derivados
   ticket_medio: Cents;
@@ -357,6 +367,36 @@ export function calcularPnl(
   const roi_real = safeDiv(lucro_real, investimento_ads);
   const custo_por_real = safeDiv(custos_totais_reais, receita_aprovada);
 
+  // ── Resultado projetado do que foi AGENDADO ──────────────────────
+  // Margem sobre o aprovado castiga o dia de muita venda: o Ads inteiro
+  // é descontado, mas só a parte já paga entra como receita. Aqui a
+  // conta fecha sobre a mesma safra: o que o vendedor fechou no período,
+  // com os custos que esses pedidos vão gerar.
+  //
+  // É PROJEÇÃO, não caixa: assume que o agendado será pago. A taxa de
+  // plataforma fica de fora da comissão porque só existe no pagamento,
+  // e nesses pedidos ele ainda não aconteceu.
+  // O frustrado sai dos DOIS lados: ele não vai ser pago, então não é
+  // receita a projetar, e o custo dele também não entra aqui — a perda
+  // dos frustrados tem linha própria, com o modo que você escolhe.
+  const agendado_de_pe = valor_agendado - valor_frustrado;
+  let lucro_agendado = 0;
+  let margem_agendado = 0;
+  if (agendado_de_pe > 0) {
+    const ca = custosDeAgendados(pedidos, periodo);
+    const custosDoAgendado =
+      ca.custo_produtos +
+      ca.frete +
+      ca.comissao_vendedor +
+      Math.round(agendado_de_pe * COMISSAO_COBRANCA) +
+      taxas_plataforma +
+      investimento_ads +
+      taxas_investimento +
+      custos_variaveis_total;
+    lucro_agendado = agendado_de_pe - custosDoAgendado;
+    margem_agendado = safeDiv(lucro_agendado, agendado_de_pe);
+  }
+
   return {
     receita_aprovada,
     qtd_pagamentos,
@@ -388,6 +428,8 @@ export function calcularPnl(
     qtd_agendados,
     valor_pendente,
     conversao_agendado,
+    lucro_agendado,
+    margem_agendado,
     ticket_medio,
     cpa,
     roas,
