@@ -7,9 +7,12 @@
 // não resolvem no runtime das funções.
 // ─────────────────────────────────────────────────────────────
 
-/** Custo do produto por plano, detectado pelo texto. */
+/** Custo do produto por plano, detectado pelo texto.
+ *  Precisa ser IGUAL a src/lib/custosConfig.ts — há teste comparando os
+ *  dois, senão a notificação da noite conta diferente da tela. */
 export const CUSTO_PRODUTO: { match: RegExp; custo: number }[] = [
   { match: /6\s*pote/i, custo: 83.0 },
+  { match: /4\s*pote/i, custo: 41.0 }, // tratamento de 4 meses, a partir de 04/09/2026
   { match: /3\s*pote/i, custo: 32.5 },
 ];
 

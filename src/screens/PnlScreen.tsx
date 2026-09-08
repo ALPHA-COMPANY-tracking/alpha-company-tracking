@@ -8,6 +8,7 @@ import {
   Megaphone,
   ShoppingCart,
   Target,
+  TriangleAlert,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
@@ -16,6 +17,7 @@ import { formatBRL, formatBRLCompact, formatMultiplier, formatPercent, reaisToCe
 import { formatDiaMes } from '@/lib/dates';
 import { type DescontoFrustrados, calcularPnl } from '@/lib/pnl';
 import { agregarPedidos } from '@/lib/pedidos';
+import { planosSemCusto } from '@/lib/custosConfig';
 import { useData } from '@/store/DataProvider';
 import { KpiCard, Panel } from '@/components/ui';
 import { Demonstrativo } from '@/components/pnl/Demonstrativo';
@@ -63,8 +65,30 @@ export function PnlScreen({
     [agg],
   );
 
+  // Plano sem custo cadastrado entra na conta valendo ZERO e infla o
+  // lucro sem nada denunciar. Melhor um aviso feio do que um número
+  // bonito e errado.
+  const semCusto = useMemo(() => planosSemCusto(pedidos, periodo), [pedidos, periodo]);
+
   return (
     <div className="flex flex-col gap-4">
+      {semCusto.length > 0 && (
+        <div className="flex items-start gap-3 rounded-[12px] border border-yel/40 bg-yel/[0.07] px-4 py-[13px]">
+          <TriangleAlert size={17} className="text-yel shrink-0 mt-[1px]" />
+          <div className="min-w-0">
+            <div className="text-[13px] font-bold text-yel">
+              {semCusto.length === 1 ? 'Um plano vendido não tem custo cadastrado' : `${semCusto.length} planos vendidos não têm custo cadastrado`}
+            </div>
+            <div className="text-[12.5px] text-dim mt-[3px] leading-relaxed">
+              Enquanto isso, {semCusto.length === 1 ? 'ele entra' : 'eles entram'} na conta com{' '}
+              <b className="text-tx">custo de produto R$ 0,00</b> — o lucro e a margem estão acima do real. Me avise
+              para eu cadastrar:
+              <span className="block mono text-[11.5px] text-tx2 mt-1.5">{semCusto.join(' · ')}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Herói — Faturamento Agendado (esquerda) · Lucro Real (direita) */}
       {/* No celular cada metade vira um bloco centralizado, com o ícone
           acima e o número grande; no desktop volta a ser ícone ao lado. */}

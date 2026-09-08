@@ -17,10 +17,11 @@ function diaMes(iso: string): string {
 
 /** Resumo do plano: "6 potes" / "3 potes". */
 function planoCurto(plano?: string | null): string {
-  const p = plano ?? '';
-  if (/6\s*pote/i.test(p)) return '6 potes';
-  if (/3\s*pote/i.test(p)) return '3 potes';
-  return '—';
+  // Lê a quantidade do próprio texto: plano novo no BlueSales já aparece
+  // certo aqui, sem precisar de mais uma linha de código.
+  const m = /(\d+)\s*pote/i.exec(plano ?? '');
+  if (!m) return (plano ?? '').trim() || '—';
+  return `${m[1]} pote${m[1] === '1' ? '' : 's'}`;
 }
 
 export function FrustradosScreen({ periodo }: { periodo: Periodo }) {

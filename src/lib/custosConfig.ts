@@ -10,9 +10,15 @@ import { isDentro } from '@/lib/dates';
 import { dataAprovacaoPedido, pedidosAtivos, statusBucket } from '@/lib/pedidos';
 
 /** Custo do produto (COGS) por plano — detectado pelo texto do plano.
- *  Valores conferidos contra o P&L real do BlueSales. */
+ *  Valores conferidos contra o P&L real do BlueSales.
+ *
+ *  Plano que não casar com nenhuma regra entra com custo ZERO e infla o
+ *  lucro em silêncio. Por isso `planosSemCusto` existe: a tela avisa em
+ *  vez de deixar passar. Ao cadastrar plano novo no BlueSales, some a
+ *  linha aqui e em api/lib-custos.ts. */
 export const CUSTO_PRODUTO: { match: RegExp; custo: number }[] = [
   { match: /6\s*pote/i, custo: 83.0 },
+  { match: /4\s*pote/i, custo: 41.0 }, // tratamento de 4 meses, a partir de 04/09/2026
   { match: /3\s*pote/i, custo: 32.5 },
 ];
 
@@ -57,6 +63,34 @@ export function custoProdutoDoPlano(plano?: string | null): number {
   const p = plano ?? '';
   for (const regra of CUSTO_PRODUTO) if (regra.match.test(p)) return regra.custo;
   return 0;
+}
+
+/** O plano tem custo configurado? */
+export function planoTemCusto(plano?: string | null): boolean {
+  const p = plano ?? '';
+  return CUSTO_PRODUTO.some((regra) => regra.match.test(p));
+}
+
+/**
+ * Planos vendidos no período que não têm custo configurado.
+ *
+ * Existe porque o custo desconhecido vale ZERO na conta — o lucro sobe e
+ * nada na tela denuncia. Quando o BlueSales ganha um plano novo (como o
+ * de 4 potes em 04/09/2026), é isto que faz o aviso aparecer em vez de o
+ * número sair errado calado.
+ */
+export function planosSemCusto(pedidos: Pedido[], periodo: Periodo): string[] {
+  const achados = new Set<string>();
+  for (const p of pedidosAtivos(pedidos)) {
+    if (statusBucket(p.status) === 'frustrado') continue;
+    const noPeriodo =
+      isDentro(p.data, periodo.inicio, periodo.fim) ||
+      isDentro(dataAprovacaoPedido(p), periodo.inicio, periodo.fim);
+    if (!noPeriodo) continue;
+    const plano = (p.produto_plano ?? '').trim();
+    if (plano && !planoTemCusto(plano)) achados.add(plano);
+  }
+  return [...achados].sort();
 }
 
 /**
