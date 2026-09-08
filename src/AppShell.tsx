@@ -174,7 +174,7 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
           </div>
         </div>
 
-        {tab === 'pnl' && <PnlScreen periodo={periodo} onAddCusto={() => setModal(true)} onLancarManual={() => setTab('ads')} />}
+        {tab === 'pnl' && <PnlScreen periodo={periodo} onAddCusto={() => setModal(true)} onLancarManual={() => setTab('ads')} onLancarTaxa={() => setTab('taxas')} />}
         {tab === 'vendas' && <VendasScreen periodo={periodo} />}
         {tab === 'ranking' && <RankingScreen periodo={periodo} />}
         {tab === 'instagram' && <InstagramScreen periodo={periodo} />}

@@ -6,6 +6,7 @@ import {
   CalendarClock,
   Crosshair,
   Megaphone,
+  Receipt,
   ShoppingCart,
   Target,
   TriangleAlert,
@@ -18,6 +19,7 @@ import { formatDiaMes } from '@/lib/dates';
 import { type DescontoFrustrados, calcularPnl } from '@/lib/pnl';
 import { agregarPedidos } from '@/lib/pedidos';
 import { planosSemCusto } from '@/lib/custosConfig';
+import { taxasPorDia } from '@/lib/taxas';
 import { useData } from '@/store/DataProvider';
 import { KpiCard, Panel } from '@/components/ui';
 import { Demonstrativo } from '@/components/pnl/Demonstrativo';
@@ -28,10 +30,13 @@ export function PnlScreen({
   periodo,
   onAddCusto,
   onLancarManual,
+  onLancarTaxa,
 }: {
   periodo: Periodo;
   onAddCusto: () => void;
   onLancarManual?: () => void;
+  /** Leva para a tela Taxas — o aviso de taxa faltando é clicável. */
+  onLancarTaxa?: () => void;
 }) {
   const { dailies, custos, categorias, pedidos } = useData();
   // Padrão 'nenhum' para ESPELHAR o BlueSales: lá os frustrados aparecem
@@ -74,6 +79,15 @@ export function PnlScreen({
   // bonito e errado.
   const semCusto = useMemo(() => planosSemCusto(pedidos, periodo), [pedidos, periodo]);
 
+  // Mesma ideia para a taxa do BlueSales: dia com pagamento e sem taxa
+  // lançada entra como R$ 0,00 e desalinha DUAS linhas — a taxa e a
+  // comissão do vendedor, que sai da receita menos a taxa. Foi o que fez
+  // o P&L de 01–08/09 fechar R$ 4,98 acima do BlueSales.
+  const diasSemTaxa = useMemo(
+    () => taxasPorDia(pedidos, dailies, periodo).filter((t) => t.fonte === 'ausente' && t.qtd_pagamentos > 0),
+    [pedidos, dailies, periodo],
+  );
+
   return (
     <div className="flex flex-col gap-4">
       {semCusto.length > 0 && (
@@ -91,6 +105,31 @@ export function PnlScreen({
             </div>
           </div>
         </div>
+      )}
+
+      {diasSemTaxa.length > 0 && (
+        <button
+          onClick={onLancarTaxa}
+          className="w-full text-left flex items-start gap-3 rounded-[12px] border border-yel/40 bg-yel/[0.07] px-4 py-[13px] hover:bg-yel/[0.11] transition-colors"
+        >
+          <Receipt size={17} className="text-yel shrink-0 mt-[1px]" />
+          <div className="min-w-0">
+            <div className="text-[13px] font-bold text-yel">
+              {diasSemTaxa.length === 1
+                ? 'A taxa do BlueSales de 1 dia não foi lançada'
+                : `A taxa do BlueSales de ${diasSemTaxa.length} dias não foi lançada`}
+            </div>
+            <div className="text-[12.5px] text-dim mt-[3px] leading-relaxed">
+              {diasSemTaxa.length === 1 ? 'Esse dia entra' : 'Esses dias entram'} com{' '}
+              <b className="text-tx">taxa R$ 0,00</b>, e isso desalinha duas linhas: a taxa e a{' '}
+              <b className="text-tx">comissão do vendedor</b>, que sai da receita menos a taxa. Pegue o valor no
+              Resultado Diário do BlueSales — clique aqui para lançar.
+              <span className="block mono text-[11.5px] text-tx2 mt-1.5">
+                {diasSemTaxa.map((t) => formatDiaMes(t.data)).join(' · ')}
+              </span>
+            </div>
+          </div>
+        </button>
       )}
 
       {/* Herói — Faturamento Agendado (esquerda) · Lucro Real (direita) */}
