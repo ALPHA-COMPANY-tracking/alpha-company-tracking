@@ -34,7 +34,11 @@ export function PnlScreen({
   onLancarManual?: () => void;
 }) {
   const { dailies, custos, categorias, pedidos } = useData();
-  const [modoFrustrados, setModoFrustrados] = useState<DescontoFrustrados>('real');
+  // Padrão 'nenhum' para ESPELHAR o BlueSales: lá os frustrados aparecem
+  // na lista de perdas mas não entram no Lucro Líquido — conferido no P&L
+  // deles de 01–08/09/2026, onde os R$ 1.170,00 ficam de fora dos Custos
+  // Totais. Quem quiser a perda de caixa troca no botão do rodapé.
+  const [modoFrustrados, setModoFrustrados] = useState<DescontoFrustrados>('nenhum');
 
   const pnl = useMemo(
     () => calcularPnl(dailies, custos, periodo, { descontarFrustrados: modoFrustrados }, pedidos),
