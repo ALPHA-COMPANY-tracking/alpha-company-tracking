@@ -7,7 +7,6 @@ import {
   Crosshair,
   Megaphone,
   Receipt,
-  ShoppingCart,
   Target,
   TriangleAlert,
   TrendingDown,
@@ -254,7 +253,20 @@ export function PnlScreen({
 
           {/* KPIs linha 2 */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-[14px]">
-            <KpiCard Icon={ShoppingCart} color="#c084fc" label="Total de Pedidos" value={String(pnl.qtd_agendados)} sub="agendados no período" />
+            {/* Card que o BlueSales tem e faltava aqui. Ocupa o lugar do
+                "Total de Pedidos", que repetia o contador do herói
+                ("N pedidos no período") logo acima. */}
+            <KpiCard
+              Icon={TriangleAlert}
+              color="#fbbf24"
+              label="Frustrados"
+              value={formatBRL(pnl.valor_frustrado)}
+              sub={
+                pnl.qtd_frustrados > 0
+                  ? `${pnl.qtd_frustrados} pedido${pnl.qtd_frustrados === 1 ? '' : 's'} perdido${pnl.qtd_frustrados === 1 ? '' : 's'}`
+                  : 'nenhum no período'
+              }
+            />
             <KpiCard Icon={BadgeCheck} color="#34d399" label="Ticket Médio" value={formatBRL(pnl.ticket_medio)} sub="sobre pedidos aprovados" />
             <KpiCard
               Icon={Crosshair}
