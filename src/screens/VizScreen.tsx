@@ -11,6 +11,7 @@ import { EvolucaoChart } from '@/components/pnl/EvolucaoChart';
 import { BarsVertical } from '@/components/viz/BarsVertical';
 import { DonutCategorias } from '@/components/viz/DonutCategorias';
 import { Funil } from '@/components/viz/Funil';
+import { COR, corDaCategoria } from '@/lib/cores';
 
 export function VizScreen({ periodo }: { periodo: Periodo }) {
   const { dailies, custos, categorias, pedidos } = useData();
@@ -38,7 +39,7 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
   const donut = pnl.custos_variaveis_por_categoria.map((agg) => ({
     nome: catMap.get(agg.categoria_id ?? '')?.nome ?? 'Sem categoria',
     valor: agg.total,
-    cor: catMap.get(agg.categoria_id ?? '')?.cor ?? '#a855f7',
+    cor: corDaCategoria(catMap.get(agg.categoria_id ?? '')?.cor, categorias.findIndex((c) => c.id === agg.categoria_id)),
   }));
 
   const rangeLabel = `${formatDiaMes(periodo.inicio)} a ${formatDiaMes(periodo.fim)}`;
@@ -80,14 +81,14 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
           <EvolucaoChart dailies={dailies} custos={custos} periodo={periodo} />
           <div className="flex gap-[18px] px-3 pt-1 pb-3 text-[11.5px] text-dim">
             <span className="flex items-center gap-2"><i className="w-[9px] h-[9px] rounded-sm bg-grn inline-block" />Receita aprovada</span>
-            <span className="flex items-center gap-2"><i className="w-[9px] h-[9px] rounded-sm bg-pur inline-block" />Lucro real</span>
+            <span className="flex items-center gap-2"><i className="w-[9px] h-[9px] rounded-sm bg-gold inline-block" />Lucro real</span>
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-6 gap-px bg-line border-t border-line">
           {miniKpis.map((k) => (
             <div key={k.l} className="bg-card px-4 py-[13px]">
               <div className="text-[9px] tracking-[0.12em] uppercase text-dim2 font-bold">{k.l}</div>
-              <div className="mono text-[15.5px] font-bold mt-[5px]" style={{ color: k.cor ?? '#eaeaf2' }}>{k.v}</div>
+              <div className="mono text-[15.5px] font-bold mt-[5px]" style={{ color: k.cor ?? COR.texto }}>{k.v}</div>
             </div>
           ))}
         </div>

@@ -10,6 +10,7 @@ import { useData } from '@/store/DataProvider';
 import { LogoMark } from '@/components/Logo';
 import { Panel } from '@/components/ui';
 import { BarsVertical } from '@/components/viz/BarsVertical';
+import { HEX } from '@/lib/cores';
 
 /** 'YYYY-MM-DD' → 'DD/MM'. */
 function diaMes(iso: string): string {
@@ -147,11 +148,11 @@ export function InstagramScreen({ periodo }: { periodo: Periodo }) {
             />
             <Cartao
               Icon={ShoppingCart}
-              cor="#c084fc"
+              cor={HEX.ouro}
               label={`Total de Pedidos (${quando})`}
               valor={String(pnl.qtd_agendados)}
             />
-            <Cartao Icon={Zap} cor="#60a5fa" label={`CPA (${quando})`} valor={formatBRL(pnl.cpa)} />
+            <Cartao Icon={Zap} cor={HEX.ouroClaro} label={`CPA (${quando})`} valor={formatBRL(pnl.cpa)} />
           </div>
 
           {/* Os dois gráficos por atendente */}

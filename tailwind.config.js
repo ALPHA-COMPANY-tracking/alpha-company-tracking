@@ -22,18 +22,17 @@ export default {
         tx2: 'rgb(var(--tx2) / <alpha-value>)',
         dim: 'rgb(var(--dim) / <alpha-value>)',
         dim2: 'rgb(var(--dim2) / <alpha-value>)',
-        pur: '#a855f7',
-        pur2: '#c084fc',
-        pur3: '#7c3aed',
-        grn: '#34d399',
-        blu: '#60a5fa',
-        pnk: '#f472b6',
-        yel: '#fbbf24',
-        red: '#fb7185',
-        cyan: '#22d3ee',
-        gold: '#d4af37',
-        gold2: '#f0d98f',
-        gold3: '#a8792e',
+        // Marca: dourado (variável CSS — escurece no modo claro).
+        gold: 'rgb(var(--gold) / <alpha-value>)',
+        gold2: 'rgb(var(--gold2) / <alpha-value>)',
+        gold3: 'rgb(var(--gold3) / <alpha-value>)',
+        // Semânticas: só onde a cor tem significado.
+        grn: '#34d399', // entrou / melhorou
+        red: '#fb7185', // saiu / piorou
+        yel: '#fbbf24', // aviso
+        // Roxo, azul, rosa e ciano foram REMOVIDOS de propósito: não são
+        // cores da marca. Uma classe text-pur2 esquecida simplesmente não
+        // gera CSS — o grep em src/ tem que voltar vazio.
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

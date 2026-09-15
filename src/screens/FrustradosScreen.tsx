@@ -157,7 +157,7 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
                               <button
                                 onClick={() => definirPerdaPedido(p.id, null)}
                                 title="Voltar ao cálculo automático"
-                                className="grid place-items-center w-8 h-8 rounded-lg text-dim2 hover:text-blu hover:bg-blu/10"
+                                className="grid place-items-center w-8 h-8 rounded-lg text-dim2 hover:text-gold hover:bg-gold/10"
                               >
                                 <RotateCcw size={14} />
                               </button>

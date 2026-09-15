@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Plus, Trash2, X } from 'lucide-react';
 import { useData } from '@/store/DataProvider';
+import { PALETA_CATEGORIAS, corDaCategoria } from '@/lib/cores';
 
-const CORES = ['#a855f7', '#c084fc', '#f472b6', '#60a5fa', '#22d3ee', '#34d399', '#fbbf24', '#fb7185', '#818cf8', '#2dd4bf', '#94a3b8', '#6b7280'];
+// Só tons da marca: escala do dourado e neutros quentes.
+const CORES = PALETA_CATEGORIAS;
 
 export function CategoriasDrawer({ aberto, onClose }: { aberto: boolean; onClose: () => void }) {
   const { categorias, custos, addCategoria, updateCategoria, deleteCategoria } = useData();
   const [novoNome, setNovoNome] = useState('');
-  const [novaCor, setNovaCor] = useState(CORES[0]);
+  const [novaCor, setNovaCor] = useState<string>(CORES[0]);
   const [confirmar, setConfirmar] = useState<string | null>(null);
 
   /** Quantos lançamentos usam esta categoria (ficarão "Sem categoria"). */
@@ -57,11 +59,11 @@ export function CategoriasDrawer({ aberto, onClose }: { aberto: boolean; onClose
               onChange={(e) => setNovoNome(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && criar()}
               placeholder="Nome da categoria"
-              className="flex-1 bg-card2 border border-line2 rounded-[10px] px-3 py-2 text-tx text-[13px] outline-none focus:border-pur placeholder:text-dim2"
+              className="flex-1 bg-card2 border border-line2 rounded-[10px] px-3 py-2 text-tx text-[13px] outline-none focus:border-gold placeholder:text-dim2"
             />
             <button
               onClick={criar}
-              className="inline-flex items-center gap-1 px-3 rounded-[10px] text-white text-[13px] font-semibold bg-gradient-to-br from-pur3 to-pur"
+              className="inline-flex items-center gap-1 px-3 rounded-[10px] text-[#15120a] text-[13px] font-semibold bg-gold-metal"
             >
               <Plus size={15} />
             </button>
@@ -109,7 +111,7 @@ export function CategoriasDrawer({ aberto, onClose }: { aberto: boolean; onClose
             }
             return (
               <div key={cat.id} className="group flex items-center gap-2 px-2 py-[7px] rounded-[10px] hover:bg-card2">
-                <span className="w-3 h-3 rounded-full shrink-0" style={{ background: cat.cor ?? '#a855f7' }} />
+                <span className="w-3 h-3 rounded-full shrink-0" style={{ background: corDaCategoria(cat.cor, categorias.indexOf(cat)) }} />
                 <input
                   value={cat.nome}
                   onChange={(e) => updateCategoria(cat.id, { nome: e.target.value })}

@@ -9,6 +9,7 @@ import { CustoModal } from '@/components/CustoModal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ImportCsvModal } from '@/components/custos/ImportCsvModal';
 import { CategoriasDrawer } from '@/components/custos/CategoriasDrawer';
+import { COR } from '@/lib/cores';
 
 export function CustosScreen({ periodo }: { periodo: Periodo }) {
   const { custos, categorias, deleteCusto } = useData();
@@ -60,8 +61,8 @@ export function CustosScreen({ periodo }: { periodo: Periodo }) {
     <div className="flex flex-col gap-4">
       {/* Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-[14px]">
-        <ResumoCard cor="#c084fc" label="Total do período" valor={formatBRL(total)} sub={`${doPeriodo.length} lançamentos`} />
-        <ResumoCard cor="#60a5fa" label="Maior categoria" valor={maiorNome} sub={maior ? formatBRL(maior[1]) : '—'} texto />
+        <ResumoCard cor={COR.ouro} label="Total do período" valor={formatBRL(total)} sub={`${doPeriodo.length} lançamentos`} />
+        <ResumoCard cor={COR.ouroClaro} label="Maior categoria" valor={maiorNome} sub={maior ? formatBRL(maior[1]) : '—'} texto />
         <ResumoCard cor="#34d399" label="Média mensal (estimada)" valor={formatBRL(mediaMensal)} sub="projeção de 30 dias" />
       </div>
 
@@ -79,7 +80,7 @@ export function CustosScreen({ periodo }: { periodo: Periodo }) {
         <select
           value={filtroCat}
           onChange={(e) => setFiltroCat(e.target.value)}
-          className="bg-card border border-line2 rounded-[10px] px-3 py-[9px] text-[13px] text-tx outline-none focus:border-pur"
+          className="bg-card border border-line2 rounded-[10px] px-3 py-[9px] text-[13px] text-tx outline-none focus:border-gold"
         >
           <option value="">Todas as categorias</option>
           {categorias.map((c) => (
@@ -91,19 +92,19 @@ export function CustosScreen({ periodo }: { periodo: Periodo }) {
         <div className="flex-1" />
         <button
           onClick={() => setDrawerAberto(true)}
-          className="inline-flex items-center gap-2 bg-card border border-line2 text-tx px-3 py-[9px] rounded-[10px] text-[13px] font-semibold hover:border-pur/60"
+          className="inline-flex items-center gap-2 bg-card border border-line2 text-tx px-3 py-[9px] rounded-[10px] text-[13px] font-semibold hover:border-gold/60"
         >
           <FolderCog size={15} /> Categorias
         </button>
         <button
           onClick={() => setImportAberto(true)}
-          className="inline-flex items-center gap-2 bg-card border border-line2 text-tx px-3 py-[9px] rounded-[10px] text-[13px] font-semibold hover:border-pur/60"
+          className="inline-flex items-center gap-2 bg-card border border-line2 text-tx px-3 py-[9px] rounded-[10px] text-[13px] font-semibold hover:border-gold/60"
         >
           <Upload size={15} /> Importar CSV
         </button>
         <button
           onClick={abrirAdd}
-          className="inline-flex items-center gap-2 text-white px-[14px] py-[9px] rounded-[10px] text-[13px] font-semibold bg-gradient-to-br from-pur3 to-pur"
+          className="inline-flex items-center gap-2 text-[#15120a] px-[14px] py-[9px] rounded-[10px] text-[13px] font-semibold bg-gold-metal"
         >
           <Plus size={15} /> Adicionar custo
         </button>
@@ -150,13 +151,13 @@ export function CustosScreen({ periodo }: { periodo: Periodo }) {
                       </td>
                       <td className="px-4 py-3 border-b border-trilha">
                         {c.recorrencia === 'mensal' ? (
-                          <span className="text-[10px] font-semibold rounded-md px-2 py-[3px] bg-pur/15 text-pur2">Mensal</span>
+                          <span className="text-[10px] font-semibold rounded-md px-2 py-[3px] bg-gold/15 text-gold2">Mensal</span>
                         ) : (
                           <span className="text-[10px] font-semibold rounded-md px-2 py-[3px] bg-[#26262f] text-dim">Único</span>
                         )}
                       </td>
                       <td className="px-4 py-3 border-b border-trilha text-right whitespace-nowrap">
-                        <button onClick={() => abrirEdit(c)} className="text-dim2 hover:text-blu p-1" title="Editar">
+                        <button onClick={() => abrirEdit(c)} className="text-dim2 hover:text-gold p-1" title="Editar">
                           <Pencil size={15} />
                         </button>
                         <button onClick={() => setExcluir(c)} className="text-dim2 hover:text-red p-1 ml-1" title="Excluir">
@@ -170,7 +171,7 @@ export function CustosScreen({ periodo }: { periodo: Periodo }) {
             </table>
 
             {/* Mobile: cards empilhados */}
-            <div className="md:hidden divide-y divide-[#22222b]">
+            <div className="md:hidden divide-y divide-line">
               {filtrados.map(({ c, valor }) => {
                 const cat = catMap.get(c.categoria_id ?? '');
                 return (
@@ -185,7 +186,7 @@ export function CustosScreen({ periodo }: { periodo: Periodo }) {
                       </div>
                       <div className="text-right shrink-0">
                         <div className="mono font-semibold text-red">{formatBRL(valor)}</div>
-                        {c.recorrencia === 'mensal' && <div className="text-[10px] text-pur2 mt-0.5">Mensal</div>}
+                        {c.recorrencia === 'mensal' && <div className="text-[10px] text-gold2 mt-0.5">Mensal</div>}
                       </div>
                     </div>
                     <div className="flex gap-2 mt-3">

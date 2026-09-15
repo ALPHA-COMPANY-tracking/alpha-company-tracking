@@ -11,20 +11,20 @@ import { addDias, hojeIso } from '@/lib/dates';
 // BlueSales. Nomes de exemplo já apareceram na tela por engano.
 
 export const SEED_CATEGORIAS: CategoriaCusto[] = [
-  { id: 'cat-chips', nome: 'Chips / Números WhatsApp', icone: 'smartphone', cor: '#22d3ee', ativo: true, ordem: 0 },
-  { id: 'cat-ferramentas', nome: 'Ferramentas e SaaS', icone: 'wrench', cor: '#60a5fa', ativo: true, ordem: 1 },
-  { id: 'cat-disparador', nome: 'Disparador / Automação', icone: 'zap', cor: '#818cf8', ativo: true, ordem: 2 },
-  { id: 'cat-crm', nome: 'CRM', icone: 'contact', cor: '#38bdf8', ativo: true, ordem: 3 },
-  { id: 'cat-equipe', nome: 'Equipe / Freelancer', icone: 'users', cor: '#a855f7', ativo: true, ordem: 4 },
-  { id: 'cat-criativos', nome: 'Criativos / UGC', icone: 'clapperboard', cor: '#f472b6', ativo: true, ordem: 5 },
-  { id: 'cat-embalagem', nome: 'Embalagem e Insumos', icone: 'package', cor: '#fbbf24', ativo: true, ordem: 6 },
-  { id: 'cat-estorno', nome: 'Estorno / Chargeback', icone: 'rotate-ccw', cor: '#fb7185', ativo: true, ordem: 7 },
-  { id: 'cat-bancarias', nome: 'Taxas Bancárias', icone: 'landmark', cor: '#f59e0b', ativo: true, ordem: 8 },
-  { id: 'cat-trafego', nome: 'Tráfego fora do Meta', icone: 'megaphone', cor: '#34d399', ativo: true, ordem: 9 },
-  { id: 'cat-juridico', nome: 'Contador / Jurídico', icone: 'scale', cor: '#94a3b8', ativo: true, ordem: 10 },
-  { id: 'cat-prolabore', nome: 'Pró-labore', icone: 'wallet', cor: '#c084fc', ativo: true, ordem: 11 },
-  { id: 'cat-infra', nome: 'Infraestrutura (servidor, domínio)', icone: 'server', cor: '#2dd4bf', ativo: true, ordem: 12 },
-  { id: 'cat-outros', nome: 'Outros', icone: 'ellipsis', cor: '#6b7280', ativo: true, ordem: 13 },
+  { id: 'cat-chips', nome: 'Chips / Números WhatsApp', icone: 'smartphone', cor: '#d4af37', ativo: true, ordem: 0 },
+  { id: 'cat-ferramentas', nome: 'Ferramentas e SaaS', icone: 'wrench', cor: '#e9c96e', ativo: true, ordem: 1 },
+  { id: 'cat-disparador', nome: 'Disparador / Automação', icone: 'zap', cor: '#f7e7ad', ativo: true, ordem: 2 },
+  { id: 'cat-crm', nome: 'CRM', icone: 'contact', cor: '#a8792e', ativo: true, ordem: 3 },
+  { id: 'cat-equipe', nome: 'Equipe / Freelancer', icone: 'users', cor: '#c9a227', ativo: true, ordem: 4 },
+  { id: 'cat-criativos', nome: 'Criativos / UGC', icone: 'clapperboard', cor: '#8a6224', ativo: true, ordem: 5 },
+  { id: 'cat-embalagem', nome: 'Embalagem e Insumos', icone: 'package', cor: '#e2dfd6', ativo: true, ordem: 6 },
+  { id: 'cat-estorno', nome: 'Estorno / Chargeback', icone: 'rotate-ccw', cor: '#a09c92', ativo: true, ordem: 7 },
+  { id: 'cat-bancarias', nome: 'Taxas Bancárias', icone: 'landmark', cor: '#736f66', ativo: true, ordem: 8 },
+  { id: 'cat-trafego', nome: 'Tráfego fora do Meta', icone: 'megaphone', cor: '#bf9a2e', ativo: true, ordem: 9 },
+  { id: 'cat-juridico', nome: 'Contador / Jurídico', icone: 'scale', cor: '#6e4f1e', ativo: true, ordem: 10 },
+  { id: 'cat-prolabore', nome: 'Pró-labore', icone: 'wallet', cor: '#4a463f', ativo: true, ordem: 11 },
+  { id: 'cat-infra', nome: 'Infraestrutura (servidor, domínio)', icone: 'server', cor: '#d4af37', ativo: true, ordem: 12 },
+  { id: 'cat-outros', nome: 'Outros', icone: 'ellipsis', cor: '#e9c96e', ativo: true, ordem: 13 },
 ];
 
 // Totais reais do período (em reais) que a distribuição diária precisa somar.

@@ -22,7 +22,7 @@ export function MoneyInput({
         const digits = e.target.value.replace(/\D/g, '');
         onChange(digits ? Number(digits) : 0);
       }}
-      className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx mono text-[15px] outline-none focus:border-pur"
+      className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx mono text-[15px] outline-none focus:border-gold"
     />
   );
 }

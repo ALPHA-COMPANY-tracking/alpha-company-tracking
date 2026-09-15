@@ -179,7 +179,7 @@ export function TaxasScreen({ periodo }: { periodo: Periodo }) {
       </Panel>
 
       <div className="flex items-start gap-3 rounded-[12px] border border-line2 bg-card2 px-4 py-[13px]">
-        <Info size={16} className="text-blu shrink-0 mt-[2px]" />
+        <Info size={16} className="text-gold shrink-0 mt-[2px]" />
         <p className="m-0 text-[12.5px] text-dim leading-relaxed">
           A taxa não dá para calcular a partir dos pedidos — dias com pagamentos idênticos são cobrados de forma
           diferente. Quando o BlueSales manda a taxa junto com o pagamento, ela entra sozinha (

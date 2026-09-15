@@ -16,6 +16,7 @@ import {
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
 import { BarsVertical } from '@/components/viz/BarsVertical';
+import { HEX, alfa } from '@/lib/cores';
 
 const MEDALHA = ['🥇', '🥈', '🥉'];
 
@@ -55,7 +56,7 @@ function BlocoRanking({
   return (
     <div className="bg-card border border-line rounded-card overflow-hidden">
       <div className="flex items-center gap-2.5 px-4 pt-3.5 pb-3 border-b border-line">
-        <span className="w-[26px] h-[26px] rounded-[8px] grid place-items-center shrink-0" style={{ background: `${cor}1f`, color: cor }}>
+        <span className="w-[26px] h-[26px] rounded-[8px] grid place-items-center shrink-0" style={{ background: alfa(cor, 12), color: cor }}>
           <Icon size={14} strokeWidth={2} />
         </span>
         <div className="min-w-0">
@@ -95,7 +96,7 @@ function BlocoRanking({
                     className="h-full rounded-full"
                     style={{
                       width: `${zerado || lider <= 0 ? 0 : Math.max(3, (v / lider) * 100)}%`,
-                      background: i === 0 ? 'linear-gradient(90deg,#eab30880,#eab308)' : `${cor}b0`,
+                      background: i === 0 ? `linear-gradient(90deg, ${alfa(HEX.ouro, 45)}, ${HEX.ouro})` : alfa(cor, 70),
                     }}
                   />
                 </div>
@@ -151,7 +152,7 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
               titulo="Faturamento Agendado"
               hint="o que cada um fechou"
               Icon={CalendarClock}
-              cor="#c084fc"
+              cor={HEX.ouro}
               metrica="agendado"
               linhas={linhas}
             />
@@ -167,7 +168,7 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
               titulo="Agendamentos"
               hint="quantidade de pedidos"
               Icon={ShoppingCart}
-              cor="#60a5fa"
+              cor={HEX.ouroPalido}
               metrica="qtd_agendados"
               linhas={linhas}
             />
@@ -205,7 +206,7 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
                           <div className="text-[10px] mono text-dim2 mt-[2px]">{formatPercent(l.pct)} de comissão</div>
                         </td>
                         <td className="px-2 sm:px-3 lg:px-5 py-3.5 lg:py-4 text-right">
-                          <div className="mono font-bold text-pur2">{formatBRL(l.agendado)}</div>
+                          <div className="mono font-bold text-gold2">{formatBRL(l.agendado)}</div>
                           <div className="text-[10px] text-dim2 mt-[2px]">
                             {l.qtd_agendados} pedido{l.qtd_agendados === 1 ? '' : 's'}
                           </div>
@@ -331,7 +332,7 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
       )}
 
       <div className="flex items-start gap-3 rounded-[12px] border border-line2 bg-card2 px-4 py-[13px]">
-        <Info size={16} className="text-blu shrink-0 mt-[2px]" />
+        <Info size={16} className="text-gold shrink-0 mt-[2px]" />
         <p className="m-0 text-[12.5px] text-dim leading-relaxed">
           <b className="text-dim">Agendado</b> conta pela data em que o vendedor fechou a venda;{' '}
           <b className="text-dim">Aprovado</b>, pela data em que o cliente pagou — por isso os dois não batem no mesmo

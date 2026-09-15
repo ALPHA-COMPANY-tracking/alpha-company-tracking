@@ -1,19 +1,7 @@
 import { useMemo, useState } from 'react';
-import {
-  BadgeCheck,
-  BarChart3,
-  Banknote,
-  CalendarClock,
-  Crosshair,
-  Megaphone,
-  Receipt,
-  Target,
-  TriangleAlert,
-  TrendingDown,
-  TrendingUp,
-} from 'lucide-react';
+import { BadgeCheck, BarChart3, Crosshair, Receipt, Target, TriangleAlert, TrendingDown } from 'lucide-react';
 import type { Periodo } from '@/types';
-import { formatBRL, formatBRLCompact, formatMultiplier, formatPercent, reaisToCents, safeDiv } from '@/lib/money';
+import { formatBRL, formatBRLCompact, formatMultiplier, formatPercent, reaisToCents } from '@/lib/money';
 import { formatDiaMes } from '@/lib/dates';
 import { type DescontoFrustrados, calcularPnl } from '@/lib/pnl';
 import { agregarPedidos } from '@/lib/pedidos';
@@ -24,6 +12,9 @@ import { KpiCard, Panel } from '@/components/ui';
 import { Demonstrativo } from '@/components/pnl/Demonstrativo';
 import { GapBlock } from '@/components/pnl/GapBlock';
 import { BarsVertical } from '@/components/viz/BarsVertical';
+import { Destaques } from '@/components/pnl/Destaques';
+import { COR } from '@/lib/cores';
+import { saudacao } from '@/lib/saudacao';
 
 export function PnlScreen({
   periodo,
@@ -44,13 +35,12 @@ export function PnlScreen({
   // Totais. Quem quiser a perda de caixa troca no botão do rodapé.
   const [modoFrustrados, setModoFrustrados] = useState<DescontoFrustrados>('nenhum');
 
-  const pnl = useMemo(
-    () => calcularPnl(dailies, custos, periodo, { descontarFrustrados: modoFrustrados }, pedidos),
-    [dailies, custos, periodo, modoFrustrados, pedidos],
-  );
+  // Memorizado: os gráficos do topo recalculam o P&L dia a dia, e um
+  // objeto novo a cada render refaria tudo à toa.
+  const opts = useMemo(() => ({ descontarFrustrados: modoFrustrados }), [modoFrustrados]);
+  const pnl = useMemo(() => calcularPnl(dailies, custos, periodo, opts, pedidos), [dailies, custos, periodo, opts, pedidos]);
 
   const vazio = pnl.receita_aprovada === 0 && pnl.custos_totais_reais === 0;
-  const lucroPositivo = pnl.lucro_real >= 0;
 
   // Desempenho por vendedor no período (fonte: pedidos do BlueSales).
   const agg = useMemo(() => agregarPedidos(pedidos, periodo), [pedidos, periodo]);
@@ -131,39 +121,14 @@ export function PnlScreen({
         </button>
       )}
 
-      {/* Herói — Faturamento Agendado (esquerda) · Pagamentos Aprovados (direita) */}
-      {/* No celular cada metade vira um bloco centralizado, com o ícone
-          acima e o número grande; no desktop volta a ser ícone ao lado. */}
-      <div className="w-full bg-card border border-line rounded-card px-4 lg:px-[22px] py-5 lg:py-[18px] grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-line">
-        <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 lg:gap-4 sm:justify-center text-center sm:text-left pb-5 sm:pb-0 sm:pr-6">
-          <div className="w-[46px] h-[46px] sm:w-[38px] sm:h-[38px] lg:w-[42px] lg:h-[42px] rounded-[14px] sm:rounded-[12px] grid place-items-center bg-pur/[0.13] text-pur2 shrink-0">
-            <CalendarClock className="w-6 h-6 sm:w-5 sm:h-5" strokeWidth={1.9} />
-          </div>
-          <div className="min-w-0 w-full sm:w-auto">
-            <div className="text-[13px] sm:text-[11.5px] lg:text-[12px] text-dim font-medium">Faturamento Agendado</div>
-            <div className="mono text-[34px] sm:text-[25px] lg:text-[30px] font-extrabold text-pur2 tracking-tight leading-tight truncate mt-0.5 sm:mt-0">
-              {formatBRL(pnl.valor_agendado)}
-            </div>
-            <div className="text-[12px] sm:text-[10.5px] text-dim2 mt-1 sm:mt-0.5">{pnl.qtd_agendados} pedidos no período</div>
-          </div>
-        </div>
-        <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 lg:gap-4 sm:justify-center text-center sm:text-left pt-5 sm:pt-0 sm:pl-6">
-          {/* Lado a lado com o agendado: o que foi vendido e o que já
-              virou dinheiro. O Lucro Real desceu para a linha de cards. */}
-          <div className="w-[46px] h-[46px] sm:w-[38px] sm:h-[38px] lg:w-[42px] lg:h-[42px] rounded-[14px] sm:rounded-[12px] grid place-items-center shrink-0 bg-grn/[0.13] text-grn">
-            <Banknote className="w-6 h-6 sm:w-5 sm:h-5" strokeWidth={1.9} />
-          </div>
-          <div className="min-w-0 w-full sm:w-auto">
-            <div className="text-[13px] sm:text-[11.5px] lg:text-[12px] text-dim font-medium">Pagamentos Aprovados</div>
-            <div className="mono text-[34px] sm:text-[25px] lg:text-[30px] font-extrabold tracking-tight leading-tight truncate mt-0.5 sm:mt-0 text-grn">
-              {formatBRL(pnl.receita_aprovada)}
-            </div>
-            <div className="text-[12px] sm:text-[10.5px] text-dim2 mt-1 sm:mt-0.5">
-              {pnl.qtd_pagamentos} pagamento{pnl.qtd_pagamentos === 1 ? '' : 's'} no período
-            </div>
-          </div>
-        </div>
+      {/* Saudação no celular — no computador ela fica na barra do topo. */}
+      <div className="lg:hidden px-0.5">
+        <div className="text-[19px] font-extrabold text-tx tracking-tight">{saudacao()}, Jonas! 👋</div>
+        <div className="text-[12.5px] text-dim mt-0.5">Aqui está o resumo da sua operação.</div>
       </div>
+
+      {/* Topo com tendência: agendado, pagamentos, anúncios e lucro. */}
+      <Destaques pnl={pnl} periodo={periodo} dailies={dailies} custos={custos} pedidos={pedidos} opts={opts} />
 
       {vazio ? (
         <Panel>
@@ -173,7 +138,7 @@ export function PnlScreen({
                 <div className="text-[15px] font-semibold text-tx mb-2">Nenhum pagamento aprovado ainda</div>
                 <div className="text-[13px] text-dim mb-5">
                   Você tem <b className="text-tx">{agg.qtd_agendados} agendamento{agg.qtd_agendados > 1 ? 's' : ''}</b>{' '}
-                  somando <b className="text-pur2">{formatBRL(reaisToCents(agg.valor_agendado))}</b>. O P&L aparece
+                  somando <b className="text-gold2">{formatBRL(reaisToCents(agg.valor_agendado))}</b>. O P&L aparece
                   quando o primeiro pagamento entrar.
                 </div>
               </>
@@ -189,7 +154,7 @@ export function PnlScreen({
               {onLancarManual && (
                 <button
                   onClick={onLancarManual}
-                  className="px-4 py-[9px] rounded-[10px] text-[13px] font-semibold text-white bg-gradient-to-br from-pur3 to-pur"
+                  className="px-4 py-[9px] rounded-[10px] text-[13px] font-semibold text-[#15120a] bg-gold-metal"
                 >
                   Lançar Ads (Meta)
                 </button>
@@ -205,57 +170,32 @@ export function PnlScreen({
         </Panel>
       ) : (
         <>
-          {/* KPIs linha 1 */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-[14px]">
-            {/* Veio do herói. Verde no lucro, vermelho no prejuízo. */}
-            <KpiCard
-              Icon={lucroPositivo ? TrendingUp : TrendingDown}
-              color={lucroPositivo ? '#34d399' : '#fb7185'}
-              label={lucroPositivo ? 'Lucro Real' : 'Prejuízo Real'}
-              value={formatBRL(pnl.lucro_real)}
-              sub={`Margem ${formatPercent(pnl.margem_real)}`}
-            />
+          {/* Indicadores. Agendado, pagamentos, anúncios e lucro subiram
+              para o topo; aqui fica o que complementa. Número com cor só
+              quando a cor significa algo (custo, perda) — o resto em branco
+              com o ícone dourado. */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-6 gap-2 lg:gap-[14px]">
             <KpiCard
               Icon={TrendingDown}
-              color="#fb7185"
+              color={COR.vermelho}
               label="Custos Totais Reais"
               value={formatBRL(pnl.custos_totais_reais)}
               sub={`Afterpay ${formatBRL(pnl.custos_afterpay)} + var. ${formatBRL(pnl.custos_variaveis_total)}`}
-            />
-            {/* O gasto sai do que foi lançado na tela Marketing. A fatia é
-                sobre o AGENDADO: sobre o aprovado leria 0% de manhã, antes
-                de o primeiro pagamento entrar. */}
-            <KpiCard
-              Icon={Megaphone}
-              color="#c084fc"
-              label="Anúncios (gasto)"
-              value={formatBRL(pnl.investimento_ads)}
-              sub={
-                pnl.investimento_ads > 0
-                  ? `${formatPercent(safeDiv(pnl.investimento_ads, pnl.valor_agendado))} do agendado`
-                  : 'lance na tela Marketing'
-              }
             />
             {/* Sobre a MESMA safra do CPA e do ROAS: o que foi agendado no
                 período e os custos que esses pedidos geram. É projeção — o
                 caixa de verdade fica no Lucro Real, lá em cima. */}
             <KpiCard
               Icon={Target}
-              color="#60a5fa"
+              color={COR.ouro}
+              valueColor={COR.texto}
               label="Margem do agendado"
               value={formatPercent(pnl.margem_agendado)}
               sub={`${formatBRL(pnl.lucro_agendado)} de lucro projetado`}
             />
-          </div>
-
-          {/* KPIs linha 2 */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-[14px]">
-            {/* Card que o BlueSales tem e faltava aqui. Ocupa o lugar do
-                "Total de Pedidos", que repetia o contador do herói
-                ("N pedidos no período") logo acima. */}
             <KpiCard
               Icon={TriangleAlert}
-              color="#fbbf24"
+              color={COR.ambar}
               label="Frustrados"
               value={formatBRL(pnl.valor_frustrado)}
               sub={
@@ -264,15 +204,30 @@ export function PnlScreen({
                   : 'nenhum no período'
               }
             />
-            <KpiCard Icon={BadgeCheck} color="#34d399" label="Ticket Médio" value={formatBRL(pnl.ticket_medio)} sub="sobre pedidos aprovados" />
+            <KpiCard
+              Icon={BadgeCheck}
+              color={COR.ouro}
+              valueColor={COR.texto}
+              label="Ticket Médio"
+              value={formatBRL(pnl.ticket_medio)}
+              sub="sobre pedidos aprovados"
+            />
             <KpiCard
               Icon={Crosshair}
-              color="#60a5fa"
+              color={COR.ouro}
+              valueColor={COR.texto}
               label="CPA por agendamento"
               value={formatBRL(pnl.cpa)}
               sub={`sobre ${pnl.qtd_agendados} agendamento${pnl.qtd_agendados === 1 ? '' : 's'}`}
             />
-            <KpiCard Icon={BarChart3} color="#f472b6" label="ROAS agendado" value={formatMultiplier(pnl.roas)} sub={`${formatBRL(pnl.valor_agendado)} agendado · ROI real ${formatPercent(pnl.roi_real)}`} />
+            <KpiCard
+              Icon={BarChart3}
+              color={COR.ouro}
+              valueColor={COR.texto}
+              label="ROAS agendado"
+              value={formatMultiplier(pnl.roas)}
+              sub={`ROI real ${formatPercent(pnl.roi_real)}`}
+            />
           </div>
 
           <Demonstrativo

@@ -1,5 +1,6 @@
 import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts';
 import { type Cents, formatBRL } from '@/lib/money';
+import { HEX } from '@/lib/cores';
 
 export interface DonutSlice {
   nome: string;
@@ -15,7 +16,7 @@ export function DonutCategorias({ data, total }: { data: DonutSlice[]; total: Ce
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
-              data={data.length ? data : [{ nome: '—', valor: 1, cor: '#23232c' }]}
+              data={data.length ? data : [{ nome: '—', valor: 1, cor: HEX.vazio }]}
               dataKey="valor"
               nameKey="nome"
               cx="50%"
@@ -26,7 +27,7 @@ export function DonutCategorias({ data, total }: { data: DonutSlice[]; total: Ce
               stroke="none"
               isAnimationActive={false}
             >
-              {(data.length ? data : [{ cor: '#23232c' }]).map((s, i) => (
+              {(data.length ? data : [{ cor: HEX.vazio }]).map((s, i) => (
                 <Cell key={i} fill={s.cor} />
               ))}
             </Pie>
@@ -40,7 +41,7 @@ export function DonutCategorias({ data, total }: { data: DonutSlice[]; total: Ce
 
       <div className="flex-1 w-full flex flex-col gap-[9px]">
         {data.map((s) => (
-          <div key={s.nome} className="flex items-center text-[12px] text-[#c6c6d4]">
+          <div key={s.nome} className="flex items-center text-[12px] text-tx2">
             <span className="w-[9px] h-[9px] rounded-full mr-[9px] shrink-0" style={{ background: s.cor }} />
             <span className="flex-1 truncate">{s.nome}</span>
             <span className="mono text-dim text-[11.5px] ml-2">{formatBRL(s.valor)}</span>

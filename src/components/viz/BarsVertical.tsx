@@ -1,4 +1,5 @@
 import { Bar, BarChart, LabelList, ResponsiveContainer, XAxis } from 'recharts';
+import { HEX } from '@/lib/cores';
 
 export interface BarDatum {
   label: string;
@@ -6,7 +7,7 @@ export interface BarDatum {
   display: string;
 }
 
-/** Barras verticais com gradiente roxo, valor acima e nome abaixo. */
+/** Barras verticais em degradê dourado, valor acima e nome abaixo. */
 export function BarsVertical({
   data,
   gradId,
@@ -21,13 +22,13 @@ export function BarsVertical({
       <BarChart data={data} margin={{ top: 26, right: 8, left: 8, bottom: 4 }} barCategoryGap="22%">
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#c084fc" />
-            <stop offset="100%" stopColor="#7c3aed" />
+            <stop offset="0%" stopColor={HEX.ouroPalido} />
+            <stop offset="100%" stopColor={HEX.ouroEscuro} />
           </linearGradient>
         </defs>
         <XAxis
           dataKey="label"
-          tick={{ fill: '#7c7c8e', fontSize: 11 }}
+          tick={{ fill: HEX.eixo, fontSize: 11 }}
           tickLine={false}
           axisLine={false}
           interval={0}
@@ -38,7 +39,7 @@ export function BarsVertical({
           <LabelList
             dataKey="display"
             position="top"
-            fill="#cfcfdd"
+            fill={HEX.rotulo}
             fontSize={11}
             fontWeight={700}
             style={{ fontFamily: '"JetBrains Mono", monospace' }}

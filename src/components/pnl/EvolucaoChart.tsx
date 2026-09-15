@@ -3,6 +3,7 @@ import type { AfterpayDaily, CustoVariavel, Periodo } from '@/types';
 import { formatBRL } from '@/lib/money';
 import { formatDiaMes } from '@/lib/dates';
 import { type PnlOptions, serieDiaria } from '@/lib/pnl';
+import { HEX } from '@/lib/cores';
 
 interface Ponto {
   label: string;
@@ -21,8 +22,8 @@ function TooltipBox({ active, payload, label }: { active?: boolean; payload?: { 
       <div className="flex items-center gap-2 text-grn">
         <span className="w-2 h-2 rounded-sm bg-grn inline-block" /> Receita <span className="mono ml-auto">{formatBRL(p.rc)}</span>
       </div>
-      <div className="flex items-center gap-2 text-pur2">
-        <span className="w-2 h-2 rounded-sm bg-pur inline-block" /> Lucro real <span className="mono ml-auto">{formatBRL(p.lc)}</span>
+      <div className="flex items-center gap-2 text-gold2">
+        <span className="w-2 h-2 rounded-sm bg-gold inline-block" /> Lucro real <span className="mono ml-auto">{formatBRL(p.lc)}</span>
       </div>
     </div>
   );
@@ -61,29 +62,29 @@ export function EvolucaoChart({
             <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
           </linearGradient>
           <linearGradient id="gl" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#a855f7" stopOpacity={0.3} />
-            <stop offset="100%" stopColor="#a855f7" stopOpacity={0} />
+            <stop offset="0%" stopColor={HEX.ouro} stopOpacity={0.3} />
+            <stop offset="100%" stopColor={HEX.ouro} stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid stroke="#22222b" vertical={false} />
+        <CartesianGrid stroke={HEX.grade} vertical={false} />
         <XAxis
           dataKey="label"
-          tick={{ fill: '#6b6b7c', fontSize: 10 }}
+          tick={{ fill: HEX.eixo, fontSize: 10 }}
           tickLine={false}
-          axisLine={{ stroke: '#2a2a35' }}
+          axisLine={{ stroke: HEX.grade }}
           interval={passo - 1}
         />
         <YAxis
-          tick={{ fill: '#6b6b7c', fontSize: 10 }}
+          tick={{ fill: HEX.eixo, fontSize: 10 }}
           tickLine={false}
           axisLine={false}
           width={54}
           tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
         />
-        <ReferenceLine y={0} stroke="#33333f" strokeDasharray="3 4" />
+        <ReferenceLine y={0} stroke={HEX.vazio} strokeDasharray="3 4" />
         <Tooltip content={<TooltipBox />} />
         <Area type="monotone" dataKey="receita" stroke="#34d399" strokeWidth={2} fill="url(#gr)" />
-        <Area type="monotone" dataKey="lucro" stroke="#a855f7" strokeWidth={2} fill="url(#gl)" />
+        <Area type="monotone" dataKey="lucro" stroke={HEX.ouro} strokeWidth={2} fill="url(#gl)" />
       </AreaChart>
     </ResponsiveContainer>
   );

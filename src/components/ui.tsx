@@ -1,6 +1,7 @@
 // Primitivos visuais compartilhados (estilo do mockup).
 import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
+import { alfa } from '@/lib/cores';
 
 export function Panel({
   title,
@@ -41,7 +42,7 @@ export function IconSquare({
   return (
     <div
       className="grid place-items-center shrink-0 rounded-icon"
-      style={{ width: size, height: size, background: `${color}22`, color }}
+      style={{ width: size, height: size, background: alfa(color, 13), color }}
     >
       <Icon size={Math.round(size / 2)} strokeWidth={1.9} />
     </div>
@@ -51,12 +52,16 @@ export function IconSquare({
 export function KpiCard({
   Icon,
   color,
+  valueColor,
   label,
   value,
   sub,
 }: {
   Icon: LucideIcon;
+  /** Cor do ícone (e do número, se valueColor não vier). */
   color: string;
+  /** Número em outra cor — ex.: branco com ícone dourado. */
+  valueColor?: string;
   label: string;
   value: string;
   sub?: ReactNode;
@@ -69,7 +74,7 @@ export function KpiCard({
       </span>
       <div className="min-w-0">
         <div className="text-[10.5px] lg:text-[11px] text-dim font-medium mb-[3px] leading-tight">{label}</div>
-        <div className="mono text-[17px] lg:text-[21px] font-extrabold tracking-tight leading-tight truncate" style={{ color }}>
+        <div className="mono text-[17px] lg:text-[21px] font-extrabold tracking-tight leading-tight truncate" style={{ color: valueColor ?? color }}>
           {value}
         </div>
         {sub && <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px] truncate">{sub}</div>}

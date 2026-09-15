@@ -50,7 +50,7 @@ export function ImportCsvModal({ aberto, onClose }: { aberto: boolean; onClose: 
 
         <div className="p-5 flex flex-col gap-3">
           <div className="text-[12.5px] text-dim">
-            Colunas: <span className="mono text-pur2">data; categoria; descrição; valor</span>. Separe por
+            Colunas: <span className="mono text-gold2">data; categoria; descrição; valor</span>. Separe por
             <span className="mono"> ;</span> (padrão do Excel BR). Datas em <span className="mono">AAAA-MM-DD</span> ou
             <span className="mono"> DD/MM/AAAA</span>; valores como <span className="mono">1.234,56</span>.
           </div>
@@ -65,7 +65,7 @@ export function ImportCsvModal({ aberto, onClose }: { aberto: boolean; onClose: 
           <div className="flex gap-2">
             <button
               onClick={() => fileRef.current?.click()}
-              className="inline-flex items-center gap-2 text-[13px] font-semibold text-tx border border-line2 rounded-[10px] px-3 py-2 hover:border-pur/60"
+              className="inline-flex items-center gap-2 text-[13px] font-semibold text-tx border border-line2 rounded-[10px] px-3 py-2 hover:border-gold/60"
             >
               <Upload size={15} /> Escolher arquivo
             </button>
@@ -82,7 +82,7 @@ export function ImportCsvModal({ aberto, onClose }: { aberto: boolean; onClose: 
             onChange={(e) => setTexto(e.target.value)}
             placeholder={EXEMPLO}
             rows={6}
-            className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-2 text-tx text-[12.5px] mono outline-none focus:border-pur placeholder:text-dim2 resize-y"
+            className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-2 text-tx text-[12.5px] mono outline-none focus:border-gold placeholder:text-dim2 resize-y"
           />
 
           {linhas.length > 0 && (
@@ -118,7 +118,7 @@ export function ImportCsvModal({ aberto, onClose }: { aberto: boolean; onClose: 
           <button
             onClick={importar}
             disabled={validas.length === 0}
-            className="px-4 py-[9px] rounded-[10px] text-[13px] font-semibold text-white bg-gradient-to-br from-pur3 to-pur disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-[9px] rounded-[10px] text-[13px] font-semibold text-[#15120a] bg-gold-metal disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Importar {validas.length > 0 ? validas.length : ''}
           </button>

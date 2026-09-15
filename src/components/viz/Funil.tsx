@@ -1,10 +1,11 @@
 import { formatBRL } from '@/lib/money';
 import type { PnlResult } from '@/lib/pnl';
+import { HEX } from '@/lib/cores';
 
 export function Funil({ pnl }: { pnl: PnlResult }) {
   const base = pnl.valor_agendado || 1;
   const linhas = [
-    { rotulo: 'Agendado', valor: pnl.valor_agendado, qtd: pnl.qtd_agendados, cor: '#a855f7', pct: 100 },
+    { rotulo: 'Agendado', valor: pnl.valor_agendado, qtd: pnl.qtd_agendados, cor: HEX.ouro, pct: 100 },
     { rotulo: 'Aprovado', valor: pnl.receita_aprovada, qtd: pnl.qtd_pagamentos, cor: '#34d399', pct: (pnl.receita_aprovada / base) * 100 },
     { rotulo: 'Frustrado', valor: pnl.valor_frustrado, qtd: pnl.qtd_frustrados, cor: '#fb7185', pct: (pnl.valor_frustrado / base) * 100 },
   ];

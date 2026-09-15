@@ -114,7 +114,7 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
         <td className="hidden sm:table-cell px-3 lg:px-5 py-3.5 lg:py-4 text-dim">{p.vendedor?.trim() || '—'}</td>
         <td className="hidden md:table-cell px-3 lg:px-5 py-3.5 lg:py-4 text-dim">{planoCurto(p.produto_plano)}</td>
         <td className="px-2 sm:px-3 lg:px-5 py-3.5 lg:py-4 text-right">
-          <span className={`mono font-bold ${removido ? 'text-dim2 line-through' : 'text-pur2'}`}>
+          <span className={`mono font-bold ${removido ? 'text-dim2 line-through' : 'text-gold2'}`}>
             {formatBRL(reaisToCents(valor))}
           </span>
         </td>
@@ -128,7 +128,7 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
             <button
               onClick={() => removerPedido(p.id, false)}
               title="Devolver esta venda para a plataforma"
-              className="grid place-items-center w-8 h-8 rounded-lg text-dim2 hover:text-blu hover:bg-blu/10 ml-auto"
+              className="grid place-items-center w-8 h-8 rounded-lg text-dim2 hover:text-gold hover:bg-gold/10 ml-auto"
             >
               <RotateCcw size={14} />
             </button>
@@ -192,12 +192,12 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
       <div className="grid grid-cols-3 gap-2 lg:gap-[14px]">
         <div className="bg-card border border-line rounded-kpi px-2.5 lg:px-4 py-3 lg:py-[15px]">
           <div className="text-[10px] lg:text-[11px] text-dim font-medium mb-[3px] leading-tight">Agendadas</div>
-          <div className="mono text-[16px] lg:text-[21px] font-extrabold text-pur2">{ativos.length}</div>
+          <div className="mono text-[16px] lg:text-[21px] font-extrabold text-gold2">{ativos.length}</div>
           <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px]">no período</div>
         </div>
         <div className="bg-card border border-line rounded-kpi px-2.5 lg:px-4 py-3 lg:py-[15px]">
           <div className="text-[10px] lg:text-[11px] text-dim font-medium mb-[3px] leading-tight">Valor agendado</div>
-          <div className="mono text-[13px] lg:text-[21px] font-extrabold text-pur2 truncate">
+          <div className="mono text-[13px] lg:text-[21px] font-extrabold text-gold2 truncate">
             {formatBRL(reaisToCents(totalAtivo))}
           </div>
           <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px]">{pagos} já pagas</div>
@@ -251,7 +251,7 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
       </div>
 
       <div className="flex items-start gap-3 rounded-[12px] border border-line2 bg-card2 px-4 py-[13px]">
-        <ShoppingBag size={16} className="text-blu shrink-0 mt-[2px]" />
+        <ShoppingBag size={16} className="text-gold shrink-0 mt-[2px]" />
         <p className="m-0 text-[12.5px] text-dim leading-relaxed">
           Nas vendas novas o nome entra sozinho. Nas anteriores a <b className="text-dim">03/09/2026</b> não há de onde
           tirar — nenhum dado do cliente era guardado até então. Clique em <b className="text-dim">escrever nome</b> para

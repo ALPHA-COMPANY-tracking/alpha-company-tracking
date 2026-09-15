@@ -6,6 +6,7 @@ import { diasDoPeriodo, formatDiaMes, isDentro } from '@/lib/dates';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
 import { MoneyInput } from '@/components/MoneyInput';
+import { COR } from '@/lib/cores';
 
 interface Valores {
   receita: number;
@@ -137,7 +138,7 @@ export function ManualEntryScreen({ periodo, onConcluir }: { periodo: Periodo; o
             <div className="flex gap-5">
               <Previa label="Custos Afterpay" valor={formatBRL(custosAfterpay)} cor="#fb7185" />
               <Previa label="Lucro (Afterpay)" valor={formatBRL(lucro)} cor={lucro >= 0 ? '#34d399' : '#fb7185'} />
-              <Previa label="Margem" valor={formatPercent(margem)} cor="#60a5fa" />
+              <Previa label="Margem" valor={formatPercent(margem)} cor={COR.ouro} />
             </div>
             <div className="text-[11px] text-dim2">
               {dias.length > 0 ? `${dias.length} dia(s) · ${formatDiaMes(inicio)}–${formatDiaMes(fim)}` : 'período inválido'}
@@ -156,7 +157,7 @@ export function ManualEntryScreen({ periodo, onConcluir }: { periodo: Periodo; o
                 <CheckCircle2 size={17} /> Período lançado e salvo na nuvem!
               </span>
               {onConcluir && (
-                <button onClick={onConcluir} className="text-[13px] font-semibold text-white bg-gradient-to-br from-pur3 to-pur px-4 py-2 rounded-[10px]">
+                <button onClick={onConcluir} className="text-[13px] font-semibold text-[#15120a] bg-gold-metal px-4 py-2 rounded-[10px]">
                   Ver no P&amp;L
                 </button>
               )}
@@ -165,7 +166,7 @@ export function ManualEntryScreen({ periodo, onConcluir }: { periodo: Periodo; o
             <button
               onClick={lancar}
               disabled={dias.length === 0}
-              className="self-start inline-flex items-center gap-2 text-white px-5 py-[11px] rounded-[10px] text-[13.5px] font-semibold bg-gradient-to-br from-pur3 to-pur disabled:opacity-40"
+              className="self-start inline-flex items-center gap-2 text-[#15120a] px-5 py-[11px] rounded-[10px] text-[13.5px] font-semibold bg-gold-metal disabled:opacity-40"
             >
               Lançar período
             </button>
@@ -210,7 +211,7 @@ function Numero({ label, value, onChange }: { label: string; value: number; onCh
         value={value ? String(value) : ''}
         onChange={(e) => onChange(Number(e.target.value.replace(/\D/g, '')) || 0)}
         placeholder="0"
-        className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx mono text-[15px] outline-none focus:border-pur placeholder:text-dim2"
+        className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx mono text-[15px] outline-none focus:border-gold placeholder:text-dim2"
       />
     </Campo>
   );

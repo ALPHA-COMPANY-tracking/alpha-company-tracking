@@ -18,7 +18,7 @@ export function GapBlock({ pnl }: { pnl: PnlResult }) {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
-        <Num label="Agendado" value={formatBRL(pnl.valor_agendado)} sub={`${pnl.qtd_agendados} pedidos`} color="text-pur2" />
+        <Num label="Agendado" value={formatBRL(pnl.valor_agendado)} sub={`${pnl.qtd_agendados} pedidos`} color="text-gold2" />
         <Num label="Aprovado" value={formatBRL(pnl.receita_aprovada)} sub={`${pnl.qtd_pagamentos} pedidos`} color="text-grn" />
         <Num
           label="Pendente geral"

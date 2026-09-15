@@ -18,7 +18,7 @@ function aplicar(tema: Tema) {
   document.documentElement.classList.toggle('tema-claro', tema === 'claro');
   // Barra de status do celular acompanha o fundo.
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', tema === 'claro' ? '#f4f5f8' : '#141419');
+  if (meta) meta.setAttribute('content', tema === 'claro' ? '#f6f4ef' : '#0b0b0b');
 }
 
 export function useTema() {

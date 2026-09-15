@@ -7,6 +7,7 @@ import { calcularPnl } from '@/lib/pnl';
 import { exportarCsvCustos, exportarXlsx } from '@/lib/export';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
+import { COR } from '@/lib/cores';
 
 export function ExportScreen({ periodo }: { periodo: Periodo }) {
   const { dailies, custos, categorias } = useData();
@@ -32,7 +33,7 @@ export function ExportScreen({ periodo }: { periodo: Periodo }) {
             <Mini label="Receita" valor={formatBRL(pnl.receita_aprovada)} cor="#34d399" />
             <Mini label="Custos totais" valor={formatBRL(pnl.custos_totais_reais)} cor="#fb7185" />
             <Mini label="Lucro real" valor={formatBRL(pnl.lucro_real)} cor="#34d399" />
-            <Mini label="Lançamentos" valor={String(pnl.qtd_lancamentos)} cor="#c084fc" />
+            <Mini label="Lançamentos" valor={String(pnl.qtd_lancamentos)} cor={COR.ouro} />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -52,9 +53,9 @@ export function ExportScreen({ periodo }: { periodo: Periodo }) {
 
             <button
               onClick={() => exportarCsvCustos(custos, categorias, periodo)}
-              className="flex items-start gap-3 text-left p-4 rounded-[12px] border border-line2 hover:border-pur/60 bg-card2 transition-colors"
+              className="flex items-start gap-3 text-left p-4 rounded-[12px] border border-line2 hover:border-gold/60 bg-card2 transition-colors"
             >
-              <span className="w-10 h-10 rounded-[10px] bg-pur/15 grid place-items-center text-pur2 shrink-0">
+              <span className="w-10 h-10 rounded-[10px] bg-gold/15 grid place-items-center text-gold2 shrink-0">
                 <FileText size={20} />
               </span>
               <span>

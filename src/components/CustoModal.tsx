@@ -94,7 +94,7 @@ export function CustoModal({
                 type="date"
                 value={form.data}
                 onChange={(e) => setForm({ ...form, data: e.target.value })}
-                className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx text-[13px] outline-none focus:border-pur "
+                className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx text-[13px] outline-none focus:border-gold "
               />
             </Campo>
             <Campo label="Valor">
@@ -106,7 +106,7 @@ export function CustoModal({
             <select
               value={form.categoria_id}
               onChange={(e) => setForm({ ...form, categoria_id: e.target.value })}
-              className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx text-[13px] outline-none focus:border-pur"
+              className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx text-[13px] outline-none focus:border-gold"
             >
               {categorias
                 .filter((c) => c.ativo)
@@ -123,7 +123,7 @@ export function CustoModal({
               value={form.descricao}
               onChange={(e) => setForm({ ...form, descricao: e.target.value })}
               placeholder="Ex.: Chip novo, UGC criador A…"
-              className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx text-[13px] outline-none focus:border-pur placeholder:text-dim2"
+              className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx text-[13px] outline-none focus:border-gold placeholder:text-dim2"
             />
           </Campo>
 
@@ -134,7 +134,7 @@ export function CustoModal({
               checked={form.mensal}
               onChange={(e) => setForm({ ...form, mensal: e.target.checked })}
             />
-            <span className="w-[29px] h-4 rounded-full bg-line2 relative transition-colors peer-checked:bg-pur3 after:content-[''] after:absolute after:top-[2.5px] after:left-[2.5px] after:w-[11px] after:h-[11px] after:rounded-full after:bg-dim2 after:transition-all peer-checked:after:left-[15px] peer-checked:after:bg-white" />
+            <span className="w-[29px] h-4 rounded-full bg-line2 relative transition-colors peer-checked:bg-gold3 after:content-[''] after:absolute after:top-[2.5px] after:left-[2.5px] after:w-[11px] after:h-[11px] after:rounded-full after:bg-dim2 after:transition-all peer-checked:after:left-[15px] peer-checked:after:bg-white" />
             Repete todo mês (rateia pelos dias do período)
           </label>
 
@@ -142,7 +142,7 @@ export function CustoModal({
             <input
               value={form.observacao}
               onChange={(e) => setForm({ ...form, observacao: e.target.value })}
-              className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx text-[13px] outline-none focus:border-pur"
+              className="w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx text-[13px] outline-none focus:border-gold"
             />
           </Campo>
 
@@ -153,14 +153,14 @@ export function CustoModal({
           {!editar && (
             <button
               onClick={() => salvar(false)}
-              className="px-4 py-[9px] rounded-[10px] text-[13px] font-semibold text-pur2 border border-line2 hover:bg-[#20182e]"
+              className="px-4 py-[9px] rounded-[10px] text-[13px] font-semibold text-gold2 border border-line2 hover:bg-gold/10"
             >
               Salvar e adicionar outro
             </button>
           )}
           <button
             onClick={() => salvar(true)}
-            className="px-4 py-[9px] rounded-[10px] text-[13px] font-semibold text-white bg-gradient-to-br from-pur3 to-pur"
+            className="px-4 py-[9px] rounded-[10px] text-[13px] font-semibold text-[#15120a] bg-gold-metal"
           >
             Salvar
           </button>

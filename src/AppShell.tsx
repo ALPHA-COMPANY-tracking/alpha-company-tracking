@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { BarChart3, Camera, Download, LogOut, Megaphone, PieChart, Receipt, RefreshCw, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/Logo';
-import { useData } from '@/store/DataProvider';
 import { usePeriodo } from '@/store/usePeriodo';
 import { PeriodSelector } from '@/components/pnl/PeriodSelector';
 import { CustoModal } from '@/components/CustoModal';
@@ -18,6 +17,7 @@ import { TaxasScreen } from '@/screens/TaxasScreen';
 import { VendasScreen } from '@/screens/VendasScreen';
 import { RankingScreen } from '@/screens/RankingScreen';
 import { InstagramScreen } from '@/screens/InstagramScreen';
+import { haQuanto, resumoDoPeriodo, saudacao } from '@/lib/saudacao';
 
 type Tab = 'pnl' | 'vendas' | 'ranking' | 'instagram' | 'ads' | 'custos' | 'taxas' | 'frustrados' | 'viz' | 'export';
 
@@ -51,11 +51,19 @@ function abaInicial(): Tab {
 }
 
 export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: string }) {
-  const { ultimoSync } = useData();
   const { preset, periodo, selecionarPreset, definirPersonalizado } = usePeriodo();
   const [tab, setTab] = useState<Tab>(abaInicial);
   const [modal, setModal] = useState(false);
   const [atualizando, setAtualizando] = useState(false);
+
+  // "Última atualização": os dados são buscados quando a página abre, e o
+  // Atualizar recarrega a página inteira — então é a hora deste carregamento.
+  const [carregadoEm] = useState(() => Date.now());
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setAgora(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     try {
@@ -158,18 +166,30 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
 
       {/* ───────── Área principal ───────── */}
       <main className="flex-1 min-w-0 px-3 lg:px-6 py-3 lg:py-5 pb-[92px] lg:pb-16">
-        {/* Barra de filtros do desktop: seletor centralizado, ações à direita. */}
-        <div className="hidden lg:flex items-center gap-3 flex-nowrap mb-5">
-          <div className="flex-1" />
+        {/* Barra do topo no computador: saudação à esquerda (no P&L),
+            períodos no centro, atualizar à direita. */}
+        <div className="hidden lg:flex items-center gap-4 flex-nowrap mb-5 pb-5 border-b border-line">
+          <div className="flex-1 min-w-0">
+            {tab === 'pnl' && (
+              <>
+                <div className="text-[19px] font-extrabold text-tx tracking-tight truncate">{saudacao()}, Jonas! 👋</div>
+                <div className="text-[12.5px] text-dim leading-snug">Aqui está o resumo da sua operação {resumoDoPeriodo(preset)}.</div>
+              </>
+            )}
+          </div>
           <PeriodSelector preset={preset} periodo={periodo} onPreset={selecionarPreset} onCustom={definirPersonalizado} />
           <div className="flex items-center gap-2 flex-1 justify-end">
             <button
               onClick={atualizar}
               disabled={atualizando}
-              className="inline-flex items-center gap-2 bg-card border border-line2 text-tx hover:border-gold/50 px-[15px] py-[10px] rounded-[10px] text-[13.5px] font-semibold transition-colors disabled:opacity-60"
-              title={ultimoSync ? `Última atualização: ${new Date(ultimoSync).toLocaleString('pt-BR')}` : 'Recarregar a página'}
+              className="inline-flex items-center gap-2.5 bg-card border border-line2 text-tx hover:border-gold/50 px-[14px] py-[7px] rounded-[11px] transition-colors disabled:opacity-60"
+              title="Recarregar os dados"
             >
-              <RefreshCw size={15} className={atualizando ? 'animate-spin' : ''} /> Atualizar
+              <RefreshCw size={15} className={`text-gold ${atualizando ? 'animate-spin' : ''}`} />
+              <span className="text-left leading-tight">
+                <span className="block text-[13px] font-semibold">Atualizar</span>
+                <span className="block text-[10.5px] text-dim2">Última atualização: {haQuanto(carregadoEm, agora)}</span>
+              </span>
             </button>
           </div>
         </div>

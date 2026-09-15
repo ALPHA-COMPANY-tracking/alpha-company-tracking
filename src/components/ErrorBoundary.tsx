@@ -42,7 +42,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="inline-flex items-center gap-2 text-white px-5 py-[11px] rounded-[10px] text-[13.5px] font-semibold bg-gradient-to-br from-pur3 to-pur"
+            className="inline-flex items-center gap-2 text-[#15120a] px-5 py-[11px] rounded-[10px] text-[13.5px] font-semibold bg-gold-metal"
           >
             <RefreshCw size={16} /> Recarregar a dashboard
           </button>

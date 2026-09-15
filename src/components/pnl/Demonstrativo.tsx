@@ -16,12 +16,13 @@ import type { Cents } from '@/lib/money';
 import { formatBRL, formatBRLSigned, formatPercent, safeDiv } from '@/lib/money';
 import { type DescontoFrustrados, type PnlResult, custoNoPeriodo } from '@/lib/pnl';
 import { COMISSAO_COBRANCA, RESPONSAVEL_COBRANCA } from '@/lib/custosConfig';
+import { HEX, corDaCategoria } from '@/lib/cores';
 
 function Sec({ children, hl = false }: { children: React.ReactNode; hl?: boolean }) {
   return (
     <div
       className={`px-3 lg:px-[18px] pt-[14px] lg:pt-[16px] pb-[7px] text-[9.5px] tracking-[0.16em] uppercase font-bold ${
-        hl ? 'text-pur2' : 'text-dim2'
+        hl ? 'text-gold2' : 'text-dim2'
       }`}
     >
       {children}
@@ -149,7 +150,7 @@ export function Demonstrativo({
   // Segmentos da barra "para onde foi cada real"
   const composicao = [
     { label: 'Custos Afterpay', total: pnl.custos_afterpay, cor: '#fb7185' },
-    { label: 'Custos variáveis', total: pnl.custos_variaveis_total, cor: '#a855f7' },
+    { label: 'Custos variáveis', total: pnl.custos_variaveis_total, cor: HEX.ouro },
     { label: 'Perda dos frustrados', total: pnl.desconto_frustrados, cor: '#fbbf24' },
     { label: 'Lucro real', total: Math.max(0, pnl.lucro_real), cor: '#34d399' },
   ];
@@ -199,7 +200,7 @@ export function Demonstrativo({
                   <span className="min-w-0">
                     <span className="flex items-center gap-[7px] min-w-0">
                       <span className="text-tx2 truncate">{v.nome}</span>
-                      <span className="mono text-[10px] font-bold text-blu border border-blu/30 bg-blu/10 rounded-full px-[6px] py-[1px] shrink-0">
+                      <span className="mono text-[10px] font-bold text-gold border border-gold/30 bg-gold/10 rounded-full px-[6px] py-[1px] shrink-0">
                         {formatPercent(v.pct)}
                       </span>
                     </span>
@@ -226,7 +227,7 @@ export function Demonstrativo({
           <div className="flex items-center justify-between gap-3 text-[11.5px]">
             <span className="flex items-center gap-[7px] min-w-0">
               <span className="text-tx2 truncate">{RESPONSAVEL_COBRANCA}</span>
-              <span className="mono text-[10px] font-bold text-blu border border-blu/30 bg-blu/10 rounded-full px-[6px] py-[1px] shrink-0">
+              <span className="mono text-[10px] font-bold text-gold border border-gold/30 bg-gold/10 rounded-full px-[6px] py-[1px] shrink-0">
                 {formatPercent(COMISSAO_COBRANCA)}
               </span>
               <span className="text-dim2 shrink-0">de {formatBRL(receita)}</span>
@@ -242,29 +243,29 @@ export function Demonstrativo({
 
       {/* CUSTOS VARIÁVEIS */}
       <Sec hl>Custos variáveis · lançados por você</Sec>
-      <div className="mx-3 lg:mx-[18px] mb-2 rounded-[12px] border border-pur/25 bg-pur/[0.05] overflow-hidden">
+      <div className="mx-3 lg:mx-[18px] mb-2 rounded-[12px] border border-gold/25 bg-gold/[0.05] overflow-hidden">
         <div className="px-4 py-[13px]">
           <div className="flex items-center justify-between mb-[10px]">
             <div className="flex items-center gap-2">
-              <span className="text-pur2 font-bold text-[13.5px]">Total de custos variáveis</span>
+              <span className="text-gold2 font-bold text-[13.5px]">Total de custos variáveis</span>
               <span className="text-[9.5px] text-dim2 border border-line2 rounded-full px-[7px] py-[2px]">
                 {pnl.custos_variaveis_por_categoria.length} categorias · {pnl.qtd_lancamentos} lançamentos
               </span>
             </div>
-            <span className="mono text-[15px] font-extrabold text-pur2">{formatBRLSigned(pnl.custos_variaveis_total, 'custo')}</span>
+            <span className="mono text-[15px] font-extrabold text-gold2">{formatBRLSigned(pnl.custos_variaveis_total, 'custo')}</span>
           </div>
           <BarraSegmentada
             segmentos={pnl.custos_variaveis_por_categoria.map((agg) => ({
               total: agg.total,
-              cor: catMap.get(agg.categoria_id ?? '')?.cor ?? '#a855f7',
+              cor: corDaCategoria(catMap.get(agg.categoria_id ?? '')?.cor, categorias.findIndex((c) => c.id === agg.categoria_id)),
             }))}
           />
         </div>
 
-        <div className="border-t border-pur/15">
+        <div className="border-t border-gold/15">
           {pnl.custos_variaveis_por_categoria.map((agg) => {
             const cat = catMap.get(agg.categoria_id ?? '');
-            const cor = cat?.cor ?? '#a855f7';
+            const cor = corDaCategoria(cat?.cor, categorias.findIndex((c) => c.id === agg.categoria_id));
             const nome = cat?.nome ?? 'Sem categoria';
             const isOpen = aberta.has(agg.categoria_id);
             const shareVar = safeDiv(agg.total, pnl.custos_variaveis_total);
@@ -272,10 +273,10 @@ export function Demonstrativo({
               .filter((c) => c.categoria_id === agg.categoria_id && custoNoPeriodo(c, periodo) > 0)
               .map((c) => ({ c, valor: custoNoPeriodo(c, periodo) as Cents }));
             return (
-              <div key={String(agg.categoria_id)} className="border-b border-pur/10 last:border-b-0">
+              <div key={String(agg.categoria_id)} className="border-b border-gold/10 last:border-b-0">
                 <button
                   onClick={() => toggleCat(agg.categoria_id)}
-                  className="w-full text-left px-4 py-[11px] hover:bg-pur/[0.06] transition-colors"
+                  className="w-full text-left px-4 py-[11px] hover:bg-gold/[0.06] transition-colors"
                   style={{ boxShadow: `inset 3px 0 0 ${cor}` }}
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -298,7 +299,7 @@ export function Demonstrativo({
                   lancs.map(({ c, valor }) => (
                     <div
                       key={c.id}
-                      className="flex items-center justify-between pl-[40px] pr-4 py-[7px] border-t border-pur/10 bg-[#161620]"
+                      className="flex items-center justify-between pl-[40px] pr-4 py-[7px] border-t border-gold/10 bg-card3"
                     >
                       <span className="text-[12.5px] text-dim truncate">
                         {c.descricao}
@@ -306,7 +307,7 @@ export function Demonstrativo({
                           {c.data.split('-').reverse().slice(0, 2).join('/')}
                         </span>
                         {c.recorrencia === 'mensal' && (
-                          <span className="ml-2 text-[9px] text-pur2 border border-pur/30 rounded px-1 py-[1px] uppercase tracking-wide">mensal</span>
+                          <span className="ml-2 text-[9px] text-gold2 border border-gold/30 rounded px-1 py-[1px] uppercase tracking-wide">mensal</span>
                         )}
                       </span>
                       <span className="mono text-[12.5px] text-dim shrink-0">{formatBRLSigned(valor, 'custo')}</span>
@@ -319,7 +320,7 @@ export function Demonstrativo({
 
         <button
           onClick={onAddCusto}
-          className="w-full flex items-center justify-center gap-[7px] py-[11px] text-[12.5px] text-pur2 font-semibold border-t border-dashed border-pur/25 hover:bg-pur/[0.06] transition-colors"
+          className="w-full flex items-center justify-center gap-[7px] py-[11px] text-[12.5px] text-gold2 font-semibold border-t border-dashed border-gold/25 hover:bg-gold/[0.06] transition-colors"
         >
           <Plus size={13} strokeWidth={1.9} /> Adicionar custo
         </button>

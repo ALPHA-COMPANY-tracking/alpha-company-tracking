@@ -5,42 +5,60 @@
 @tailwind utilities;
 
 @layer base {
-  /* Tons neutros do tema. Em RGB puro para o Tailwind poder aplicar
-     opacidade (bg-card/40). O escuro é exatamente a paleta de sempre. */
+  /* Paleta da marca AJ Alpha Company: PRETO + DOURADO, tirada da logo.
+     Em RGB puro para o Tailwind poder aplicar opacidade (bg-card/40).
+
+     Regra de cor do app inteiro:
+       • dourado  → destaque da marca (botões, foco, números principais)
+       • verde    → dinheiro que entrou / variação boa
+       • vermelho → dinheiro que saiu / variação ruim
+       • âmbar    → aviso
+     Nada de roxo, azul ou rosa: não têm relação com o produto.
+
+     Os neutros são pretos levemente quentes (não azulados) para casar
+     com o dourado. */
   :root {
     color-scheme: dark;
-    --bg: 20 20 25; /* #141419 */
-    --card: 28 28 36; /* #1c1c24 */
-    --card2: 32 32 42; /* #20202a */
-    --card3: 23 23 30; /* #17171e — painéis internos */
-    --chip: 35 35 44; /* #23232c — quadradinho do ícone */
-    --trilha: 34 34 43; /* #22222b — fundo de barra de progresso */
-    --hover: 30 30 39; /* #1e1e27 */
-    --line: 42 42 53; /* #2a2a35 */
-    --line2: 51 51 63; /* #33333f */
-    --tx: 234 234 242; /* #eaeaf2 */
-    --tx2: 220 220 230; /* #dcdce6 */
-    --dim: 154 154 171; /* #9a9aab */
-    --dim2: 107 107 124; /* #6b6b7c */
+    --bg: 11 11 11; /* #0b0b0b */
+    --card: 21 21 20; /* #151514 */
+    --card2: 26 26 24; /* #1a1a18 */
+    --card3: 17 17 16; /* #111110 — painéis internos */
+    --chip: 32 31 28; /* #201f1c — quadradinho do ícone */
+    --trilha: 36 35 31; /* #24231f — fundo de barra de progresso */
+    --hover: 26 25 23; /* #1a1917 */
+    --line: 40 39 35; /* #282723 */
+    --line2: 52 50 45; /* #34322d */
+    --tx: 241 239 233; /* #f1efe9 */
+    --tx2: 226 223 214; /* #e2dfd6 */
+    --dim: 160 156 146; /* #a09c92 */
+    --dim2: 115 111 102; /* #736f66 */
+
+    --gold: 212 175 55; /* #d4af37 — o dourado da logo */
+    --gold2: 233 201 110; /* #e9c96e — mais claro, para números sobre o preto */
+    --gold3: 168 121 46; /* #a8792e — escuro, para bordas e degradês */
   }
 
-  /* Modo claro: mesma estrutura, tons invertidos. As cores de destaque
-     (verde, roxo, dourado…) valem para os dois temas. */
+  /* Modo claro: mesma estrutura, tons invertidos. O dourado escurece —
+     o da logo sobre o branco fica ilegível como texto. */
   :root.tema-claro {
     color-scheme: light;
-    --bg: 244 245 248;
+    --bg: 246 244 239;
     --card: 255 255 255;
-    --card2: 248 249 251;
-    --card3: 241 242 246;
-    --chip: 236 238 243;
-    --trilha: 228 230 237;
-    --hover: 240 241 245;
-    --line: 223 225 232;
-    --line2: 205 208 218;
-    --tx: 24 25 32;
-    --tx2: 44 46 56;
-    --dim: 92 96 110;
-    --dim2: 128 132 146;
+    --card2: 250 248 243;
+    --card3: 243 240 233;
+    --chip: 239 235 225;
+    --trilha: 232 227 215;
+    --hover: 244 241 234;
+    --line: 228 223 211;
+    --line2: 212 205 190;
+    --tx: 26 24 19;
+    --tx2: 46 43 36;
+    --dim: 101 95 83;
+    --dim2: 138 131 117;
+
+    --gold: 166 124 30; /* #a67c1e */
+    --gold2: 138 102 20; /* #8a6614 */
+    --gold3: 120 86 22; /* #785616 */
   }
 
   html,
@@ -87,7 +105,7 @@
     height: 10px;
   }
   ::-webkit-scrollbar-thumb {
-    background: #33333f;
+    background: rgb(var(--line2));
     border-radius: 99px;
   }
   ::-webkit-scrollbar-track {
