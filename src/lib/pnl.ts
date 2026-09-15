@@ -176,15 +176,18 @@ export interface PnlResult {
 /**
  * Série diária de receita, custos totais reais e lucro real.
  * Reusa calcularPnl por dia (o rateio de mensais vira parcela diária).
+ * Sem os pedidos a receita sairia só do lançamento manual — zerada
+ * desde que o BlueSales virou a fonte.
  */
 export function serieDiaria(
   dailies: AfterpayDaily[],
   custos: CustoVariavel[],
   periodo: Periodo,
   opts: PnlOptions = {},
+  pedidos: Pedido[] = [],
 ): PontoDiario[] {
   return diasDoPeriodo(periodo.inicio, periodo.fim).map((dia) => {
-    const p = calcularPnl(dailies, custos, { inicio: dia, fim: dia }, opts);
+    const p = calcularPnl(dailies, custos, { inicio: dia, fim: dia }, opts, pedidos);
     return { data: dia, receita: p.receita_aprovada, custos: p.custos_totais_reais, lucro: p.lucro_real };
   });
 }

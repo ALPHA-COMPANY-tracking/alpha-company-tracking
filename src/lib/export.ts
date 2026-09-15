@@ -4,7 +4,7 @@
 // Excel. Datas em pt-BR.
 // ─────────────────────────────────────────────────────────────
 
-import type { AfterpayDaily, CategoriaCusto, CustoVariavel, Periodo } from '@/types';
+import type { AfterpayDaily, CategoriaCusto, CustoVariavel, Pedido, Periodo } from '@/types';
 import { centsToReais } from '@/lib/money';
 import { diasDoPeriodo } from '@/lib/dates';
 import { calcularPnl, custoNoPeriodo } from '@/lib/pnl';
@@ -37,10 +37,12 @@ export async function exportarXlsx(
   custos: CustoVariavel[],
   categorias: CategoriaCusto[],
   periodo: Periodo,
+  pedidos: Pedido[],
 ) {
   const { default: ExcelJS } = await import('exceljs');
   const catMap = new Map(categorias.map((c) => [c.id, c]));
-  const pnl = calcularPnl(dailies, custos, periodo);
+  // Com os pedidos do BlueSales: sem eles a planilha saía com receita zero.
+  const pnl = calcularPnl(dailies, custos, periodo, {}, pedidos);
   const r = centsToReais;
 
   const wb = new ExcelJS.Workbook();
@@ -129,7 +131,7 @@ export async function exportarXlsx(
     { header: 'Pagamentos', key: 'pag', width: 12 },
   ];
   diasDoPeriodo(periodo.inicio, periodo.fim).forEach((dia) => {
-    const p = calcularPnl(dailies, custos, { inicio: dia, fim: dia });
+    const p = calcularPnl(dailies, custos, { inicio: dia, fim: dia }, {}, pedidos);
     const row = ws3.addRow({
       data: fmtDataBR(dia),
       rec: r(p.receita_aprovada),
@@ -141,11 +143,10 @@ export async function exportarXlsx(
     ['rec', 'ca', 'cv', 'lucro'].forEach((k) => (row.getCell(k).numFmt = FMT_MOEDA));
   });
 
-  // Estilo dos cabeçalhos
+  // Cabeçalhos nas cores da marca: fundo preto, texto dourado.
   for (const ws of [ws1, ws2, ws3]) {
-    ws.getRow(1).font = { bold: true };
-    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF7C3AED' } };
-    ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0B0B0B' } };
+    ws.getRow(1).font = { bold: true, color: { argb: 'FFD4AF37' } };
   }
 
   const buf = await wb.xlsx.writeBuffer();

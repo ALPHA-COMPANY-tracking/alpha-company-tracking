@@ -78,7 +78,7 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
 
       <Panel title="Evolução no período" hint={`${rangeLabel} · valores diários`}>
         <div className="p-3 pb-0">
-          <EvolucaoChart dailies={dailies} custos={custos} periodo={periodo} />
+          <EvolucaoChart dailies={dailies} custos={custos} periodo={periodo} pedidos={pedidos} />
           <div className="flex gap-[18px] px-3 pt-1 pb-3 text-[11.5px] text-dim">
             <span className="flex items-center gap-2"><i className="w-[9px] h-[9px] rounded-sm bg-grn inline-block" />Receita aprovada</span>
             <span className="flex items-center gap-2"><i className="w-[9px] h-[9px] rounded-sm bg-gold inline-block" />Lucro real</span>

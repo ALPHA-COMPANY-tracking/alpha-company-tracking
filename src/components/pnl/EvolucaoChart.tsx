@@ -1,5 +1,5 @@
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import type { AfterpayDaily, CustoVariavel, Periodo } from '@/types';
+import type { AfterpayDaily, CustoVariavel, Pedido, Periodo } from '@/types';
 import { formatBRL } from '@/lib/money';
 import { formatDiaMes } from '@/lib/dates';
 import { type PnlOptions, serieDiaria } from '@/lib/pnl';
@@ -34,15 +34,17 @@ export function EvolucaoChart({
   custos,
   periodo,
   opts,
+  pedidos = [],
   altura = 230,
 }: {
   dailies: AfterpayDaily[];
   custos: CustoVariavel[];
   periodo: Periodo;
   opts?: PnlOptions;
+  pedidos?: Pedido[];
   altura?: number;
 }) {
-  const serie = serieDiaria(dailies, custos, periodo, opts);
+  const serie = serieDiaria(dailies, custos, periodo, opts, pedidos);
   const data: Ponto[] = serie.map((p) => ({
     label: formatDiaMes(p.data),
     receita: p.receita / 100,
@@ -79,7 +81,7 @@ export function EvolucaoChart({
           tickLine={false}
           axisLine={false}
           width={54}
-          tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
+          tickFormatter={(v: number) => (Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
         />
         <ReferenceLine y={0} stroke={HEX.vazio} strokeDasharray="3 4" />
         <Tooltip content={<TooltipBox />} />

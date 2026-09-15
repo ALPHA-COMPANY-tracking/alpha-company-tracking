@@ -114,8 +114,9 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
                     : 'text-dim hover:text-tx hover:bg-white/[0.025] border border-transparent'
                 }`}
               >
-                <Icon size={16} className={ativo ? 'text-gold' : 'text-dim2'} />
-                {label}
+                <Icon size={16} className={`shrink-0 ${ativo ? 'text-gold' : 'text-dim2'}`} />
+                {/* No menu lateral, nome longo quebra linha em vez de espremer o ícone. */}
+                <span className="lg:whitespace-normal leading-snug">{label}</span>
               </button>
             );
           })}

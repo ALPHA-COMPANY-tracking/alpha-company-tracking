@@ -1,7 +1,7 @@
 // Demonstrativo: os blocos só reagrupam o P&L — nenhum centavo some ou aparece.
 import { describe, expect, it } from 'vitest';
 import type { AfterpayDaily, CustoVariavel, Pedido } from '@/types';
-import { calcularPnl } from '@/lib/pnl';
+import { calcularPnl, serieDiaria } from '@/lib/pnl';
 import { degrausCascata, montarDRE } from '@/lib/dre';
 
 const P = { inicio: '2026-09-09', fim: '2026-09-15' };
@@ -55,6 +55,13 @@ describe('demonstrativo de resultados', () => {
       expect(d.base).toBeGreaterThanOrEqual(0);
       expect(d.base + d.altura).toBeLessThanOrEqual(1 + 1e-9);
     }
+  });
+
+  it('evolução diária usa os pedidos: a receita dos dias soma a do período', () => {
+    const serie = serieDiaria(dailies, custos, P, {}, pedidos);
+    const pnl = calcularPnl(dailies, custos, P, {}, pedidos);
+    expect(pnl.receita_aprovada).toBeGreaterThan(0);
+    expect(serie.reduce((s, d) => s + d.receita, 0)).toBe(pnl.receita_aprovada);
   });
 
   it('prejuízo: custos maiores que a receita continuam dentro da escala', () => {

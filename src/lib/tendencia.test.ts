@@ -120,7 +120,7 @@ describe('paleta da marca', () => {
       });
     const proibidos = [
       /-(pur|pur2|pur3|blu|pnk|cyan)(?![\w-])/, // classes antigas
-      /#(a855f7|c084fc|7c3aed|60a5fa|f472b6|22d3ee|818cf8|38bdf8|8b5cf6|6366f1|3b82f6|ec4899)\b/i, // HEX
+      /(#|argb: 'FF)(a855f7|c084fc|7c3aed|60a5fa|f472b6|22d3ee|818cf8|38bdf8|8b5cf6|6366f1|3b82f6|ec4899)\b/i, // HEX (e ARGB do Excel)
     ];
     const achados = arquivos('src').flatMap((f) =>
       readFileSync(f, 'utf8')

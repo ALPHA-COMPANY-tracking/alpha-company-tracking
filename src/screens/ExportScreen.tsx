@@ -10,14 +10,14 @@ import { Panel } from '@/components/ui';
 import { COR } from '@/lib/cores';
 
 export function ExportScreen({ periodo }: { periodo: Periodo }) {
-  const { dailies, custos, categorias } = useData();
+  const { dailies, custos, categorias, pedidos } = useData();
   const [gerando, setGerando] = useState(false);
-  const pnl = useMemo(() => calcularPnl(dailies, custos, periodo), [dailies, custos, periodo]);
+  const pnl = useMemo(() => calcularPnl(dailies, custos, periodo, {}, pedidos), [dailies, custos, periodo, pedidos]);
 
   async function baixarExcel() {
     setGerando(true);
     try {
-      await exportarXlsx(dailies, custos, categorias, periodo);
+      await exportarXlsx(dailies, custos, categorias, periodo, pedidos);
     } finally {
       setGerando(false);
     }
@@ -30,9 +30,9 @@ export function ExportScreen({ periodo }: { periodo: Periodo }) {
       <Panel title="Exportar período" hint={rangeLabel}>
         <div className="p-5 flex flex-col gap-5">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Mini label="Receita" valor={formatBRL(pnl.receita_aprovada)} cor="#34d399" />
-            <Mini label="Custos totais" valor={formatBRL(pnl.custos_totais_reais)} cor="#fb7185" />
-            <Mini label="Lucro real" valor={formatBRL(pnl.lucro_real)} cor="#34d399" />
+            <Mini label="Receita" valor={formatBRL(pnl.receita_aprovada)} cor={COR.verde} />
+            <Mini label="Custos totais" valor={formatBRL(pnl.custos_totais_reais)} cor={COR.vermelho} />
+            <Mini label="Lucro real" valor={formatBRL(pnl.lucro_real)} cor={pnl.lucro_real >= 0 ? COR.verde : COR.vermelho} />
             <Mini label="Lançamentos" valor={String(pnl.qtd_lancamentos)} cor={COR.ouro} />
           </div>
 
