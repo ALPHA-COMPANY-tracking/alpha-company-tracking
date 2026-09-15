@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { Cents } from '@/lib/money';
-import { safeDiv } from '@/lib/money';
+import { formatBRL, safeDiv } from '@/lib/money';
 import type { PnlResult } from '@/lib/pnl';
 import { HEX } from '@/lib/cores';
 
@@ -94,6 +94,16 @@ export function montarDRE(pnl: PnlResult): DRE {
     resultadoOperacional: sub('Resultado operacional', resultadoOperacional),
     lucroReal: sub(lucroReal >= 0 ? 'Lucro real' : 'Prejuízo real', lucroReal),
   };
+}
+
+/**
+ * Quanto de cada R$ 1,00 recebido foi para um grupo. Grupo pequeno (a taxa
+ * costuma ser ~0,1% da receita) dá menos de um centavo: mostra "< R$ 0,01"
+ * em vez de um "R$ 0,00" que parece dado faltando.
+ */
+export function porReal(total: Cents, receita: Cents): string {
+  const centavos = Math.round(safeDiv(total, receita) * 100);
+  return total > 0 && centavos === 0 ? '< R$ 0,01' : formatBRL(centavos);
 }
 
 export interface DegrauCascata {

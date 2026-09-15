@@ -17,7 +17,7 @@ import type { Cents } from '@/lib/money';
 import { formatBRL, formatPercent, safeDiv } from '@/lib/money';
 import { type DescontoFrustrados, type PnlResult, custoNoPeriodo } from '@/lib/pnl';
 import { COMISSAO_COBRANCA, RESPONSAVEL_COBRANCA } from '@/lib/custosConfig';
-import { COR_GRUPO, type DegrauCascata, type GrupoDRE, degrausCascata, montarDRE } from '@/lib/dre';
+import { COR_GRUPO, type DegrauCascata, type GrupoDRE, degrausCascata, montarDRE, porReal } from '@/lib/dre';
 import { alfa, corDaCategoria } from '@/lib/cores';
 import { hojeIso } from '@/lib/dates';
 import { seloPeriodo } from '@/lib/tendencia';
@@ -590,10 +590,12 @@ export function Demonstrativo({
                   <div className="text-[11.5px] text-dim truncate">{d.nome}</div>
                   <div className="flex items-baseline gap-1.5">
                     <span className={`mono text-[13px] font-bold ${d.id === 'lucro' ? 'text-grn' : 'text-tx'}`}>
-                      {formatBRL(Math.round(safeDiv(d.total, receita) * 100))}
+                      {porReal(d.total, receita)}
                     </span>
                     <span className="mono text-[10px] text-dim2">{formatPercent(safeDiv(d.total, receita))}</span>
                   </div>
+                  {/* O valor do período ao lado dos centavos: "R$ 0,00" sozinho parecia vazio. */}
+                  <div className="mono text-[10.5px] text-dim2">{formatBRL(d.total)} no período</div>
                 </div>
               </div>
             ))}

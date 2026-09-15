@@ -2,7 +2,8 @@
 import { describe, expect, it } from 'vitest';
 import type { AfterpayDaily, CustoVariavel, Pedido } from '@/types';
 import { calcularPnl, serieDiaria } from '@/lib/pnl';
-import { degrausCascata, montarDRE } from '@/lib/dre';
+import { formatBRL } from '@/lib/money';
+import { degrausCascata, montarDRE, porReal } from '@/lib/dre';
 
 const P = { inicio: '2026-09-09', fim: '2026-09-15' };
 
@@ -55,6 +56,13 @@ describe('demonstrativo de resultados', () => {
       expect(d.base).toBeGreaterThanOrEqual(0);
       expect(d.base + d.altura).toBeLessThanOrEqual(1 + 1e-9);
     }
+  });
+
+  it('cada R$ 1,00: taxa de menos de um centavo não aparece como R$ 0,00', () => {
+    // R$ 30 de taxa sobre R$ 25.000 de receita = 0,12% → R$ 0,0012 por real.
+    expect(porReal(3_000, 2_500_000)).toBe('< R$ 0,01');
+    expect(porReal(0, 2_500_000)).toBe(formatBRL(0));
+    expect(porReal(1_550_000, 2_500_000)).toBe(formatBRL(62));
   });
 
   it('evolução diária usa os pedidos: a receita dos dias soma a do período', () => {
