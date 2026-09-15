@@ -42,7 +42,7 @@ export function BarsVertical({
             fill={HEX.rotulo}
             fontSize={11}
             fontWeight={700}
-            style={{ fontFamily: '"JetBrains Mono", monospace' }}
+            style={{ fontFamily: 'Poppins, system-ui, sans-serif', fontVariantNumeric: 'tabular-nums' }}
           />
         </Bar>
       </BarChart>

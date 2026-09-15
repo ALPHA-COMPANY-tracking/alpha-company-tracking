@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
+/* Poppins: a mesma fonte do BlueSales, para textos e números. */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -70,7 +71,7 @@
     margin: 0;
     background: rgb(var(--bg));
     color: rgb(var(--tx));
-    font-family: Inter, system-ui, sans-serif;
+    font-family: Poppins, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     /* Sem transition aqui: quando a cor vem de variável CSS, o navegador
        segura o valor antigo e o fundo não acompanha a troca de tema. */
@@ -82,7 +83,9 @@
 
 @layer utilities {
   .mono {
-    font-family: 'JetBrains Mono', monospace;
+    /* Números também em Poppins, como no BlueSales. Os algarismos de
+       largura fixa mantêm as colunas de valores alinhadas. */
+    font-family: Poppins, system-ui, sans-serif;
     font-variant-numeric: tabular-nums;
   }
   /* Texto dourado metálico (brand AJ Alpha Company) */

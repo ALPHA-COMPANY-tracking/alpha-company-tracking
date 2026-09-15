@@ -35,8 +35,16 @@ export default {
         // gera CSS — o grep em src/ tem que voltar vazio.
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['"JetBrains Mono"', 'monospace'],
+        // Poppins em tudo, igual ao BlueSales. 'mono' mantido como nome
+        // porque marca os números (com algarismos de largura fixa).
+        sans: ['Poppins', 'system-ui', 'sans-serif'],
+        mono: ['Poppins', 'system-ui', 'sans-serif'],
+      },
+      // A Poppins já é compacta: o "tight" padrão (-0.025em) grudava as
+      // palavras dos títulos ("Demonstrativode Resultados").
+      letterSpacing: {
+        tight: '-0.01em',
+        tighter: '-0.015em',
       },
       borderRadius: {
         kpi: '14px',
