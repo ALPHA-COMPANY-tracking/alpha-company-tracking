@@ -266,6 +266,8 @@ export function Demonstrativo({
     { id: 'real', label: 'Valor real perdido', hint: 'produto + frete', lucro: lucroSemFrustrados - pnl.perda_real_frustrados },
   ];
 
+  const taxaNasComissoes = pnl.comissoes_por_vendedor.reduce((s, v) => s + v.taxa_descontada, 0);
+
   // Para onde foi cada real: grupos com valor + o lucro.
   const destinos = [
     ...Object.values(grupos).filter((g) => g.total > 0),
@@ -357,10 +359,9 @@ export function Demonstrativo({
           <Bloco grupo={grupos.comissoes} Icon={Users} descricao="Vendedores e cobrança">
             <Linha
               rotulo="Comissões Vendedor"
-              // A base não é a receita cheia: o BlueSales tira a taxa de
-              // plataforma antes de comissionar. Mostrar a base deixa qualquer
-              // divergência com o BlueSales visível na hora.
-              nota={`sobre ${formatBRL(receita - pnl.taxas_plataforma)} (receita − taxas de plataforma)`}
+              // Na linha do P&L o BlueSales tira a taxa de plataforma antes de
+              // comissionar. Mostrar a base deixa qualquer divergência visível.
+              nota={`no P&L: sobre ${formatBRL(receita - pnl.taxas_plataforma)} (receita − taxas de plataforma)`}
               cents={pnl.comissoes_vendedor}
               receita={receita}
               cor={grupos.comissoes.cor}
@@ -384,6 +385,17 @@ export function Demonstrativo({
                       <div className="mono text-[12.5px] font-semibold text-tx2 shrink-0">{formatBRL(v.comissao)}</div>
                     </div>
                   ))}
+                  {/* O vendedor recebe o valor cheio (como no BlueSales); a linha
+                      do P&L tira a parte da taxa. Esta linha fecha a conta. */}
+                  {taxaNasComissoes > 0 && (
+                    <div className="px-3 py-2.5 flex items-center justify-between gap-3 bg-card3">
+                      <div className="min-w-0">
+                        <div className="text-[12px] text-dim">Parte da taxa de plataforma</div>
+                        <div className="text-[10.5px] text-dim2 mt-0.5">descontada só no P&L · o vendedor recebe o valor cheio</div>
+                      </div>
+                      <div className="mono text-[12.5px] font-semibold text-dim shrink-0">{saida(taxaNasComissoes)}</div>
+                    </div>
+                  )}
                 </Quebra>
               )}
             </Linha>

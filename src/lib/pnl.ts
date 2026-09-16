@@ -95,7 +95,17 @@ export interface ComissaoVendedor {
   agendado: Cents;
   /** Quantos pedidos ele agendou no período. */
   qtd_agendados: number;
+  /**
+   * O que ele recebe: percentual sobre o aprovado CHEIO — é o número da
+   * comissão de cada vendedor no BlueSales (PETER 5% × 22.436,00 = 1.121,80).
+   */
   comissao: Cents;
+  /**
+   * Parte da taxa de plataforma que a linha "Comissões Vendedor" do P&L
+   * desconta dele (percentual × taxa proporcional à receita). Não sai do
+   * bolso do vendedor: só explica por que o P&L soma menos que as comissões.
+   */
+  taxa_descontada: Cents;
 }
 
 export interface PnlOptions {
@@ -194,8 +204,12 @@ export function serieDiaria(
 
 /** Calcula o P&L completo de um período. */
 /**
- * Comissão dos vendedores: cada um com o seu percentual, sobre a própria
- * receita menos a parcela proporcional das taxas de plataforma.
+ * Comissão dos vendedores, cada um com o seu percentual. Duas visões, as
+ * mesmas do BlueSales (conferido em 16/09/2026):
+ *   - `comissao`: o que o vendedor recebe = pct × receita dele, cheia
+ *     (PETER 5% × 22.436,00 = 1.121,80 · Matheus 6% × 9.135,00 = 548,10);
+ *   - linha do P&L: pct × (receita dele − parcela proporcional das taxas),
+ *     ou seja `comissao − taxa_descontada`.
  *
  * Com todos no mesmo percentual o resultado é idêntico à conta antiga
  * (`pct × (receita − taxas)`), então trocar para cá não mexe em nada de
@@ -240,8 +254,9 @@ export function comissaoVendedores(
     .map(({ nome, receita, agendado, qtd_agendados }) => {
       const pct = comissaoDoVendedor(nome);
       const taxasV = receitaTotal > 0 ? Math.round(taxas * (receita / receitaTotal)) : 0;
-      const comissao = receita > 0 ? Math.round((receita - taxasV) * pct) : 0;
-      return { nome, pct, receita, agendado, qtd_agendados, comissao };
+      const comissao = receita > 0 ? Math.round(receita * pct) : 0;
+      const liquida = receita > 0 ? Math.round((receita - taxasV) * pct) : 0;
+      return { nome, pct, receita, agendado, qtd_agendados, comissao, taxa_descontada: comissao - liquida };
     })
     // Quem mais recebe primeiro; empate, quem mais agendou.
     .sort((a, b) => b.comissao - a.comissao || b.agendado - a.agendado || a.nome.localeCompare(b.nome));
@@ -310,7 +325,9 @@ export function calcularPnl(
     // do total do dia. Ver lib/taxas.ts.
     taxas_plataforma = taxasDoPeriodo(pedidos, dailies, periodo);
     comissoes_por_vendedor = comissaoVendedores(agg.porAtendente, receita_aprovada, taxas_plataforma);
-    comissoes_vendedor = comissoes_por_vendedor.reduce((s, c) => s + c.comissao, 0);
+    // A linha do P&L é a comissão MENOS a parte da taxa (como a linha do
+    // BlueSales); cada vendedor, na quebra, recebe o valor cheio.
+    comissoes_vendedor = comissoes_por_vendedor.reduce((s, c) => s + c.comissao - c.taxa_descontada, 0);
     comissoes_cobranca = Math.round(receita_aprovada * COMISSAO_COBRANCA);
   }
 

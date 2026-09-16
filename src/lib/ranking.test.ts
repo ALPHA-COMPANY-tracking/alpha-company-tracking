@@ -112,8 +112,12 @@ describe('rankingVendedores', () => {
     for (const c of pnl.comissoes_por_vendedor) {
       expect(de(c.nome, linhas).comissao).toBe(c.comissao);
     }
+    // O ranking mostra o que cada um recebe (cheio); a linha do P&L tira a
+    // parte da taxa — a diferença entre os dois é exatamente essa parte.
     const somaRanking = linhas.reduce((s, l) => s + l.comissao, 0);
-    expect(somaRanking).toBe(pnl.comissoes_vendedor);
+    const parteDaTaxa = pnl.comissoes_por_vendedor.reduce((s, c) => s + c.taxa_descontada, 0);
+    expect(parteDaTaxa).toBeGreaterThan(0);
+    expect(somaRanking - parteDaTaxa).toBe(pnl.comissoes_vendedor);
   });
 
   it('vendedor sem venda no período aparece zerado, não some', () => {

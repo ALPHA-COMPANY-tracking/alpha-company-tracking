@@ -89,6 +89,24 @@ describe('comissão no P&L', () => {
     expect(soma).toBe(pnl.comissoes_vendedor);
   });
 
+  it('BlueSales 16/09/2026: vendedor recebe sobre o aprovado cheio; o P&L tira a taxa', () => {
+    // Números reais do período: PETER aprovou R$ 22.436,00, Matheus
+    // R$ 9.135,00, taxas R$ 52,50. O BlueSales mostra na comissão de cada
+    // um PETER R$ 1.121,80 e Matheus R$ 548,10 — percentual × aprovado.
+    const pedidos = [pago('p1', 22_436, 'PETER'), pago('m1', 9_135, 'Matheus')];
+    const pnl = calcularPnl([daily('2026-08-10', 52.5)], [], periodo, {}, pedidos);
+
+    const peter = pnl.comissoes_por_vendedor.find((v) => v.nome === 'PETER')!;
+    const matheus = pnl.comissoes_por_vendedor.find((v) => v.nome === 'Matheus')!;
+    expect(peter.comissao).toBe(112_180); // R$ 1.121,80
+    expect(matheus.comissao).toBe(54_810); // R$ 548,10
+
+    // A linha do P&L continua descontando a parte da taxa de cada um.
+    const parteDaTaxa = peter.taxa_descontada + matheus.taxa_descontada;
+    expect(pnl.comissoes_vendedor).toBe(112_180 + 54_810 - parteDaTaxa);
+    expect(pnl.comissoes_vendedor).toBe(166_712); // R$ 1.667,12 (BlueSales: 1.667,20)
+  });
+
   it('não duplica quem está configurado com outra caixa (Matheus/MATHEUS)', () => {
     // O BlueSales manda "Matheus"; a configuração usa "MATHEUS".
     const pnl = calcularPnl([], [], periodo, {}, [pago('m1', 500, 'Matheus'), pago('p1', 1000, 'PETER')]);
