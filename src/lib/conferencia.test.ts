@@ -1,7 +1,7 @@
 // Conferência com o BlueSales: achar a venda a mais sem procurar à mão.
 import { describe, expect, it } from 'vitest';
 import type { Pedido } from '@/types';
-import { agendadoPorDia, agregarPedidos, possiveisDuplicados } from '@/lib/pedidos';
+import { agendadoPorDia, agregarPedidos, casaComBusca, possiveisDuplicados } from '@/lib/pedidos';
 
 const SET = { inicio: '2026-09-01', fim: '2026-09-17' };
 
@@ -51,6 +51,27 @@ describe('possíveis duplicados', () => {
       ped('novo', '2026-09-11', 735, 'Adelia Pereira', { status: 'pagos' }),
     ];
     expect(possiveisDuplicados(pedidos, SET)).toEqual([]);
+  });
+});
+
+describe('busca na tela Vendas', () => {
+  const p = ped('BLV-3LLR3RC8LJ', '2026-09-17', 535, 'ELOIDE ANGELA DA CONCEICAO PEREIRA', { internal_id: 1407 });
+
+  it('acha por parte do nome, sem ligar para acento ou maiúscula', () => {
+    expect(casaComBusca(p, 'eloide')).toBe(true);
+    expect(casaComBusca(p, 'Conceição')).toBe(true);
+    expect(casaComBusca(p, 'adelia')).toBe(false);
+  });
+
+  it('acha pelo #número e pelo código BLV', () => {
+    expect(casaComBusca(p, '#1407')).toBe(true);
+    expect(casaComBusca(p, '1407')).toBe(true);
+    expect(casaComBusca(p, '140')).toBe(false); // número tem que ser o inteiro
+    expect(casaComBusca(p, '3llr3')).toBe(true);
+  });
+
+  it('busca vazia mostra tudo', () => {
+    expect(casaComBusca(p, '  ')).toBe(true);
   });
 });
 

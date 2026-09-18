@@ -152,8 +152,23 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
 // ─────────────────────────────────────────────────────────────
 
 /** Nome do cliente comparável: sem acento, minúsculo, espaços únicos. */
-function nomeComparavel(nome: string | null | undefined): string {
+export function nomeComparavel(nome: string | null | undefined): string {
   return norm(nome).replace(/\s+/g, ' ');
+}
+
+/**
+ * A venda casa com o que foi digitado na busca? Aceita parte do nome
+ * (sem ligar para acento/maiúscula), o #número do BlueSales ou o código BLV.
+ */
+export function casaComBusca(p: Pedido, busca: string): boolean {
+  const termo = nomeComparavel(busca);
+  if (!termo) return true;
+  const numero = termo.replace(/^#/, '');
+  return (
+    nomeComparavel(p.cliente).includes(termo) ||
+    (/^\d+$/.test(numero) && String(p.internal_id ?? '') === numero) ||
+    nomeComparavel(p.id).includes(termo)
+  );
 }
 
 /**

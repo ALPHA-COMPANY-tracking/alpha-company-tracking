@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Copy, RotateCcw, ShoppingBag, Trash2, TriangleAlert } from 'lucide-react';
+import { Copy, RotateCcw, Search, ShoppingBag, Trash2, TriangleAlert, X } from 'lucide-react';
 import type { Pedido, Periodo } from '@/types';
 import { formatBRL, reaisToCents } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
-import { agendadoPorDia, possiveisDuplicados, statusBucket } from '@/lib/pedidos';
+import { agendadoPorDia, casaComBusca, possiveisDuplicados, statusBucket } from '@/lib/pedidos';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
 
@@ -62,6 +62,22 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
 
   const ativos = doPeriodo.filter((p) => !p.removido_em);
   const removidos = doPeriodo.filter((p) => p.removido_em);
+
+  // Busca: procura em TODAS as datas (a venda que se procura muitas vezes
+  // é de outro mês), inclusive nas excluídas — para dar para devolver.
+  const [busca, setBusca] = useState('');
+  const buscando = busca.trim().length > 0;
+  const achados = useMemo(
+    () =>
+      buscando
+        ? pedidos
+            .filter((p) => casaComBusca(p, busca))
+            .sort((a, b) => b.data.localeCompare(a.data) || (b.internal_id ?? 0) - (a.internal_id ?? 0))
+        : [],
+    [pedidos, busca, buscando],
+  );
+  const listaAtivos = buscando ? achados.filter((p) => !p.removido_em) : ativos;
+  const listaRemovidos = buscando ? achados.filter((p) => p.removido_em) : removidos;
 
   const totalAtivo = ativos.reduce((s, p) => s + (Number(p.valor_agendado ?? p.valor) || 0), 0);
   const pagos = ativos.filter((p) => statusBucket(p.status) === 'aprovado').length;
@@ -221,111 +237,140 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
         </div>
       </div>
 
-      {/* Conferir com o BlueSales — primeiro o que dá para apontar sozinho. */}
-      <Panel
-        title="Conferir com o BlueSales"
-        hint={duplicados.length > 0 ? `${duplicados.length} cliente${duplicados.length === 1 ? '' : 's'} com mais de um pedido` : 'nenhum cliente repetido'}
-      >
-        <div className="p-4 lg:p-5 flex flex-col gap-4">
-          {duplicados.length > 0 ? (
-            <div className="flex flex-col gap-3">
-              <p className="m-0 text-[12.5px] text-dim leading-relaxed">
-                <b className="text-tx">Possíveis duplicados.</b> O mesmo cliente com mais de um pedido costuma ser venda
-                refeita: o vendedor criou de novo e excluiu a antiga no BlueSales — que continua aqui. Procure o
-                #número no BlueSales e só tire o que <b className="text-tx">não existir mais lá</b>.
-              </p>
-              {duplicados.map((g) => (
-                <div key={g[0].id} className="rounded-[12px] border border-yel/30 bg-yel/[0.04] overflow-hidden">
-                  <div className="px-3.5 py-2 text-[12.5px] font-semibold text-tx border-b border-yel/20 flex items-center gap-2">
-                    <Copy size={13} className="text-yel shrink-0" />
-                    <span className="truncate">{g[0].cliente}</span>
-                    <span className="text-[10.5px] text-dim2 font-normal shrink-0">{g.length} pedidos</span>
-                  </div>
-                  {g.some((p) => statusBucket(p.status) === 'frustrado') && (
-                    <div className="px-3.5 py-2 text-[11.5px] text-yel/90 bg-yel/[0.05] border-b border-yel/20">
-                      Tem um frustrado: pode ser <b>recompra</b> (a entrega falhou e ela comprou de novo) — aí as duas vendas
-                      são reais. Só apague se o pedido não existir mais no BlueSales.
-                    </div>
-                  )}
-                  <div className="divide-y divide-line/70">
-                    {g.map((p) => {
-                      const s = selo(p);
-                      return (
-                        <div key={p.id} className="px-3.5 py-2.5 flex items-center justify-between gap-3">
-                          <div className="min-w-0 flex items-center gap-x-3 gap-y-1 flex-wrap text-[12px]">
-                            <span className="mono font-bold text-dim">#{p.internal_id ?? '—'}</span>
-                            <span className="text-tx">{diaMes(p.data)}</span>
-                            <span className="text-dim">{planoCurto(p.produto_plano)}</span>
-                            <span className="text-dim">{p.vendedor?.trim() || '—'}</span>
-                            <span className={`text-[10.5px] border rounded-full px-[8px] py-[1px] whitespace-nowrap ${s.classe}`}>{s.texto}</span>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="mono font-bold text-gold2 text-[12.5px]">
-                              {formatBRL(reaisToCents(Number(p.valor_agendado ?? p.valor) || 0))}
-                            </span>
-                            {lixeira(p)}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="m-0 text-[12.5px] text-dim leading-relaxed">
-              <b className="text-tx">Nenhum cliente com dois pedidos</b> neste período. Se o total não bate com o
-              BlueSales, compare o agendado de cada dia abaixo com o gráfico de lá (passe o mouse em cima do dia): o dia
-              que não bate é onde está a venda a mais.
-            </p>
-          )}
+      {/* Busca em todas as datas — logo no topo, que é onde se procura. */}
+      <label className="flex items-center gap-2.5 bg-card border border-line2 focus-within:border-gold/60 rounded-[12px] px-3.5 py-2.5 transition-colors">
+        <Search size={16} className="text-gold shrink-0" />
+        <input
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          placeholder="Buscar venda por nome do cliente, #número ou código BLV"
+          className="flex-1 min-w-0 bg-transparent text-[13.5px] text-tx placeholder:text-dim2 outline-none"
+        />
+        {buscando && (
+          <button onClick={() => setBusca('')} title="Limpar busca" className="text-dim2 hover:text-tx shrink-0">
+            <X size={16} />
+          </button>
+        )}
+      </label>
 
-          {porDia.length > 0 && (
-            <div>
-              <div className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-dim2 mb-2">Agendado por dia</div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                {porDia.map((d) => (
-                  <div key={d.data} className="rounded-[10px] border border-line bg-card2 px-3 py-2">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[12px] font-semibold text-tx">{diaMes(d.data)}</span>
-                      <span className="text-[10.5px] text-dim2">
-                        {d.qtd} venda{d.qtd === 1 ? '' : 's'}
-                      </span>
+      {/* Conferir com o BlueSales — primeiro o que dá para apontar sozinho. */}
+      {!buscando && (
+        <Panel
+          title="Conferir com o BlueSales"
+          hint={duplicados.length > 0 ? `${duplicados.length} cliente${duplicados.length === 1 ? '' : 's'} com mais de um pedido` : 'nenhum cliente repetido'}
+        >
+          <div className="p-4 lg:p-5 flex flex-col gap-4">
+            {duplicados.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                <p className="m-0 text-[12.5px] text-dim leading-relaxed">
+                  <b className="text-tx">Possíveis duplicados.</b> O mesmo cliente com mais de um pedido costuma ser venda
+                  refeita: o vendedor criou de novo e excluiu a antiga no BlueSales — que continua aqui. Procure o
+                  #número no BlueSales e só tire o que <b className="text-tx">não existir mais lá</b>.
+                </p>
+                {duplicados.map((g) => (
+                  <div key={g[0].id} className="rounded-[12px] border border-yel/30 bg-yel/[0.04] overflow-hidden">
+                    <div className="px-3.5 py-2 text-[12.5px] font-semibold text-tx border-b border-yel/20 flex items-center gap-2">
+                      <Copy size={13} className="text-yel shrink-0" />
+                      <span className="truncate">{g[0].cliente}</span>
+                      <span className="text-[10.5px] text-dim2 font-normal shrink-0">{g.length} pedidos</span>
                     </div>
-                    <div className="mono text-[13px] font-bold text-gold2 mt-0.5">{formatBRL(reaisToCents(d.valor))}</div>
+                    {g.some((p) => statusBucket(p.status) === 'frustrado') && (
+                      <div className="px-3.5 py-2 text-[11.5px] text-yel/90 bg-yel/[0.05] border-b border-yel/20">
+                        Tem um frustrado: pode ser <b>recompra</b> (a entrega falhou e ela comprou de novo) — aí as duas vendas
+                        são reais. Só apague se o pedido não existir mais no BlueSales.
+                      </div>
+                    )}
+                    <div className="divide-y divide-line/70">
+                      {g.map((p) => {
+                        const s = selo(p);
+                        return (
+                          <div key={p.id} className="px-3.5 py-2.5 flex items-center justify-between gap-3">
+                            <div className="min-w-0 flex items-center gap-x-3 gap-y-1 flex-wrap text-[12px]">
+                              <span className="mono font-bold text-dim">#{p.internal_id ?? '—'}</span>
+                              <span className="text-tx">{diaMes(p.data)}</span>
+                              <span className="text-dim">{planoCurto(p.produto_plano)}</span>
+                              <span className="text-dim">{p.vendedor?.trim() || '—'}</span>
+                              <span className={`text-[10.5px] border rounded-full px-[8px] py-[1px] whitespace-nowrap ${s.classe}`}>{s.texto}</span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="mono font-bold text-gold2 text-[12.5px]">
+                                {formatBRL(reaisToCents(Number(p.valor_agendado ?? p.valor) || 0))}
+                              </span>
+                              {lixeira(p)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-        </div>
-      </Panel>
+            ) : (
+              <p className="m-0 text-[12.5px] text-dim leading-relaxed">
+                <b className="text-tx">Nenhum cliente com dois pedidos</b> neste período. Se o total não bate com o
+                BlueSales, compare o agendado de cada dia abaixo com o gráfico de lá (passe o mouse em cima do dia): o dia
+                que não bate é onde está a venda a mais.
+              </p>
+            )}
 
-      <Panel title="Vendas do período" hint="a lixeira tira a venda de todos os cálculos">
+            {porDia.length > 0 && (
+              <div>
+                <div className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-dim2 mb-2">Agendado por dia</div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {porDia.map((d) => (
+                    <div key={d.data} className="rounded-[10px] border border-line bg-card2 px-3 py-2">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-[12px] font-semibold text-tx">{diaMes(d.data)}</span>
+                        <span className="text-[10.5px] text-dim2">
+                          {d.qtd} venda{d.qtd === 1 ? '' : 's'}
+                        </span>
+                      </div>
+                      <div className="mono text-[13px] font-bold text-gold2 mt-0.5">{formatBRL(reaisToCents(d.valor))}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </Panel>
+      )}
+
+      <Panel
+        title={buscando ? 'Resultado da busca' : 'Vendas do período'}
+        hint={
+          buscando
+            ? `${achados.length} encontrada${achados.length === 1 ? '' : 's'} · em todas as datas`
+            : 'a lixeira tira a venda de todos os cálculos'
+        }
+      >
         <div className="overflow-x-auto">
           <table className="w-full text-[13px] min-w-[335px] lg:min-w-[720px]">
             {cabecalho}
             <tbody>
-              {ativos.length === 0 ? (
+              {listaAtivos.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-5 py-10 text-center text-dim2">
-                    Nenhuma venda agendada neste período.
+                    {buscando
+                      ? listaRemovidos.length > 0
+                        ? 'Só aparece entre as excluídas, logo abaixo.'
+                        : 'Nenhuma venda encontrada com esse nome ou número.'
+                      : 'Nenhuma venda agendada neste período.'}
                   </td>
                 </tr>
               ) : (
-                ativos.map((p) => linha(p, false))
+                listaAtivos.map((p) => linha(p, false))
               )}
             </tbody>
           </table>
         </div>
       </Panel>
 
-      {removidos.length > 0 && (
+      {listaRemovidos.length > 0 && (
         <Panel title="Excluídas da plataforma" hint="não entram em nenhum cálculo · a seta devolve">
           <div className="overflow-x-auto">
             <table className="w-full text-[13px] min-w-[420px] lg:min-w-[720px]">
               {cabecalho}
-              <tbody>{removidos.map((p) => linha(p, true))}</tbody>
+              <tbody>{listaRemovidos.map((p) => linha(p, true))}</tbody>
             </table>
           </div>
         </Panel>
