@@ -143,3 +143,60 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
     total,
   };
 }
+
+// ─────────────────────────────────────────────────────────────
+// Conferência com o BlueSales. Quando uma venda é excluída lá, nenhum
+// evento chega — ela fica presa aqui e infla o Faturamento Agendado.
+// Procurar à mão entre centenas de pedidos não dá; estas duas funções
+// apontam onde olhar.
+// ─────────────────────────────────────────────────────────────
+
+/** Nome do cliente comparável: sem acento, minúsculo, espaços únicos. */
+function nomeComparavel(nome: string | null | undefined): string {
+  return norm(nome).replace(/\s+/g, ' ');
+}
+
+/**
+ * Clientes com mais de um pedido ativo, sendo pelo menos um criado no
+ * período. É o caso típico de venda refeita: o vendedor cria de novo
+ * (outro plano, outro valor) e exclui a antiga no BlueSales — que
+ * continua aqui. Os pedidos de fora do período entram no grupo para
+ * mostrar o par completo.
+ */
+export function possiveisDuplicados(todos: Pedido[], periodo: Periodo): Pedido[][] {
+  const grupos = new Map<string, Pedido[]>();
+  for (const p of pedidosAtivos(todos)) {
+    const chave = nomeComparavel(p.cliente);
+    if (chave.length < 4) continue; // sem nome não dá para casar
+    const g = grupos.get(chave);
+    if (g) g.push(p);
+    else grupos.set(chave, [p]);
+  }
+  return [...grupos.values()]
+    .filter((g) => g.length > 1 && g.some((p) => isDentro(p.data, periodo.inicio, periodo.fim)))
+    .map((g) => g.sort((a, b) => a.data.localeCompare(b.data) || (a.internal_id ?? 0) - (b.internal_id ?? 0)))
+    .sort((a, b) => b[b.length - 1].data.localeCompare(a[a.length - 1].data));
+}
+
+export interface AgendadoDoDia {
+  data: string;
+  qtd: number;
+  valor: number;
+}
+
+/**
+ * Agendado de cada dia do período (mesma regra do Faturamento Agendado:
+ * data de criação, valor do agendamento). Comparando com o gráfico do
+ * BlueSales, o dia que não bate diz onde está a venda a mais.
+ */
+export function agendadoPorDia(todos: Pedido[], periodo: Periodo): AgendadoDoDia[] {
+  const dias = new Map<string, AgendadoDoDia>();
+  for (const p of pedidosAtivos(todos)) {
+    if (!isDentro(p.data, periodo.inicio, periodo.fim)) continue;
+    const d = dias.get(p.data) ?? { data: p.data, qtd: 0, valor: 0 };
+    d.qtd += 1;
+    d.valor += Number(p.valor_agendado ?? p.valor) || 0;
+    dias.set(p.data, d);
+  }
+  return [...dias.values()].sort((a, b) => b.data.localeCompare(a.data));
+}

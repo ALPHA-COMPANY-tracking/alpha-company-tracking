@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { RotateCcw, ShoppingBag, Trash2, TriangleAlert } from 'lucide-react';
+import { Copy, RotateCcw, ShoppingBag, Trash2, TriangleAlert } from 'lucide-react';
 import type { Pedido, Periodo } from '@/types';
 import { formatBRL, reaisToCents } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
-import { statusBucket } from '@/lib/pedidos';
+import { agendadoPorDia, possiveisDuplicados, statusBucket } from '@/lib/pedidos';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
 
@@ -66,10 +66,44 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
   const totalAtivo = ativos.reduce((s, p) => s + (Number(p.valor_agendado ?? p.valor) || 0), 0);
   const pagos = ativos.filter((p) => statusBucket(p.status) === 'aprovado').length;
 
+  // Conferência: onde está a venda que o BlueSales não conta mais.
+  const duplicados = useMemo(() => possiveisDuplicados(pedidos, periodo), [pedidos, periodo]);
+  const porDia = useMemo(() => agendadoPorDia(pedidos, periodo), [pedidos, periodo]);
+
+  /** Lixeira com confirmação, a mesma da tabela. */
+  function lixeira(p: Pedido) {
+    if (confirmando === p.id) {
+      return (
+        <div className="inline-flex items-center gap-1.5">
+          <button
+            onClick={() => {
+              removerPedido(p.id, true);
+              setConfirmando(null);
+            }}
+            className="px-2.5 py-[5px] rounded-lg text-[11.5px] font-semibold text-red border border-red/40 bg-red/10 hover:bg-red/20"
+          >
+            Excluir
+          </button>
+          <button onClick={() => setConfirmando(null)} className="px-2.5 py-[5px] rounded-lg text-[11.5px] text-dim2 hover:text-tx">
+            Não
+          </button>
+        </div>
+      );
+    }
+    return (
+      <button
+        onClick={() => setConfirmando(p.id)}
+        title="Tirar esta venda da plataforma"
+        className="grid place-items-center w-8 h-8 rounded-lg text-red/70 hover:text-red hover:bg-red/10"
+      >
+        <Trash2 size={15} />
+      </button>
+    );
+  }
+
   function linha(p: Pedido, removido: boolean) {
     const s = selo(p);
     const valor = Number(p.valor_agendado ?? p.valor) || 0;
-    const perguntando = confirmando === p.id;
     return (
       <tr key={p.id} className={`border-t border-line/70 hover:bg-white/[0.015] ${removido ? 'opacity-55' : ''}`}>
         <td className="px-2 sm:px-3 lg:px-5 py-3.5 lg:py-4 text-tx font-medium whitespace-nowrap">{diaMes(p.data)}</td>
@@ -132,33 +166,9 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
             >
               <RotateCcw size={14} />
             </button>
-          ) : perguntando ? (
-            // Tirar uma venda mexe no faturamento: pede confirmação.
-            <div className="inline-flex items-center gap-1.5">
-              <button
-                onClick={() => {
-                  removerPedido(p.id, true);
-                  setConfirmando(null);
-                }}
-                className="px-2.5 py-[5px] rounded-lg text-[11.5px] font-semibold text-red border border-red/40 bg-red/10 hover:bg-red/20"
-              >
-                Excluir
-              </button>
-              <button
-                onClick={() => setConfirmando(null)}
-                className="px-2.5 py-[5px] rounded-lg text-[11.5px] text-dim2 hover:text-tx"
-              >
-                Não
-              </button>
-            </div>
           ) : (
-            <button
-              onClick={() => setConfirmando(p.id)}
-              title="Tirar esta venda da plataforma"
-              className="grid place-items-center w-8 h-8 rounded-lg text-red/70 hover:text-red hover:bg-red/10 ml-auto"
-            >
-              <Trash2 size={15} />
-            </button>
+            // Tirar uma venda mexe no faturamento: pede confirmação.
+            <div className="flex justify-end">{lixeira(p)}</div>
           )}
         </td>
       </tr>
@@ -210,6 +220,80 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
           <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px]">fora dos cálculos</div>
         </div>
       </div>
+
+      {/* Conferir com o BlueSales — primeiro o que dá para apontar sozinho. */}
+      <Panel
+        title="Conferir com o BlueSales"
+        hint={duplicados.length > 0 ? `${duplicados.length} cliente${duplicados.length === 1 ? '' : 's'} com mais de um pedido` : 'nenhum cliente repetido'}
+      >
+        <div className="p-4 lg:p-5 flex flex-col gap-4">
+          {duplicados.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              <p className="m-0 text-[12.5px] text-dim leading-relaxed">
+                <b className="text-tx">Possíveis duplicados.</b> O mesmo cliente com mais de um pedido costuma ser venda
+                refeita: o vendedor criou de novo e excluiu a antiga no BlueSales — que continua aqui. Veja qual ainda
+                existe lá e tire a outra.
+              </p>
+              {duplicados.map((g) => (
+                <div key={g[0].id} className="rounded-[12px] border border-yel/30 bg-yel/[0.04] overflow-hidden">
+                  <div className="px-3.5 py-2 text-[12.5px] font-semibold text-tx border-b border-yel/20 flex items-center gap-2">
+                    <Copy size={13} className="text-yel shrink-0" />
+                    <span className="truncate">{g[0].cliente}</span>
+                    <span className="text-[10.5px] text-dim2 font-normal shrink-0">{g.length} pedidos</span>
+                  </div>
+                  <div className="divide-y divide-line/70">
+                    {g.map((p) => {
+                      const s = selo(p);
+                      return (
+                        <div key={p.id} className="px-3.5 py-2.5 flex items-center justify-between gap-3">
+                          <div className="min-w-0 flex items-center gap-x-3 gap-y-1 flex-wrap text-[12px]">
+                            <span className="mono font-bold text-dim">#{p.internal_id ?? '—'}</span>
+                            <span className="text-tx">{diaMes(p.data)}</span>
+                            <span className="text-dim">{planoCurto(p.produto_plano)}</span>
+                            <span className="text-dim">{p.vendedor?.trim() || '—'}</span>
+                            <span className={`text-[10.5px] border rounded-full px-[8px] py-[1px] whitespace-nowrap ${s.classe}`}>{s.texto}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="mono font-bold text-gold2 text-[12.5px]">
+                              {formatBRL(reaisToCents(Number(p.valor_agendado ?? p.valor) || 0))}
+                            </span>
+                            {lixeira(p)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="m-0 text-[12.5px] text-dim leading-relaxed">
+              <b className="text-tx">Nenhum cliente com dois pedidos</b> neste período. Se o total não bate com o
+              BlueSales, compare o agendado de cada dia abaixo com o gráfico de lá (passe o mouse em cima do dia): o dia
+              que não bate é onde está a venda a mais.
+            </p>
+          )}
+
+          {porDia.length > 0 && (
+            <div>
+              <div className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-dim2 mb-2">Agendado por dia</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {porDia.map((d) => (
+                  <div key={d.data} className="rounded-[10px] border border-line bg-card2 px-3 py-2">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-[12px] font-semibold text-tx">{diaMes(d.data)}</span>
+                      <span className="text-[10.5px] text-dim2">
+                        {d.qtd} venda{d.qtd === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <div className="mono text-[13px] font-bold text-gold2 mt-0.5">{formatBRL(reaisToCents(d.valor))}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </Panel>
 
       <Panel title="Vendas do período" hint="a lixeira tira a venda de todos os cálculos">
         <div className="overflow-x-auto">
