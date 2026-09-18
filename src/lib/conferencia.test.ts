@@ -44,11 +44,13 @@ describe('possíveis duplicados', () => {
     expect(possiveisDuplicados(pedidos, SET)).toEqual([]);
   });
 
-  it('par com um pedido antigo aparece se o novo é do período', () => {
-    const pedidos = [ped('velho', '2026-08-20', 735, 'Ana Souza'), ped('novo', '2026-09-05', 535, 'Ana Souza')];
-    expect(possiveisDuplicados(pedidos, SET)[0].map((p) => p.id)).toEqual(['velho', 'novo']);
-    // Nenhum dos dois no período: não é problema deste período.
-    expect(possiveisDuplicados(pedidos, { inicio: '2026-09-10', fim: '2026-09-17' })).toEqual([]);
+  it('recompra depois de um frustrado de outro mês NÃO é duplicado (caso Adelia)', () => {
+    // Frustrado em agosto, nova venda paga em setembro: duas vendas reais.
+    const pedidos = [
+      ped('frustrado', '2026-08-20', 735, 'Adelia Pereira', { status: 'frustrados' }),
+      ped('novo', '2026-09-11', 735, 'Adelia Pereira', { status: 'pagos' }),
+    ];
+    expect(possiveisDuplicados(pedidos, SET)).toEqual([]);
   });
 });
 

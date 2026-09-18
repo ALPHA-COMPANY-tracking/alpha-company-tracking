@@ -157,15 +157,20 @@ function nomeComparavel(nome: string | null | undefined): string {
 }
 
 /**
- * Clientes com mais de um pedido ativo, sendo pelo menos um criado no
- * período. É o caso típico de venda refeita: o vendedor cria de novo
- * (outro plano, outro valor) e exclui a antiga no BlueSales — que
- * continua aqui. Os pedidos de fora do período entram no grupo para
- * mostrar o par completo.
+ * Clientes com mais de um pedido ativo CRIADO NO PERÍODO. É o caso típico
+ * de venda refeita: o vendedor cria de novo (outro plano, outro valor) e
+ * exclui a antiga no BlueSales — que continua aqui.
+ *
+ * Só pedidos do período: o que sobra no agendado está nele. Com pedidos de
+ * fora, uma recompra legítima (frustrado em agosto, nova venda paga em
+ * setembro) aparecia como duplicado — foi o caso da Adelia em 18/09/2026,
+ * apagado por engano. Recompra dentro do período ainda aparece; a tela
+ * avisa quando o grupo tem frustrado.
  */
 export function possiveisDuplicados(todos: Pedido[], periodo: Periodo): Pedido[][] {
   const grupos = new Map<string, Pedido[]>();
   for (const p of pedidosAtivos(todos)) {
+    if (!isDentro(p.data, periodo.inicio, periodo.fim)) continue;
     const chave = nomeComparavel(p.cliente);
     if (chave.length < 4) continue; // sem nome não dá para casar
     const g = grupos.get(chave);
@@ -173,7 +178,7 @@ export function possiveisDuplicados(todos: Pedido[], periodo: Periodo): Pedido[]
     else grupos.set(chave, [p]);
   }
   return [...grupos.values()]
-    .filter((g) => g.length > 1 && g.some((p) => isDentro(p.data, periodo.inicio, periodo.fim)))
+    .filter((g) => g.length > 1)
     .map((g) => g.sort((a, b) => a.data.localeCompare(b.data) || (a.internal_id ?? 0) - (b.internal_id ?? 0)))
     .sort((a, b) => b[b.length - 1].data.localeCompare(a[a.length - 1].data));
 }

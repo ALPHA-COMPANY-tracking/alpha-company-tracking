@@ -231,8 +231,8 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
             <div className="flex flex-col gap-3">
               <p className="m-0 text-[12.5px] text-dim leading-relaxed">
                 <b className="text-tx">Possíveis duplicados.</b> O mesmo cliente com mais de um pedido costuma ser venda
-                refeita: o vendedor criou de novo e excluiu a antiga no BlueSales — que continua aqui. Veja qual ainda
-                existe lá e tire a outra.
+                refeita: o vendedor criou de novo e excluiu a antiga no BlueSales — que continua aqui. Procure o
+                #número no BlueSales e só tire o que <b className="text-tx">não existir mais lá</b>.
               </p>
               {duplicados.map((g) => (
                 <div key={g[0].id} className="rounded-[12px] border border-yel/30 bg-yel/[0.04] overflow-hidden">
@@ -241,6 +241,12 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
                     <span className="truncate">{g[0].cliente}</span>
                     <span className="text-[10.5px] text-dim2 font-normal shrink-0">{g.length} pedidos</span>
                   </div>
+                  {g.some((p) => statusBucket(p.status) === 'frustrado') && (
+                    <div className="px-3.5 py-2 text-[11.5px] text-yel/90 bg-yel/[0.05] border-b border-yel/20">
+                      Tem um frustrado: pode ser <b>recompra</b> (a entrega falhou e ela comprou de novo) — aí as duas vendas
+                      são reais. Só apague se o pedido não existir mais no BlueSales.
+                    </div>
+                  )}
                   <div className="divide-y divide-line/70">
                     {g.map((p) => {
                       const s = selo(p);
