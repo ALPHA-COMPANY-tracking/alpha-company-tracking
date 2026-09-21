@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { Check, Info, Pencil, Receipt, X, Zap } from 'lucide-react';
 import type { AfterpayDaily, Periodo } from '@/types';
 import { formatBRL, reaisToCents } from '@/lib/money';
-import { pagamentosPorDia, taxasPorDia } from '@/lib/taxas';
+import { diasDaTabelaDeTaxas, pagamentosPorDia } from '@/lib/taxas';
+import { hojeIso } from '@/lib/dates';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
 import { MoneyInput } from '@/components/MoneyInput';
@@ -11,6 +12,12 @@ import { MoneyInput } from '@/components/MoneyInput';
 function diaMes(iso: string): string {
   const [, m, d] = iso.split('-');
   return `${d}/${m}`;
+}
+
+/** 'YYYY-MM-DD' → 'seg', 'ter'… — ajuda a achar o dia na lista do mês. */
+function diaDaSemana(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
 }
 
 function zeroDaily(data: string): AfterpayDaily {
@@ -28,8 +35,10 @@ export function TaxasScreen({ periodo }: { periodo: Periodo }) {
   const [editando, setEditando] = useState<string | null>(null);
   const [rascunho, setRascunho] = useState(0);
 
-  const linhas = useMemo(() => taxasPorDia(pedidos, dailies, periodo), [pedidos, dailies, periodo]);
+  // Todos os dias (1 ao 30/31 em "Este mês"), como uma planilha do mês.
+  const linhas = useMemo(() => diasDaTabelaDeTaxas(pedidos, dailies, periodo), [pedidos, dailies, periodo]);
   const porDia = useMemo(() => pagamentosPorDia(pedidos, periodo), [pedidos, periodo]);
+  const hoje = hojeIso();
 
   const total = linhas.reduce((s, l) => s + l.cents, 0);
   const pagamentos = linhas.reduce((s, l) => s + l.qtd_pagamentos, 0);
@@ -109,9 +118,20 @@ export function TaxasScreen({ periodo }: { periodo: Periodo }) {
                   // Dia que já veio taxado pelo BlueSales não se edita aqui:
                   // o valor está preso a cada pagamento.
                   const automatico = l.fonte === 'pagamento';
+                  const futuro = l.data > hoje;
+                  const semPagamento = l.qtd_pagamentos === 0;
                   return (
-                    <tr key={l.data} className="border-t border-line/70 hover:bg-white/[0.015]">
-                      <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-tx font-medium whitespace-nowrap">{diaMes(l.data)}</td>
+                    <tr
+                      key={l.data}
+                      className={`border-t border-line/70 hover:bg-white/[0.015] ${futuro ? 'opacity-40' : ''} ${
+                        l.data === hoje ? 'bg-gold/[0.04]' : ''
+                      }`}
+                    >
+                      <td className="px-3 lg:px-5 py-3 lg:py-3.5 whitespace-nowrap">
+                        <span className="text-tx font-medium">{diaMes(l.data)}</span>
+                        <span className="ml-2 text-[10.5px] text-dim2">{diaDaSemana(l.data)}</span>
+                        {l.data === hoje && <span className="ml-2 text-[10px] font-bold text-gold uppercase tracking-wide">hoje</span>}
+                      </td>
                       <td className="px-2 sm:px-3 lg:px-5 py-3.5 lg:py-4 text-right text-dim mono">{l.qtd_pagamentos}</td>
                       <td className="hidden sm:table-cell px-3 lg:px-5 py-3.5 lg:py-4 text-right text-dim mono">{formatBRL(reaisToCents(receita))}</td>
                       <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-right">
@@ -122,17 +142,22 @@ export function TaxasScreen({ periodo }: { periodo: Periodo }) {
                         ) : (
                           <div>
                             <span className={`mono font-bold ${l.fonte === 'ausente' ? 'text-dim2' : 'text-red'}`}>
-                              {formatBRL(l.cents)}
+                              {futuro ? '—' : formatBRL(l.cents)}
                             </span>
                             <div className="text-[10px] text-dim2 mt-[2px] flex items-center justify-end gap-1">
-                              {automatico ? (
+                              {futuro ? (
+                                'ainda não chegou'
+                              ) : automatico ? (
                                 <>
                                   <Zap size={10} className="text-grn" />
                                   automático · {l.qtd_com_taxa} de {l.qtd_pagamentos}
                                 </>
                               ) : l.fonte === 'dia' ? (
                                 'lançado por você'
+                              ) : semPagamento ? (
+                                'não lançada'
                               ) : (
+                                // Dia com pagamento e sem taxa: é o que desalinha a comissão.
                                 <span className="text-yel">não lançada</span>
                               )}
                             </div>
@@ -159,7 +184,7 @@ export function TaxasScreen({ periodo }: { periodo: Periodo }) {
                           </div>
                         ) : automatico ? (
                           <span className="hidden sm:inline text-[10.5px] text-dim2">vem do BlueSales</span>
-                        ) : (
+                        ) : futuro ? null : (
                           <button
                             onClick={() => abrir(l.data, l.cents)}
                             title="Lançar a taxa deste dia"

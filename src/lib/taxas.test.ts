@@ -5,7 +5,7 @@
 // novos (taxa por pagamento) some os dois sem contar nada duas vezes.
 import { describe, expect, it } from 'vitest';
 import type { AfterpayDaily, Pedido, Periodo } from '@/types';
-import { taxasDoPeriodo, taxasPorDia } from '@/lib/taxas';
+import { diasDaTabelaDeTaxas, taxasDoPeriodo, taxasPorDia } from '@/lib/taxas';
 import { calcularPnl } from '@/lib/pnl';
 
 const periodo: Periodo = { inicio: '2026-08-01', fim: '2026-08-31' };
@@ -81,6 +81,43 @@ describe('taxasPorDia', () => {
     ];
     const total = taxasDoPeriodo(pedidos, [daily('2026-08-14', 5), daily('2026-08-28', 99)], periodo);
     expect(total).toBe(500 + 250); // R$ 7,50
+  });
+});
+
+describe('tabela de lançamento: todos os dias', () => {
+  it('"Este mês" (01 a 21/09) mostra do dia 1 ao 30, em ordem', () => {
+    const dias = diasDaTabelaDeTaxas(
+      [pago('a', 735, '2026-09-15')],
+      [daily('2026-09-11', 10, true)],
+      { inicio: '2026-09-01', fim: '2026-09-21' },
+    );
+    expect(dias).toHaveLength(30);
+    expect(dias[0].data).toBe('2026-09-01');
+    expect(dias[29].data).toBe('2026-09-30');
+    // Dia sem nada lançado aparece zerado, esperando o lançamento.
+    expect(dias[0]).toMatchObject({ cents: 0, fonte: 'ausente', qtd_pagamentos: 0 });
+    // Os dias com dado continuam com o dado.
+    expect(dias.find((d) => d.data === '2026-09-11')).toMatchObject({ cents: 1_000, fonte: 'dia' });
+    expect(dias.find((d) => d.data === '2026-09-15')?.qtd_pagamentos).toBe(1);
+  });
+
+  it('mês de 31 dias vai até o 31', () => {
+    expect(diasDaTabelaDeTaxas([], [], { inicio: '2026-08-01', fim: '2026-08-10' })).toHaveLength(31);
+  });
+
+  it('período que não começa no dia 1 (7D, 30D) mostra só os seus dias', () => {
+    const dias = diasDaTabelaDeTaxas([], [], { inicio: '2026-09-15', fim: '2026-09-21' });
+    expect(dias.map((d) => d.data)).toEqual([
+      '2026-09-15', '2026-09-16', '2026-09-17', '2026-09-18', '2026-09-19', '2026-09-20', '2026-09-21',
+    ]);
+  });
+
+  it('o total não muda: dia vazio soma zero', () => {
+    const pedidos = [pago('a', 735, '2026-09-15')];
+    const dailies = [daily('2026-09-11', 10, true)];
+    const p = { inicio: '2026-09-01', fim: '2026-09-21' };
+    const soma = diasDaTabelaDeTaxas(pedidos, dailies, p).reduce((s, d) => s + d.cents, 0);
+    expect(soma).toBe(taxasDoPeriodo(pedidos, dailies, p));
   });
 });
 

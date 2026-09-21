@@ -19,7 +19,7 @@
 import type { AfterpayDaily, Pedido, Periodo } from '@/types';
 import type { Cents } from '@/lib/money';
 import { reaisToCents } from '@/lib/money';
-import { isDentro } from '@/lib/dates';
+import { diasDoPeriodo, isDentro, parseYmd, ultimoDiaMes } from '@/lib/dates';
 import { dataAprovacaoPedido, pedidosAtivos, statusBucket } from '@/lib/pedidos';
 
 /** De onde saiu a taxa que está valendo para um dia. */
@@ -99,6 +99,26 @@ export function taxasPorDia(pedidos: Pedido[], dailies: AfterpayDaily[], periodo
         qtd_com_taxa: 0,
       };
     });
+}
+
+/**
+ * Todos os dias da tabela de lançamento, em ordem (1, 2, 3…), com ou sem
+ * pagamento — para lançar a taxa dia a dia como numa planilha do mês.
+ *
+ * Período que começa no dia 1 e termina no mesmo mês ("Este mês") vai até
+ * o último dia do mês: o mês inteiro fica à vista, os dias que ainda não
+ * chegaram aparecem esperando. Os outros períodos mostram só os seus dias.
+ */
+export function diasDaTabelaDeTaxas(pedidos: Pedido[], dailies: AfterpayDaily[], periodo: Periodo): TaxaDoDia[] {
+  const ini = parseYmd(periodo.inicio);
+  const fim = parseYmd(periodo.fim);
+  const mesInteiro = ini.d === 1 && ini.y === fim.y && ini.m === fim.m;
+  const ultimo = mesInteiro ? ultimoDiaMes(fim.y, fim.m) : periodo.fim;
+
+  const lancados = new Map(taxasPorDia(pedidos, dailies, periodo).map((t) => [t.data, t]));
+  return diasDoPeriodo(periodo.inicio, ultimo).map(
+    (data) => lancados.get(data) ?? { data, cents: 0, fonte: 'ausente', qtd_pagamentos: 0, qtd_com_taxa: 0 },
+  );
 }
 
 /** Total de taxa de plataforma do período. */
