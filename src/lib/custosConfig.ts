@@ -93,18 +93,21 @@ export function planosSemCusto(pedidos: Pedido[], periodo: Periodo): string[] {
   return [...achados].sort();
 }
 
-/** O pacote volta para a empresa: devolvido, voltando, aguardando devolução. */
-const PRODUTO_VOLTA = /devol|voltand|retorn/;
+/** O produto não se perde: devolvido, voltando, aguardando devolução, cancelado. */
+const PRODUTO_VOLTA = /devol|voltand|retorn|cancel/;
 
 /**
  * Perda REAL de um pedido frustrado, em reais.
  *
  * O valor do pedido é a receita que não entrou — não o dinheiro que saiu.
- * O que se perde de fato:
- *   · o produto VOLTOU (devolvido, voltando, aguardando devolução) → só o
- *     frete, que foi gasto e não volta (regra do Jonas, 21/09/2026);
- *   · o produto NÃO volta (roubo, frustrado, cancelado…) → produto + frete.
- * Um ajuste manual (`perda_real`) tem prioridade sobre os dois.
+ * O que se perde de fato (regras do Jonas, 21/09/2026):
+ *   · o produto VOLTA (devolvido, voltando, aguardando devolução) ou o
+ *     pedido foi CANCELADO "c/ custo" (a cliente não pagou o frete) → só o
+ *     frete;
+ *   · o produto NÃO volta (roubo, frustrado…) → produto + frete;
+ *   · "Cancelado s/ Custo" no BlueSales (não saiu, ou a cliente pagou ida e
+ *     volta) → zero: marcado na tela Frustrados, vira perda_real = 0.
+ * Um ajuste manual (`perda_real`) tem prioridade sobre tudo.
  */
 export function perdaRealDePedido(p: Pedido): number {
   if (p.perda_real != null) return Number(p.perda_real) || 0;

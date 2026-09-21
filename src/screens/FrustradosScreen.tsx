@@ -25,10 +25,10 @@ function planoCurto(plano?: string | null): string {
   return `${m[1]} pote${m[1] === '1' ? '' : 's'}`;
 }
 
-/** Devolvido, voltando, aguardando devolução: o produto retorna ao estoque. */
+/** Devolvido, voltando, aguardando devolução, cancelado: o produto não se perde. */
 function produtoVolta(p: Pedido): boolean {
   const m = motivoFrustracao(p);
-  return m === 'devolvido' || m === 'voltando' || m === 'aguardando_devolucao';
+  return m === 'devolvido' || m === 'voltando' || m === 'aguardando_devolucao' || m === 'cancelado';
 }
 
 export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
@@ -137,6 +137,7 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
                   const perda = perdaRealDePedido(p);
                   const cogs = custoProdutoDoPlano(p.produto_plano);
                   const ajustado = p.perda_real != null;
+                  const semCusto = ajustado && Number(p.perda_real) === 0;
                   const emEdicao = editando === p.id;
                   return (
                     <tr key={p.id} className="border-t border-line/70 hover:bg-white/[0.015]">
@@ -163,15 +164,36 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
                           </div>
                         ) : (
                           <div>
-                            <span className={`mono font-bold ${ajustado ? 'text-yel' : 'text-red'}`}>
+                            <span className={`mono font-bold ${semCusto ? 'text-dim' : ajustado ? 'text-yel' : 'text-red'}`}>
                               {formatBRL(reaisToCents(perda))}
                             </span>
                             <div className="text-[10px] text-dim2 mt-[2px]">
-                              {ajustado
-                                ? 'ajustado por você'
-                                : produtoVolta(p)
-                                  ? `só o frete — o produto volta`
-                                  : `produto ${formatBRL(reaisToCents(cogs))} + frete ${formatBRL(reaisToCents(FRETE_POR_PEDIDO))}`}
+                              {semCusto
+                                ? 'sem custo — não saiu ou a cliente pagou o frete'
+                                : ajustado
+                                  ? 'ajustado por você'
+                                  : produtoVolta(p)
+                                    ? `só o frete — o produto não se perde`
+                                    : `produto ${formatBRL(reaisToCents(cogs))} + frete ${formatBRL(reaisToCents(FRETE_POR_PEDIDO))}`}
+                            </div>
+                            {/* As mesmas etiquetas do BlueSales: "Cancelado c/ Custo"
+                                (a cliente não pagou o frete) e "s/ Custo" (não saiu,
+                                ou a cliente pagou ida e volta → perda zero). */}
+                            <div className="inline-flex mt-1.5 rounded-full border border-line2 overflow-hidden text-[10px]">
+                              <button
+                                onClick={() => definirPerdaPedido(p.id, null)}
+                                title="Cancelado com custo: a cliente não pagou o frete"
+                                className={`px-2 py-[2px] ${!ajustado ? 'bg-red/15 text-red font-semibold' : 'text-dim2 hover:text-tx'}`}
+                              >
+                                c/ custo
+                              </button>
+                              <button
+                                onClick={() => definirPerdaPedido(p.id, 0)}
+                                title="Cancelado sem custo: não saiu, ou a cliente pagou o frete de ida e volta"
+                                className={`px-2 py-[2px] border-l border-line2 ${semCusto ? 'bg-white/10 text-tx font-semibold' : 'text-dim2 hover:text-tx'}`}
+                              >
+                                s/ custo
+                              </button>
                             </div>
                           </div>
                         )}
@@ -227,10 +249,11 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
       <div className="flex items-start gap-3 rounded-[12px] border border-line2 bg-card2 px-4 py-[13px]">
         <TriangleAlert size={16} className="text-yel shrink-0 mt-[2px]" />
         <p className="m-0 text-[12.5px] text-dim leading-relaxed">
-          A perda é o dinheiro que de fato saiu: <b className="text-dim">só o frete</b> quando o produto volta (devolvido,
-          voltando, aguardando devolução) e <b className="text-dim">produto + frete</b> quando não volta (roubo, frustrado,
-          cancelado). Se um caso for diferente, ajuste no lápis. O total daqui é o que aparece como
-          <b className="text-dim"> “Valor real perdido”</b> na Demonstração de Resultados.
+          A perda é o dinheiro que de fato saiu: <b className="text-dim">só o frete</b> quando o produto não se perde
+          (devolvido, voltando, aguardando devolução, cancelado c/ custo) e <b className="text-dim">produto + frete</b>{' '}
+          quando se perde (roubo, frustrado). Marque <b className="text-dim">s/ custo</b> como no BlueSales quando o
+          pedido não saiu ou a cliente pagou o frete de ida e volta — a perda fica zero. O total daqui é o que aparece
+          como <b className="text-dim"> “Valor real perdido”</b> na Demonstração de Resultados.
         </p>
       </div>
     </div>

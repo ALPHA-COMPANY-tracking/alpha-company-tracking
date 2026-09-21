@@ -40,6 +40,16 @@ describe('perdaRealDePedido', () => {
   it('ajuste de zero é respeitado (nada foi perdido)', () => {
     expect(perdaRealDePedido(frustrado('a', 735, '6 POTE', 0))).toBe(0);
   });
+
+  it('produto não se perde (devolvido, voltando, aguardando devolução, cancelado c/ custo): só o frete', () => {
+    for (const status of ['devolvido', 'voltando', 'aguardando_devolucao', 'cancelados'])
+      expect(perdaRealDePedido({ ...frustrado('a', 735, '6 POTE'), status })).toBe(33);
+    expect(perdaRealDePedido({ ...frustrado('a', 735, '6 POTE'), status: 'roubo' })).toBe(116); // roubado: produto + frete
+  });
+
+  it('"Cancelado s/ Custo" (marcado na tela) = perda zero', () => {
+    expect(perdaRealDePedido({ ...frustrado('a', 735, '6 POTE', 0), status: 'devolvido' })).toBe(0);
+  });
 });
 
 describe('frustrados no P&L', () => {

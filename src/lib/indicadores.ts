@@ -78,7 +78,7 @@ export const MOTIVOS: { id: MotivoFrustracao; rotulo: string; nota: string }[] =
   { id: 'devolvido', rotulo: 'Devolvidos', nota: 'o produto já voltou · perde o frete' },
   { id: 'voltando', rotulo: 'Voltando', nota: 'o pacote está retornando · perde o frete' },
   { id: 'aguardando_devolucao', rotulo: 'Aguardando devolução', nota: 'a cliente vai devolver · perde o frete' },
-  { id: 'cancelado', rotulo: 'Cancelados', nota: 'cancelados no BlueSales' },
+  { id: 'cancelado', rotulo: 'Cancelados', nota: 'c/ custo perde o frete · s/ custo, nada' },
   { id: 'roubo', rotulo: 'Roubados', nota: 'roubo ou furto na entrega' },
   { id: 'frustrado', rotulo: 'Frustrados', nota: 'recusou ou não pagou' },
   { id: 'outros', rotulo: 'Outros', nota: 'extravio, sinistro, recusa' },
