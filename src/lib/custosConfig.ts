@@ -93,16 +93,23 @@ export function planosSemCusto(pedidos: Pedido[], periodo: Periodo): string[] {
   return [...achados].sort();
 }
 
+/** O pacote volta para a empresa: devolvido, voltando, aguardando devolução. */
+const PRODUTO_VOLTA = /devol|voltand|retorn/;
+
 /**
  * Perda REAL de um pedido frustrado, em reais.
  *
  * O valor do pedido é a receita que não entrou — não o dinheiro que saiu.
- * O que se perde de fato é o produto enviado + o frete de ida. Um ajuste
- * manual (`perda_real`) tem prioridade: cobre casos como o produto ter
- * voltado, onde só o frete foi perdido.
+ * O que se perde de fato:
+ *   · o produto VOLTOU (devolvido, voltando, aguardando devolução) → só o
+ *     frete, que foi gasto e não volta (regra do Jonas, 21/09/2026);
+ *   · o produto NÃO volta (roubo, frustrado, cancelado…) → produto + frete.
+ * Um ajuste manual (`perda_real`) tem prioridade sobre os dois.
  */
 export function perdaRealDePedido(p: Pedido): number {
   if (p.perda_real != null) return Number(p.perda_real) || 0;
+  const status = (p.status ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  if (PRODUTO_VOLTA.test(status)) return FRETE_POR_PEDIDO;
   return custoProdutoDoPlano(p.produto_plano) + FRETE_POR_PEDIDO;
 }
 

@@ -25,6 +25,12 @@ function planoCurto(plano?: string | null): string {
   return `${m[1]} pote${m[1] === '1' ? '' : 's'}`;
 }
 
+/** Devolvido, voltando, aguardando devolução: o produto retorna ao estoque. */
+function produtoVolta(p: Pedido): boolean {
+  const m = motivoFrustracao(p);
+  return m === 'devolvido' || m === 'voltando' || m === 'aguardando_devolucao';
+}
+
 export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
   const { pedidos, definirPerdaPedido } = useData();
   const [editando, setEditando] = useState<string | null>(null);
@@ -47,6 +53,7 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
     (m) => m.id !== 'outros' || m.qtd > 0,
   );
   const rotuloMotivo = Object.fromEntries(MOTIVOS.map((m) => [m.id, m.rotulo]));
+  const dosCorreios = frustrados.filter((p) => p.passou_correios).length;
 
   function abrir(p: Pedido) {
     setEditando(p.id);
@@ -63,7 +70,7 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
       <div>
         <h1 className="text-[21px] lg:text-[26px] font-extrabold text-tx tracking-tight">Frustrados</h1>
         <p className="text-[13px] text-dim mt-0.5">
-          Quanto os pedidos não pagos realmente custaram — produto enviado + frete, não o valor da venda
+          Quanto os pedidos não pagos realmente custaram — o frete e o produto que não voltou, não o valor da venda
         </p>
       </div>
 
@@ -86,8 +93,8 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
         </div>
       </div>
 
-      {/* Por motivo */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+      {/* Por motivo — as mesmas etapas do BlueSales */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 -mb-3">
         {porMotivo.map((m) => (
           <div
             key={m.id}
@@ -98,6 +105,10 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
             <div className="text-[9.5px] text-dim2 leading-snug">{m.nota}</div>
           </div>
         ))}
+      </div>
+      <div className="text-[11.5px] text-dim px-1">
+        Desses, <b className="text-tx">{dosCorreios}</b> {dosCorreios === 1 ? 'veio' : 'vieram'} da retirada nos Correios
+        (a cliente não buscou) — já contados acima.
       </div>
 
       <Panel title="Pedidos frustrados no período" hint="clique no lápis para ajustar a perda">
@@ -141,6 +152,7 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
                         <span className="text-[10.5px] border rounded-full px-[8px] py-[2px] whitespace-nowrap text-red border-red/35 bg-red/10">
                           {rotuloMotivo[motivoFrustracao(p)]}
                         </span>
+                        {p.passou_correios && <div className="text-[10px] text-dim2 mt-1">dos Correios</div>}
                       </td>
                       <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-dim">{planoCurto(p.produto_plano)}</td>
                       <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-right text-dim mono">{formatBRL(reaisToCents(Number(p.valor) || 0))}</td>
@@ -155,7 +167,11 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
                               {formatBRL(reaisToCents(perda))}
                             </span>
                             <div className="text-[10px] text-dim2 mt-[2px]">
-                              {ajustado ? 'ajustado por você' : `produto ${formatBRL(reaisToCents(cogs))} + frete ${formatBRL(reaisToCents(FRETE_POR_PEDIDO))}`}
+                              {ajustado
+                                ? 'ajustado por você'
+                                : produtoVolta(p)
+                                  ? `só o frete — o produto volta`
+                                  : `produto ${formatBRL(reaisToCents(cogs))} + frete ${formatBRL(reaisToCents(FRETE_POR_PEDIDO))}`}
                             </div>
                           </div>
                         )}
@@ -211,8 +227,9 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
       <div className="flex items-start gap-3 rounded-[12px] border border-line2 bg-card2 px-4 py-[13px]">
         <TriangleAlert size={16} className="text-yel shrink-0 mt-[2px]" />
         <p className="m-0 text-[12.5px] text-dim leading-relaxed">
-          Por padrão a perda é <b className="text-dim">custo do produto + frete de ida</b> — o dinheiro que de fato saiu.
-          Se num caso o produto voltou e você só perdeu o frete, ajuste no lápis. O total daqui é o que aparece como
+          A perda é o dinheiro que de fato saiu: <b className="text-dim">só o frete</b> quando o produto volta (devolvido,
+          voltando, aguardando devolução) e <b className="text-dim">produto + frete</b> quando não volta (roubo, frustrado,
+          cancelado). Se um caso for diferente, ajuste no lápis. O total daqui é o que aparece como
           <b className="text-dim"> “Valor real perdido”</b> na Demonstração de Resultados.
         </p>
       </div>

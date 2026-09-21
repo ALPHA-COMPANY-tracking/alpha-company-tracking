@@ -36,15 +36,33 @@ describe('situação do pedido', () => {
     expect(situacaoDoPedido('confirmados')).toBe('rota'); // etapa nova de 21/09: antes do envio
   });
 
-  it('motivo: quem passou por "Retirar nos Correios" e voltou conta como Correios', () => {
-    expect(motivoFrustracao({ status: 'aguardando_devolucao', passou_correios: true })).toBe('correios');
-    expect(motivoFrustracao({ status: 'devolvido', passou_correios: true })).toBe('correios');
-    expect(motivoFrustracao({ status: 'aguardando_devolucao' })).toBe('aguardando_devolucao');
+  it('motivo segue a etapa do BlueSales, inclusive "Voltando"', () => {
     expect(motivoFrustracao({ status: 'devolvido' })).toBe('devolvido');
-    expect(motivoFrustracao({ status: 'roubo', passou_correios: true })).toBe('roubo'); // roubo é roubo
+    expect(motivoFrustracao({ status: 'voltando' })).toBe('voltando');
+    expect(motivoFrustracao({ status: 'aguardando_devolucao' })).toBe('aguardando_devolucao');
     expect(motivoFrustracao({ status: 'cancelados' })).toBe('cancelado');
+    expect(motivoFrustracao({ status: 'roubo' })).toBe('roubo');
     expect(motivoFrustracao({ status: 'frustrados' })).toBe('frustrado');
     expect(motivoFrustracao({ status: 'extraviado' })).toBe('outros');
+    expect(situacaoDoPedido('voltando')).toBe('frustracao');
+  });
+
+  it('BlueSales 21/09: Devolvido 6, Voltando 8, Aguard. Devolução 2 — todos frustrados', () => {
+    const todos: Pedido[] = [
+      ...Array.from({ length: 6 }, () => ped('devolvido', '2026-08-20')),
+      ...Array.from({ length: 8 }, (_, i) => ped('voltando', '2026-08-25', { passou_correios: i < 7 })),
+      ...Array.from({ length: 2 }, () => ped('aguardando_devolucao', '2026-08-27')),
+    ];
+    const ago = { inicio: '2026-08-01', fim: '2026-08-31' };
+    const ind = calcularIndicadores([], [], todos, ago);
+    const qtd = Object.fromEntries(ind.frustracao_por_motivo.map((f) => [f.motivo, f.qtd]));
+    expect(qtd).toMatchObject({ devolvido: 6, voltando: 8, aguardando_devolucao: 2 });
+    expect(ind.situacao.frustracao.qtd).toBe(16);
+    // 7 dos que estão voltando tinham ido para a retirada nos Correios.
+    expect(ind.vieram_dos_correios.qtd).toBe(7);
+    // O produto volta: a perda é só o frete (R$ 33) em cada um.
+    expect(ind.projecao.perda_frustracao).toBe(16 * 3_300);
+    expect(calcularPnl([], [], ago, {}, todos).qtd_frustrados).toBe(16);
   });
 
   it('card de Frustrados igual ao BlueSales (setembro/2026: 5 pedidos, R$ 3.675)', () => {
@@ -109,14 +127,14 @@ describe('indicadores', () => {
     // Os seis motivos aparecem sempre, mesmo zerados; "Outros" só com pedido.
     expect(ind.frustracao_por_motivo.map((f) => f.motivo)).toEqual([
       'devolvido',
+      'voltando',
+      'aguardando_devolucao',
       'cancelado',
       'roubo',
-      'aguardando_devolucao',
-      'correios',
       'frustrado',
     ]);
     const qtd = Object.fromEntries(ind.frustracao_por_motivo.map((f) => [f.motivo, f.qtd]));
-    expect(qtd).toMatchObject({ devolvido: 1, frustrado: 1, cancelado: 0, roubo: 0, correios: 0 });
+    expect(qtd).toMatchObject({ devolvido: 1, frustrado: 1, cancelado: 0, roubo: 0, voltando: 0 });
   });
 
   it('taxa de recebimento vem só dos pedidos já resolvidos', () => {
@@ -131,7 +149,8 @@ describe('indicadores', () => {
     expect(pr.rota.valor).toBe(73_500 + 53_500);
     expect(pr.a_receber).toBe(Math.round(127_000 * 0.7));
     expect(pr.envio_rota).toBe(8_300 + 3_300 + 4_100 + 3_300);
-    expect(pr.perda_frustracao).toBe(2 * (8_300 + 3_300));
+    // Frustrado: produto + frete. Devolvido: o produto voltou, só o frete.
+    expect(pr.perda_frustracao).toBe(8_300 + 3_300 + 3_300);
     expect(pr.lucro_real).toBe(calcularPnl(dailies, [], P, {}, pedidos).lucro_real);
     expect(pr.lucro_projetado).toBe(pr.lucro_real - pr.perda_frustracao + pr.a_receber - pr.comissoes - pr.envio_rota);
   });

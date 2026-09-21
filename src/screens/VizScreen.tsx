@@ -180,7 +180,7 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
             <Linha rotulo="Lucro real até agora" nota="o mesmo da Demonstração de Resultados" cents={pr.lucro_real} sinal="=" />
             <Linha
               rotulo="Perda da frustração"
-              nota="produto + frete dos pedidos frustrados, devolvidos…"
+              nota="frete de todos + produto dos que não voltam"
               cents={-pr.perda_frustracao}
               sinal="−"
             />
@@ -249,7 +249,7 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
               <div className="mono text-[17px] lg:text-[20px] font-extrabold text-red tracking-tight leading-tight mt-1">
                 {formatBRL(pr.perda_frustracao)}
               </div>
-              <div className="text-[10.5px] text-dim2 leading-snug">produto + frete que saíram</div>
+              <div className="text-[10.5px] text-dim2 leading-snug">frete + produto que não voltou</div>
             </div>
           </div>
           {/* Todos os motivos, sempre — zerado também é informação. */}
@@ -290,6 +290,17 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
                 </div>
               );
             })}
+            {/* Recorte, não motivo: já está somado nas linhas acima. */}
+            <div className="px-[18px] py-3 flex items-center justify-between gap-3 bg-card2">
+              <div className="min-w-0">
+                <div className="text-[12.5px] text-tx">Desses, vieram da retirada nos Correios</div>
+                <div className="text-[10.5px] text-dim2">a cliente não buscou o pacote · já contados acima</div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="mono text-[13px] font-bold text-tx">{ind.vieram_dos_correios.qtd}</div>
+                <div className="mono text-[10.5px] text-dim2">{formatBRL(ind.vieram_dos_correios.valor)}</div>
+              </div>
+            </div>
           </div>
           <div className="px-[18px] py-3 border-t border-line flex items-start gap-2 text-[11px] text-dim2 leading-relaxed">
             <Wallet size={13} className="text-gold shrink-0 mt-[2px]" />

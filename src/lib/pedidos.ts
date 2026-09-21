@@ -27,7 +27,9 @@ const APROVADO = new Set(['pagos', 'pago']);
 // Só "frustrados" deixava roubo, devolução e cancelamento de fora.
 // Por padrão de texto: etapa nova com uma dessas palavras já entra.
 // (Negociação, Atenção, Cobrados, Enviados etc. seguem como pipeline.)
-const FRUSTRADO = /frustr|devol|roub|furt|extravi|sinistr|recus|cancel/;
+// "Voltando" entrou em 21/09/2026: o BlueSales passou a usar essa etapa
+// para o pacote que está retornando (8 pedidos, a maioria dos Correios).
+const FRUSTRADO = /frustr|devol|voltand|retorn|roub|furt|extravi|sinistr|recus|cancel/;
 
 export function statusBucket(status: string | null | undefined): 'aprovado' | 'frustrado' | 'pipeline' {
   const s = norm(status);
