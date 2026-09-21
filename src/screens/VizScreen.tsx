@@ -25,13 +25,50 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
   const { dailies, custos, pedidos } = useData();
   const ind = useMemo(() => calcularIndicadores(dailies, custos, pedidos, periodo), [dailies, custos, pedidos, periodo]);
   const pr = ind.projecao;
+  const sit = ind.situacao;
   const faixa = `${formatDiaMes(periodo.inicio)} a ${formatDiaMes(periodo.fim)}`;
-  const totalSafra = ind.safra.pago.qtd + ind.safra.aberto.qtd + ind.safra.frustracao.qtd;
+  const deAntes = ind.qtd_pagamentos - ind.pagos_da_safra;
 
-  const fatias = [
-    { id: 'pago', nome: 'Pagos', qtd: ind.safra.pago.qtd, pct: ind.pct_pagos, cor: 'bg-grn', texto: 'text-grn' },
-    { id: 'aberto', nome: 'Em aberto', qtd: ind.safra.aberto.qtd, pct: ind.pct_aberto, cor: 'bg-gold', texto: 'text-gold2' },
-    { id: 'frustracao', nome: 'Frustração', qtd: ind.safra.frustracao.qtd, pct: ind.pct_frustracao, cor: 'bg-red', texto: 'text-red' },
+  // Pagos = pagamentos do período (mesmo número do card de Pagamentos
+  // aprovados). O resto é onde estão hoje os pedidos agendados no período.
+  const blocos = [
+    {
+      id: 'pago',
+      nome: 'Pagos',
+      qtd: ind.qtd_pagamentos,
+      valor: ind.receita_aprovada,
+      nota: deAntes > 0 ? `recebidos · ${deAntes} de pedidos de antes` : 'recebidos no período',
+      cor: 'bg-grn',
+      texto: 'text-grn',
+    },
+    { id: 'rota', nome: 'Em rota', qtd: sit.rota.qtd, valor: sit.rota.valor, nota: 'a receber', cor: 'bg-gold', texto: 'text-gold2' },
+    {
+      id: 'aguardando',
+      nome: 'Entregues',
+      qtd: sit.aguardando.qtd,
+      valor: sit.aguardando.valor,
+      nota: 'entregues e cobrados, sem pagar',
+      cor: 'bg-gold3',
+      texto: 'text-tx',
+    },
+    {
+      id: 'negociacao',
+      nome: 'Negociação',
+      qtd: sit.negociacao.qtd,
+      valor: sit.negociacao.valor,
+      nota: 'e requer atenção',
+      cor: 'bg-yel',
+      texto: 'text-yel',
+    },
+    {
+      id: 'frustracao',
+      nome: 'Frustração',
+      qtd: sit.frustracao.qtd,
+      valor: sit.frustracao.valor,
+      nota: 'frustrado, devolvido…',
+      cor: 'bg-red',
+      texto: 'text-red',
+    },
   ];
 
   return (
@@ -43,7 +80,7 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
 
       {/* Agendamentos do período + onde está cada pedido hoje */}
       <section className="relative overflow-hidden rounded-card border border-gold/25 bg-gradient-to-br from-gold/[0.08] via-card to-card px-5 lg:px-7 py-5 lg:py-6">
-        <div className="flex flex-col lg:flex-row lg:items-end gap-5 lg:gap-10">
+        <div className="flex flex-col gap-5">
           <div className="shrink-0">
             <div className="text-[11px] font-bold tracking-[0.13em] uppercase text-tx2">Agendamentos do período</div>
             <div className="mono text-[32px] lg:text-[40px] font-extrabold text-gold2 tracking-tight leading-none mt-2">
@@ -55,32 +92,18 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
             </div>
           </div>
 
-          <div className="flex-1 min-w-0">
-            <div className="flex items-baseline justify-between gap-3 mb-2">
-              <span className="text-[11px] text-dim2">Onde está hoje cada pedido agendado</span>
-              <span className="text-[11px] text-dim2 mono">{totalSafra} pedidos</span>
-            </div>
-            <div className="flex h-[14px] rounded-full overflow-hidden gap-[2px] bg-trilha">
-              {fatias.map((f) =>
-                f.qtd > 0 ? <div key={f.id} className={`h-full ${f.cor}`} style={{ width: `${f.pct * 100}%` }} title={f.nome} /> : null,
-              )}
-            </div>
-            <div className="grid grid-cols-3 gap-3 mt-3">
-              {fatias.map((f) => (
-                <div key={f.id} className="min-w-0">
-                  <div className="flex items-center gap-1.5 text-[11.5px] text-dim">
-                    <i className={`w-[8px] h-[8px] rounded-[3px] inline-block ${f.cor}`} />
-                    {f.nome}
-                  </div>
-                  <div className={`mono text-[17px] lg:text-[20px] font-extrabold leading-tight mt-0.5 ${f.texto}`}>
-                    {formatPercent(f.pct)}
-                  </div>
-                  <div className="text-[10.5px] text-dim2">
-                    {f.qtd} pedido{f.qtd === 1 ? '' : 's'}
-                  </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 lg:gap-3">
+            {blocos.map((b) => (
+              <div key={b.id} className="min-w-0 rounded-[12px] border border-line bg-card/70 px-3 py-2.5">
+                <div className="flex items-center gap-1.5 text-[11px] text-dim">
+                  <i className={`w-[8px] h-[8px] rounded-[3px] inline-block shrink-0 ${b.cor}`} />
+                  <span className="truncate">{b.nome}</span>
                 </div>
-              ))}
-            </div>
+                <div className={`mono text-[20px] lg:text-[22px] font-extrabold leading-tight mt-1 ${b.texto}`}>{b.qtd}</div>
+                <div className="mono text-[11.5px] font-semibold text-tx2">{formatBRL(b.valor)}</div>
+                <div className="text-[10px] text-dim2 truncate">{b.nota}</div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -139,20 +162,20 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
           color={COR.verde}
           label="Pedidos pagos"
           value={formatPercent(ind.pct_pagos)}
-          sub={`${ind.safra.pago.qtd} de ${totalSafra} agendados`}
+          sub={`${ind.qtd_pagamentos} pagos ÷ ${ind.qtd_agendados} agendados`}
         />
         <KpiCard
           Icon={TriangleAlert}
           color={COR.vermelho}
           label="Frustração geral"
           value={formatPercent(ind.pct_frustracao)}
-          sub={`${ind.safra.frustracao.qtd} de ${totalSafra} agendados`}
+          sub={`${sit.frustracao.qtd} de ${ind.qtd_agendados} agendados`}
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
         {/* Lucro projetado */}
-        <Panel title="Lucro projetado" hint="no ritmo de pagamento da operação">
+        <Panel title="Lucro projetado" hint="só pedidos em rota">
           <div className="divide-y divide-line">
             <Linha rotulo="Lucro real até agora" nota="o mesmo da Demonstração de Resultados" cents={pr.lucro_real} sinal="=" />
             <Linha
@@ -162,18 +185,22 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
               sinal="−"
             />
             <Linha
-              rotulo="A receber"
-              nota={`${formatBRL(pr.aberto.valor)} em aberto × ${formatPercent(pr.taxa_recebimento)} de recebimento`}
+              rotulo="A receber dos pedidos em rota"
+              nota={`${pr.rota.qtd} pedidos · ${formatBRL(pr.rota.valor)} × ${formatPercent(pr.taxa_recebimento)} de recebimento`}
               cents={pr.a_receber}
               sinal="+"
             />
             <Linha rotulo="Comissões sobre o que entrar" nota="vendedor + cobrança" cents={-pr.comissoes} sinal="−" />
             <Linha
-              rotulo="Produto e frete do que está em aberto"
-              nota={`${pr.aberto.qtd} pedidos já enviados`}
-              cents={-pr.envio_aberto}
+              rotulo="Produto e frete dos pedidos em rota"
+              nota={`${pr.rota.qtd} pedidos`}
+              cents={-pr.envio_rota}
               sinal="−"
             />
+          </div>
+          <div className="px-[18px] py-2.5 border-t border-line text-[10.5px] text-dim2 leading-relaxed">
+            Fora da projeção: {sit.negociacao.qtd} em negociação/atenção, {sit.aguardando.qtd} entregues sem pagar e{' '}
+            {sit.frustracao.qtd} em frustração.
           </div>
           <div
             className={`px-[18px] py-5 border-t flex items-end justify-between gap-4 bg-gradient-to-br ${
@@ -202,13 +229,13 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
                 {formatPercent(ind.pct_frustracao)}
               </div>
               <div className="text-[12px] text-dim mt-2">
-                {ind.safra.frustracao.qtd} de {totalSafra} pedidos agendados no período
+                {sit.frustracao.qtd} de {ind.qtd_agendados} pedidos agendados no período
               </div>
             </div>
             <div className="text-right">
               <div className="text-[10.5px] text-dim2">Perda real</div>
               <div className="mono text-[17px] font-bold text-red">{formatBRL(pr.perda_frustracao)}</div>
-              <div className="text-[10.5px] text-dim2">{formatBRL(ind.safra.frustracao.valor)} em pedidos</div>
+              <div className="text-[10.5px] text-dim2">{formatBRL(sit.frustracao.valor)} em pedidos</div>
             </div>
           </div>
           {ind.frustracao_por_status.length > 0 ? (
@@ -222,7 +249,7 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="mono text-[13px] font-bold text-tx">{formatPercent(totalSafra ? f.qtd / totalSafra : 0)}</div>
+                    <div className="mono text-[13px] font-bold text-tx">{formatPercent(ind.qtd_agendados ? f.qtd / ind.qtd_agendados : 0)}</div>
                     <div className="mono text-[10.5px] text-red">perda {formatBRL(f.perda)}</div>
                   </div>
                 </div>

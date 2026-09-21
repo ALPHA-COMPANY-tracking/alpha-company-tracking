@@ -1,23 +1,22 @@
 // ─────────────────────────────────────────────────────────────
-// Indicadores da operação (tela Visualização).
+// Indicadores da operação (tela Visualização). Só dados do banco.
 //
-// Três leituras diferentes, cada uma com a sua base — misturar é o que
-// faz número "bonito" e errado:
-//
+//   · Pagos: os PAGAMENTOS do período (data do pagamento) — os mesmos
+//     números do card "Pagamentos aprovados" da Demonstração. Incluem
+//     pedidos agendados antes do período e pagos dentro dele.
 //   · Anúncio ÷ venda (CPA, ROAS): o gasto do período contra o que o
 //     período agendou ou recebeu. Mesmas regras da Demonstração.
-//   · Safra: os pedidos AGENDADOS no período e onde cada um está hoje —
-//     pago, em aberto ou em frustração (frustrado, devolvido, roubo…).
-//     É daqui que saem "% pagos" e "% de frustração".
-//   · Projeção: o lucro real de hoje + o que a safra em aberto ainda deve
-//     render, na taxa de recebimento que a operação já mostrou.
+//   · Situação dos agendados do período: em rota, aguardando pagamento,
+//     negociação/atenção e frustração (frustrado, devolvido, roubo…).
+//   · Projeção: o lucro real de hoje + o que os pedidos EM ROTA devem
+//     render. Negociação, frustrado e cobrança parada não entram.
 // ─────────────────────────────────────────────────────────────
 
 import type { AfterpayDaily, CustoVariavel, Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
 import { calcularPnl } from '@/lib/pnl';
-import { pedidosAtivos, statusBucket } from '@/lib/pedidos';
+import { dataAprovacaoPedido, pedidosAtivos, statusBucket } from '@/lib/pedidos';
 import {
   COMISSAO_COBRANCA,
   comissaoDoVendedor,
@@ -26,7 +25,7 @@ import {
   perdaRealDePedido,
 } from '@/lib/custosConfig';
 
-export type Situacao = 'pago' | 'aberto' | 'frustracao';
+export type Situacao = 'pago' | 'rota' | 'aguardando' | 'negociacao' | 'frustracao';
 
 function norm(s: string | null | undefined): string {
   return (s ?? '')
@@ -36,21 +35,30 @@ function norm(s: string | null | undefined): string {
     .toLowerCase();
 }
 
-/**
- * Tudo que é frustração da operação: frustrado, devolvido, aguardando
- * devolução, roubo/furto, extravio, sinistro, recusado. Por padrão de
- * texto: status novo do BlueSales com uma dessas palavras já entra.
- * (Negociação, Requer atenção, Entregues, Cobrados seguem EM ABERTO: o
- * pedido ainda pode ser pago.)
- */
+// Por padrão de texto: status novo do BlueSales com uma dessas palavras
+// já cai no grupo certo. A ordem importa — frustração primeiro.
 const FRUSTRACAO = /frustr|devol|roub|furt|extravi|sinistr|recus/;
+const NEGOCIACAO = /negocia|atencao/;
+const AGUARDANDO = /entregue|cobrad/;
 
+/**
+ * Onde o pedido está:
+ *   rota        → cadastrado, aguardando coleta, enviado, saiu para
+ *                 entrega, retirar nos correios: a caminho do cliente
+ *   aguardando  → entregue / cobrado: chegou, falta pagar
+ *   negociacao  → negociação, requer atenção: travado, sem previsão
+ *   frustracao  → frustrado, devolvido, aguardando devolução, roubo…
+ */
 export function situacaoDoPedido(status: string | null | undefined): Situacao {
   if (statusBucket(status) === 'aprovado') return 'pago';
-  return FRUSTRACAO.test(norm(status)) ? 'frustracao' : 'aberto';
+  const s = norm(status);
+  if (FRUSTRACAO.test(s)) return 'frustracao';
+  if (NEGOCIACAO.test(s)) return 'negociacao';
+  if (AGUARDANDO.test(s)) return 'aguardando';
+  return 'rota';
 }
 
-/** Nome do status para a tela: "aguardando_devolucao" → "Aguardando devolucao". */
+/** Nome do status para a tela: "aguardando_devolucao" → "Aguardando devolução". */
 function rotuloStatus(status: string): string {
   const s = norm(status);
   if (s === 'frustrados' || s === 'frustrado') return 'Frustrado';
@@ -78,27 +86,30 @@ export interface FrustracaoPorStatus {
 export interface Projecao {
   /** Lucro real do período — o mesmo número da Demonstração de Resultados. */
   lucro_real: Cents;
-  /** Produto + frete dos pedidos da safra que já frustraram. */
+  /** Produto + frete dos agendados do período que já frustraram. */
   perda_frustracao: Cents;
-  /** Em aberto: valor e quantidade. */
-  aberto: Fatia;
-  /** Dos pedidos que já se resolveram, quantos % pagaram. */
+  /** Pedidos em rota: valor e quantidade. */
+  rota: Fatia;
+  /** Dos pedidos que já se resolveram (pago ou frustração), quantos % pagaram. */
   taxa_recebimento: number;
   /** Quantos pedidos resolvidos sustentam a taxa. */
   base_taxa: number;
-  /** Em aberto × taxa de recebimento. */
+  /** Em rota × taxa de recebimento. */
   a_receber: Cents;
   /** Comissões (vendedor + cobrança) sobre o que deve ser recebido. */
   comissoes: Cents;
-  /** Produto + frete dos pedidos em aberto — já enviados, já pagos. */
-  envio_aberto: Cents;
+  /** Produto + frete dos pedidos em rota. */
+  envio_rota: Cents;
   lucro_projetado: Cents;
 }
 
 export interface Indicadores {
   investimento_ads: Cents;
+  /** Pagamentos do período (data do pagamento). */
   receita_aprovada: Cents;
   qtd_pagamentos: number;
+  /** Desses pagamentos, quantos são de pedidos agendados no próprio período. */
+  pagos_da_safra: number;
   valor_agendado: Cents;
   qtd_agendados: number;
 
@@ -106,19 +117,16 @@ export interface Indicadores {
   ticket_medio_real: Cents;
   /** Valor médio de um agendamento. */
   ticket_agendado: Cents;
-  /** Anúncio ÷ agendamentos. */
   cpa_agendamento: Cents;
-  /** Anúncio ÷ pagamentos. */
   cpa_pago: Cents;
-  /** Agendado ÷ anúncio. */
   roas_agendado: number;
-  /** Aprovado ÷ anúncio. */
   roas_aprovado: number;
+  /** Pagamentos do período ÷ agendamentos do período. */
+  pct_pagos: number;
 
   /** Onde está hoje cada pedido agendado no período. */
-  safra: Record<Situacao, Fatia>;
-  pct_pagos: number;
-  pct_aberto: number;
+  situacao: Record<Situacao, Fatia>;
+  /** Frustração dos agendados do período ÷ agendados do período. */
   pct_frustracao: number;
   frustracao_por_status: FrustracaoPorStatus[];
 
@@ -136,62 +144,72 @@ export function calcularIndicadores(
   const ads = pnl.investimento_ads;
   const ativos = pedidosAtivos(pedidos);
 
-  // ── Safra do período ──
-  const safra: Record<Situacao, Fatia> = {
+  // ── Situação dos agendados do período ──
+  const situacao: Record<Situacao, Fatia> = {
     pago: { qtd: 0, valor: 0 },
-    aberto: { qtd: 0, valor: 0 },
+    rota: { qtd: 0, valor: 0 },
+    aguardando: { qtd: 0, valor: 0 },
+    negociacao: { qtd: 0, valor: 0 },
     frustracao: { qtd: 0, valor: 0 },
   };
   const porStatus = new Map<string, FrustracaoPorStatus>();
-  let envio_aberto = 0;
-  let comissaoCheia = 0; // comissões se TODO o aberto for pago
+  let envio_rota = 0;
+  let comissaoCheia = 0; // comissões se TODO pedido em rota for pago
   for (const p of ativos) {
     if (!isDentro(p.data, periodo.inicio, periodo.fim)) continue;
-    const situacao = situacaoDoPedido(p.status);
+    const s = situacaoDoPedido(p.status);
     const valor = reaisToCents(Number(p.valor_agendado ?? p.valor) || 0);
-    safra[situacao].qtd += 1;
-    safra[situacao].valor += valor;
+    situacao[s].qtd += 1;
+    situacao[s].valor += valor;
 
-    if (situacao === 'frustracao') {
+    if (s === 'frustracao') {
       const chave = norm(p.status);
-      const s = porStatus.get(chave) ?? { status: chave, rotulo: rotuloStatus(chave), qtd: 0, valor: 0, perda: 0 };
-      s.qtd += 1;
-      s.valor += valor;
-      s.perda += reaisToCents(perdaRealDePedido(p));
-      porStatus.set(chave, s);
-    } else if (situacao === 'aberto') {
-      envio_aberto += reaisToCents(custoProdutoDoPlano(p.produto_plano) + FRETE_POR_PEDIDO);
+      const f = porStatus.get(chave) ?? { status: chave, rotulo: rotuloStatus(chave), qtd: 0, valor: 0, perda: 0 };
+      f.qtd += 1;
+      f.valor += valor;
+      f.perda += reaisToCents(perdaRealDePedido(p));
+      porStatus.set(chave, f);
+    } else if (s === 'rota') {
+      envio_rota += reaisToCents(custoProdutoDoPlano(p.produto_plano) + FRETE_POR_PEDIDO);
       comissaoCheia += Math.round(valor * (comissaoDoVendedor(p.vendedor) + COMISSAO_COBRANCA));
     }
   }
-  const totalSafra = safra.pago.qtd + safra.aberto.qtd + safra.frustracao.qtd;
   const frustracao_por_status = [...porStatus.values()].sort((a, b) => b.qtd - a.qtd || b.valor - a.valor);
 
+  // Dos pagamentos do período, quantos são de pedidos agendados nele
+  // (o resto é venda de antes que pagou agora).
+  const pagos_da_safra = ativos.filter(
+    (p) =>
+      statusBucket(p.status) === 'aprovado' &&
+      isDentro(p.data, periodo.inicio, periodo.fim) &&
+      isDentro(dataAprovacaoPedido(p), periodo.inicio, periodo.fim),
+  ).length;
+
   // ── Taxa de recebimento: dos pedidos já resolvidos até o fim do período,
-  // quantos pagaram. Os em aberto ficam fora: ainda não disseram nada.
+  // quantos pagaram. O que ainda não se resolveu não diz nada.
   let resolvidosPagos = 0;
   let resolvidos = 0;
   for (const p of ativos) {
     if (p.data > periodo.fim) continue;
-    const situacao = situacaoDoPedido(p.status);
-    if (situacao === 'aberto') continue;
-    resolvidos += 1;
-    if (situacao === 'pago') resolvidosPagos += 1;
+    const s = situacaoDoPedido(p.status);
+    if (s === 'pago') resolvidosPagos += 1;
+    if (s === 'pago' || s === 'frustracao') resolvidos += 1;
   }
   const taxa_recebimento = safeDiv(resolvidosPagos, resolvidos);
 
-  // ── Projeção ──
-  // Cada pedido em aberto já foi enviado: produto e frete saíram do caixa
-  // de qualquer jeito. A receita (e a comissão sobre ela) só vem se pagar.
-  const a_receber = Math.round(safra.aberto.valor * taxa_recebimento);
+  // ── Projeção: só os pedidos EM ROTA ──
+  // A receita (e a comissão sobre ela) só vem se pagar; produto e frete
+  // saem de qualquer jeito.
+  const a_receber = Math.round(situacao.rota.valor * taxa_recebimento);
   const comissoes = Math.round(comissaoCheia * taxa_recebimento);
   const perda_frustracao = frustracao_por_status.reduce((s, f) => s + f.perda, 0);
-  const lucro_projetado = pnl.lucro_real - perda_frustracao + a_receber - comissoes - envio_aberto;
+  const lucro_projetado = pnl.lucro_real - perda_frustracao + a_receber - comissoes - envio_rota;
 
   return {
     investimento_ads: ads,
     receita_aprovada: pnl.receita_aprovada,
     qtd_pagamentos: pnl.qtd_pagamentos,
+    pagos_da_safra,
     valor_agendado: pnl.valor_agendado,
     qtd_agendados: pnl.qtd_agendados,
 
@@ -201,22 +219,21 @@ export function calcularIndicadores(
     cpa_pago: pnl.qtd_pagamentos ? Math.round(ads / pnl.qtd_pagamentos) : 0,
     roas_agendado: pnl.roas,
     roas_aprovado: safeDiv(pnl.receita_aprovada, ads),
+    pct_pagos: safeDiv(pnl.qtd_pagamentos, pnl.qtd_agendados),
 
-    safra,
-    pct_pagos: safeDiv(safra.pago.qtd, totalSafra),
-    pct_aberto: safeDiv(safra.aberto.qtd, totalSafra),
-    pct_frustracao: safeDiv(safra.frustracao.qtd, totalSafra),
+    situacao,
+    pct_frustracao: safeDiv(situacao.frustracao.qtd, pnl.qtd_agendados),
     frustracao_por_status,
 
     projecao: {
       lucro_real: pnl.lucro_real,
       perda_frustracao,
-      aberto: safra.aberto,
+      rota: situacao.rota,
       taxa_recebimento,
       base_taxa: resolvidos,
       a_receber,
       comissoes,
-      envio_aberto,
+      envio_rota,
       lucro_projetado,
     },
   };

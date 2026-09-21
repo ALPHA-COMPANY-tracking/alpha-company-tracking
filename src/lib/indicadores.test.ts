@@ -25,66 +25,76 @@ const ped = (status: string, data: string, extra: Partial<Pedido> = {}): Pedido 
 });
 
 describe('situação do pedido', () => {
-  it('frustração inclui devolução, roubo e extravio; negociação segue em aberto', () => {
+  it('em rota, aguardando pagamento, negociação e frustração', () => {
     expect(situacaoDoPedido('pagos')).toBe('pago');
+    for (const s of ['cadastrados', 'aguard_coleta', 'enviados', 'saiu_para_entrega', 'retirar_nos_correios'])
+      expect(situacaoDoPedido(s)).toBe('rota');
+    for (const s of ['entregues', 'cobrados']) expect(situacaoDoPedido(s)).toBe('aguardando');
+    for (const s of ['negociação', 'requer_atencao']) expect(situacaoDoPedido(s)).toBe('negociacao');
     for (const s of ['frustrados', 'devolvido', 'aguardando_devolucao', 'Roubado', 'extraviado', 'sinistro'])
       expect(situacaoDoPedido(s)).toBe('frustracao');
-    for (const s of ['enviados', 'cobrados', 'requer_atencao', 'negociação', 'entregues', 'aguard_coleta'])
-      expect(situacaoDoPedido(s)).toBe('aberto');
   });
 });
 
 describe('indicadores', () => {
-  // 10 agendados em setembro: 5 pagos, 3 em aberto, 2 em frustração.
-  // Histórico (agosto): 3 pagos e 1 frustrado já resolvidos.
+  // Setembro: 10 agendados — 4 pagos, 2 em rota, 1 cobrado, 1 negociação,
+  // 2 em frustração. Mais 3 pagamentos em setembro de pedidos de agosto.
+  // Agosto também tem 1 frustrado já resolvido.
   const pedidos: Pedido[] = [
-    ...Array.from({ length: 5 }, () => ped('pagos', '2026-09-05', { data_aprovacao: '2026-09-10' })),
+    ...Array.from({ length: 4 }, () => ped('pagos', '2026-09-05', { data_aprovacao: '2026-09-10' })),
     ped('enviados', '2026-09-20'),
-    ped('cobrados', '2026-09-21'),
-    ped('negociação', '2026-09-22', { valor: 535, valor_agendado: 535, produto_plano: 'DERMAX PREMIUM - 4 POTE' }),
+    ped('aguard_coleta', '2026-09-21', { valor: 535, valor_agendado: 535, produto_plano: 'DERMAX PREMIUM - 4 POTE' }),
+    ped('cobrados', '2026-09-15'),
+    ped('negociação', '2026-09-12'),
     ped('frustrados', '2026-09-06'),
     ped('devolvido', '2026-09-07'),
-    ...Array.from({ length: 3 }, () => ped('pagos', '2026-08-10', { data_aprovacao: '2026-08-15' })),
+    ...Array.from({ length: 3 }, () => ped('pagos', '2026-08-20', { data_aprovacao: '2026-09-02' })),
     ped('frustrados', '2026-08-11'),
   ];
   const dailies = [dia('2026-09-10', 1000)];
   const ind = calcularIndicadores(dailies, [], pedidos, P);
 
+  it('pagos são os PAGAMENTOS do período, igual ao card de Pagamentos aprovados', () => {
+    const pnl = calcularPnl(dailies, [], P, {}, pedidos);
+    expect(ind.qtd_pagamentos).toBe(7); // 4 da safra + 3 de agosto
+    expect(ind.qtd_pagamentos).toBe(pnl.qtd_pagamentos);
+    expect(ind.receita_aprovada).toBe(pnl.receita_aprovada);
+    expect(ind.pagos_da_safra).toBe(4);
+    expect(ind.pct_pagos).toBeCloseTo(7 / 10, 5); // pagamentos ÷ agendados
+  });
+
   it('CPA e ROAS: agendado e pago, cada um com a sua base', () => {
     expect(ind.qtd_agendados).toBe(10);
-    expect(ind.qtd_pagamentos).toBe(5);
     expect(ind.cpa_agendamento).toBe(10_000); // 1.000 ÷ 10
-    expect(ind.cpa_pago).toBe(20_000); // 1.000 ÷ 5
-    expect(ind.roas_aprovado).toBeCloseTo(3.675, 3); // 3.675 ÷ 1.000
-    expect(ind.roas_agendado).toBeCloseTo(7.15, 3); // (9 × 735 + 535) ÷ 1.000
+    expect(ind.cpa_pago).toBe(Math.round(100_000 / 7)); // 1.000 ÷ 7
+    expect(ind.roas_aprovado).toBeCloseTo(5.145, 3); // 7 × 735 ÷ 1.000
     expect(ind.ticket_medio_real).toBe(73_500);
   });
 
-  it('safra: % pagos, em aberto e em frustração somam 100%', () => {
-    expect(ind.safra.pago.qtd).toBe(5);
-    expect(ind.safra.aberto.qtd).toBe(3);
-    expect(ind.safra.frustracao.qtd).toBe(2);
-    expect(ind.pct_pagos).toBeCloseTo(0.5, 5);
+  it('situação dos agendados e frustração geral', () => {
+    expect(ind.situacao.rota.qtd).toBe(2);
+    expect(ind.situacao.aguardando.qtd).toBe(1);
+    expect(ind.situacao.negociacao.qtd).toBe(1);
+    expect(ind.situacao.frustracao.qtd).toBe(2);
     expect(ind.pct_frustracao).toBeCloseTo(0.2, 5);
-    expect(ind.pct_pagos + ind.pct_aberto + ind.pct_frustracao).toBeCloseTo(1, 5);
     expect(ind.frustracao_por_status.map((f) => f.rotulo).sort()).toEqual(['Devolvido', 'Frustrado']);
   });
 
   it('taxa de recebimento vem só dos pedidos já resolvidos', () => {
-    // Resolvidos até 30/09: 8 pagos e 3 em frustração → 8/11.
-    expect(ind.projecao.base_taxa).toBe(11);
-    expect(ind.projecao.taxa_recebimento).toBeCloseTo(8 / 11, 5);
+    // Resolvidos até 30/09: 7 pagos e 3 em frustração → 7/10.
+    expect(ind.projecao.base_taxa).toBe(10);
+    expect(ind.projecao.taxa_recebimento).toBeCloseTo(0.7, 5);
   });
 
-  it('lucro projetado = lucro real − perdas + a receber − comissões − envio do aberto', () => {
-    const pnl = calcularPnl(dailies, [], P, {}, pedidos);
+  it('a receber conta SÓ os pedidos em rota (sem negociação, cobrado ou frustrado)', () => {
     const pr = ind.projecao;
-    expect(pr.lucro_real).toBe(pnl.lucro_real); // mesmo número da Demonstração
-    expect(pr.perda_frustracao).toBe(2 * (8_300 + 3_300)); // 2 × (produto 83 + frete 33)
-    expect(pr.aberto.valor).toBe(73_500 + 73_500 + 53_500);
-    expect(pr.envio_aberto).toBe(2 * (8_300 + 3_300) + (4_100 + 3_300));
-    expect(pr.a_receber).toBe(Math.round(200_500 * (8 / 11)));
-    expect(pr.lucro_projetado).toBe(pr.lucro_real - pr.perda_frustracao + pr.a_receber - pr.comissoes - pr.envio_aberto);
+    expect(pr.rota.qtd).toBe(2);
+    expect(pr.rota.valor).toBe(73_500 + 53_500);
+    expect(pr.a_receber).toBe(Math.round(127_000 * 0.7));
+    expect(pr.envio_rota).toBe(8_300 + 3_300 + 4_100 + 3_300);
+    expect(pr.perda_frustracao).toBe(2 * (8_300 + 3_300));
+    expect(pr.lucro_real).toBe(calcularPnl(dailies, [], P, {}, pedidos).lucro_real);
+    expect(pr.lucro_projetado).toBe(pr.lucro_real - pr.perda_frustracao + pr.a_receber - pr.comissoes - pr.envio_rota);
   });
 
   it('sem histórico resolvido a taxa é zero, e nada é inventado', () => {
