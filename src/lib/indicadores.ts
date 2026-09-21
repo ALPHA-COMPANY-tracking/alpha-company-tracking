@@ -60,15 +60,41 @@ export function situacaoDoPedido(status: string | null | undefined): Situacao {
   return 'rota';
 }
 
-/** Nome do status para a tela: "aguardando_devolucao" → "Aguardando devolução". */
-function rotuloStatus(status: string): string {
-  const s = norm(status);
-  if (s === 'frustrados' || s === 'frustrado') return 'Frustrado';
-  if (s === 'devolvido' || s === 'devolvidos') return 'Devolvido';
-  if (s === 'aguardando_devolucao') return 'Aguardando devolução';
-  if (s === 'cancelados' || s === 'cancelado') return 'Cancelado';
-  const t = s.replace(/_/g, ' ');
-  return t.charAt(0).toUpperCase() + t.slice(1);
+/** Por que o pedido frustrou. Cada pedido cai em um só motivo. */
+export type MotivoFrustracao =
+  | 'devolvido'
+  | 'cancelado'
+  | 'roubo'
+  | 'aguardando_devolucao'
+  | 'correios'
+  | 'frustrado'
+  | 'outros';
+
+/** Os motivos na ordem da tela. Os seis primeiros aparecem sempre, mesmo zerados. */
+export const MOTIVOS: { id: MotivoFrustracao; rotulo: string; nota: string }[] = [
+  { id: 'devolvido', rotulo: 'Devolvidos', nota: 'o produto voltou' },
+  { id: 'cancelado', rotulo: 'Cancelados', nota: 'cancelados no BlueSales' },
+  { id: 'roubo', rotulo: 'Roubados', nota: 'roubo ou furto na entrega' },
+  { id: 'aguardando_devolucao', rotulo: 'Aguardando devolução', nota: 'voltando da cliente' },
+  { id: 'correios', rotulo: 'Voltou dos Correios', nota: 'foi para retirada e a cliente não buscou' },
+  { id: 'frustrado', rotulo: 'Frustrados', nota: 'recusou ou não pagou' },
+  { id: 'outros', rotulo: 'Outros', nota: 'extravio, sinistro, recusa' },
+];
+
+/**
+ * Motivo da frustração. A ordem decide os casos que se sobrepõem: um pedido
+ * que passou por "Retirar nos Correios" e voltou conta como Correios, não
+ * como devolução comum.
+ */
+export function motivoFrustracao(p: Pick<Pedido, 'status' | 'passou_correios'>): MotivoFrustracao {
+  const s = norm(p.status);
+  if (/roub|furt/.test(s)) return 'roubo';
+  if (/cancel/.test(s)) return 'cancelado';
+  if (p.passou_correios && /devol|frustr/.test(s)) return 'correios';
+  if (/aguard.*devol/.test(s)) return 'aguardando_devolucao';
+  if (/devol/.test(s)) return 'devolvido';
+  if (/frustr/.test(s)) return 'frustrado';
+  return 'outros';
 }
 
 export interface Fatia {
@@ -77,9 +103,10 @@ export interface Fatia {
   valor: Cents;
 }
 
-export interface FrustracaoPorStatus {
-  status: string;
+export interface FrustracaoPorMotivo {
+  motivo: MotivoFrustracao;
   rotulo: string;
+  nota: string;
   qtd: number;
   valor: Cents;
   /** Dinheiro que saiu: produto + frete (ou o ajuste da tela Frustrados). */
@@ -133,7 +160,8 @@ export interface Indicadores {
   pct_frustracao: number;
   /** O mesmo, em VALOR: valor dos pedidos frustrados ÷ valor agendado. */
   pct_frustracao_valor: number;
-  frustracao_por_status: FrustracaoPorStatus[];
+  /** Por motivo, sempre com os seis principais (mesmo zerados). */
+  frustracao_por_motivo: FrustracaoPorMotivo[];
 
   projecao: Projecao;
 }
@@ -157,7 +185,9 @@ export function calcularIndicadores(
     negociacao: { qtd: 0, valor: 0 },
     frustracao: { qtd: 0, valor: 0 },
   };
-  const porStatus = new Map<string, FrustracaoPorStatus>();
+  const porMotivo = new Map<MotivoFrustracao, FrustracaoPorMotivo>(
+    MOTIVOS.map((m) => [m.id, { motivo: m.id, rotulo: m.rotulo, nota: m.nota, qtd: 0, valor: 0, perda: 0 }]),
+  );
   let envio_rota = 0;
   let comissaoCheia = 0; // comissões se TODO pedido em rota for pago
   for (const p of ativos) {
@@ -168,18 +198,17 @@ export function calcularIndicadores(
     situacao[s].valor += valor;
 
     if (s === 'frustracao') {
-      const chave = norm(p.status);
-      const f = porStatus.get(chave) ?? { status: chave, rotulo: rotuloStatus(chave), qtd: 0, valor: 0, perda: 0 };
+      const f = porMotivo.get(motivoFrustracao(p))!;
       f.qtd += 1;
       f.valor += valor;
       f.perda += reaisToCents(perdaRealDePedido(p));
-      porStatus.set(chave, f);
     } else if (s === 'rota') {
       envio_rota += reaisToCents(custoProdutoDoPlano(p.produto_plano) + FRETE_POR_PEDIDO);
       comissaoCheia += Math.round(valor * (comissaoDoVendedor(p.vendedor) + COMISSAO_COBRANCA));
     }
   }
-  const frustracao_por_status = [...porStatus.values()].sort((a, b) => b.qtd - a.qtd || b.valor - a.valor);
+  // "Outros" só aparece quando tem pedido; os seis principais, sempre.
+  const frustracao_por_motivo = [...porMotivo.values()].filter((f) => f.motivo !== 'outros' || f.qtd > 0);
 
   // Dos pagamentos do período, quantos são de pedidos agendados nele
   // (o resto é venda de antes que pagou agora).
@@ -207,7 +236,7 @@ export function calcularIndicadores(
   // saem de qualquer jeito.
   const a_receber = Math.round(situacao.rota.valor * taxa_recebimento);
   const comissoes = Math.round(comissaoCheia * taxa_recebimento);
-  const perda_frustracao = frustracao_por_status.reduce((s, f) => s + f.perda, 0);
+  const perda_frustracao = frustracao_por_motivo.reduce((s, f) => s + f.perda, 0);
   const lucro_projetado = pnl.lucro_real - perda_frustracao + a_receber - comissoes - envio_rota;
 
   return {
@@ -229,7 +258,7 @@ export function calcularIndicadores(
     situacao,
     pct_frustracao: safeDiv(situacao.frustracao.qtd, pnl.qtd_agendados),
     pct_frustracao_valor: safeDiv(situacao.frustracao.valor, pnl.valor_agendado),
-    frustracao_por_status,
+    frustracao_por_motivo,
 
     projecao: {
       lucro_real: pnl.lucro_real,

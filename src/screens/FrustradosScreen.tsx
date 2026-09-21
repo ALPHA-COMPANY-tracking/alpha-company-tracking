@@ -3,7 +3,8 @@ import { Check, Pencil, RotateCcw, TriangleAlert, X } from 'lucide-react';
 import type { Pedido, Periodo } from '@/types';
 import { formatBRL, reaisToCents } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
-import { statusBucket } from '@/lib/pedidos';
+import { pedidosAtivos, statusBucket } from '@/lib/pedidos';
+import { MOTIVOS, motivoFrustracao } from '@/lib/indicadores';
 import { custoProdutoDoPlano, FRETE_POR_PEDIDO, perdaRealDePedido } from '@/lib/custosConfig';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
@@ -31,7 +32,8 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
 
   const frustrados = useMemo(
     () =>
-      pedidos
+      // Vendas tiradas da plataforma (lixeira) não contam aqui também.
+      pedidosAtivos(pedidos)
         .filter((p) => statusBucket(p.status) === 'frustrado' && isDentro(p.data, periodo.inicio, periodo.fim))
         .sort((a, b) => b.data.localeCompare(a.data)),
     [pedidos, periodo],
@@ -39,6 +41,12 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
 
   const totalPedidos = frustrados.reduce((s, p) => s + (Number(p.valor) || 0), 0);
   const totalPerda = frustrados.reduce((s, p) => s + perdaRealDePedido(p), 0);
+
+  // Quantos por motivo — os seis sempre à vista, mesmo zerados.
+  const porMotivo = MOTIVOS.map((m) => ({ ...m, qtd: frustrados.filter((p) => motivoFrustracao(p) === m.id).length })).filter(
+    (m) => m.id !== 'outros' || m.qtd > 0,
+  );
+  const rotuloMotivo = Object.fromEntries(MOTIVOS.map((m) => [m.id, m.rotulo]));
 
   function abrir(p: Pedido) {
     setEditando(p.id);
@@ -78,13 +86,28 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
         </div>
       </div>
 
+      {/* Por motivo */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        {porMotivo.map((m) => (
+          <div
+            key={m.id}
+            className={`rounded-[12px] border px-3 py-2.5 ${m.qtd > 0 ? 'border-red/30 bg-red/[0.05]' : 'border-line bg-card opacity-60'}`}
+          >
+            <div className="text-[11px] text-dim leading-tight">{m.rotulo}</div>
+            <div className={`mono text-[20px] font-extrabold leading-tight mt-0.5 ${m.qtd > 0 ? 'text-red' : 'text-dim2'}`}>{m.qtd}</div>
+            <div className="text-[9.5px] text-dim2 leading-snug">{m.nota}</div>
+          </div>
+        ))}
+      </div>
+
       <Panel title="Pedidos frustrados no período" hint="clique no lápis para ajustar a perda">
         <div className="overflow-x-auto">
-          <table className="w-full text-[13px] min-w-[720px]">
+          <table className="w-full text-[13px] min-w-[860px]">
             <thead>
               <tr className="text-dim2 text-[11px] uppercase tracking-wide">
                 <th className="text-left font-semibold px-3 lg:px-5 py-3">Data</th>
-                <th className="text-left font-semibold px-3 lg:px-5 py-3">Pedido</th>
+                <th className="text-left font-semibold px-3 lg:px-5 py-3">Cliente / pedido</th>
+                <th className="text-left font-semibold px-3 lg:px-5 py-3">Motivo</th>
                 <th className="text-left font-semibold px-3 lg:px-5 py-3">Plano</th>
                 <th className="text-right font-semibold px-3 lg:px-5 py-3">Valor do pedido</th>
                 <th className="text-right font-semibold px-3 lg:px-5 py-3">Perda real</th>
@@ -94,7 +117,7 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
             <tbody>
               {frustrados.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-dim2">
+                  <td colSpan={7} className="px-5 py-10 text-center text-dim2">
                     Nenhum pedido frustrado neste período. 🎉
                   </td>
                 </tr>
@@ -107,7 +130,18 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
                   return (
                     <tr key={p.id} className="border-t border-line/70 hover:bg-white/[0.015]">
                       <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-tx font-medium whitespace-nowrap">{diaMes(p.data)}</td>
-                      <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-dim mono text-[12px]">{p.id}</td>
+                      <td className="px-3 lg:px-5 py-3.5 lg:py-4">
+                        <div className="text-tx text-[12.5px] truncate max-w-[220px]">{p.cliente ?? '—'}</div>
+                        <div className="text-[10px] mono text-dim2">
+                          {p.internal_id != null && <b className="text-dim">#{p.internal_id} · </b>}
+                          {p.id}
+                        </div>
+                      </td>
+                      <td className="px-3 lg:px-5 py-3.5 lg:py-4">
+                        <span className="text-[10.5px] border rounded-full px-[8px] py-[2px] whitespace-nowrap text-red border-red/35 bg-red/10">
+                          {rotuloMotivo[motivoFrustracao(p)]}
+                        </span>
+                      </td>
                       <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-dim">{planoCurto(p.produto_plano)}</td>
                       <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-right text-dim mono">{formatBRL(reaisToCents(Number(p.valor) || 0))}</td>
                       <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-right">

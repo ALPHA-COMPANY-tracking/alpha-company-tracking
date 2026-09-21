@@ -119,4 +119,7 @@ export interface Pedido {
   metodo_pagamento?: string | null;
   vendedor?: string | null;
   rastreamento?: string | null;
+  /** Ficou em "Retirar nos Correios" alguma vez (marcado no banco). Com
+   *  status de devolução, é pedido que a cliente não retirou e voltou. */
+  passou_correios?: boolean;
 }

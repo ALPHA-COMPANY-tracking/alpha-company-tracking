@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AfterpayDaily, Pedido } from '@/types';
 import { calcularPnl } from '@/lib/pnl';
-import { calcularIndicadores, situacaoDoPedido } from '@/lib/indicadores';
+import { calcularIndicadores, motivoFrustracao, situacaoDoPedido } from '@/lib/indicadores';
 
 const P = { inicio: '2026-09-01', fim: '2026-09-30' };
 
@@ -34,6 +34,17 @@ describe('situação do pedido', () => {
     for (const s of ['frustrados', 'devolvido', 'aguardando_devolucao', 'roubo', 'Roubado', 'cancelados', 'extraviado', 'sinistro'])
       expect(situacaoDoPedido(s)).toBe('frustracao');
     expect(situacaoDoPedido('confirmados')).toBe('rota'); // etapa nova de 21/09: antes do envio
+  });
+
+  it('motivo: quem passou por "Retirar nos Correios" e voltou conta como Correios', () => {
+    expect(motivoFrustracao({ status: 'aguardando_devolucao', passou_correios: true })).toBe('correios');
+    expect(motivoFrustracao({ status: 'devolvido', passou_correios: true })).toBe('correios');
+    expect(motivoFrustracao({ status: 'aguardando_devolucao' })).toBe('aguardando_devolucao');
+    expect(motivoFrustracao({ status: 'devolvido' })).toBe('devolvido');
+    expect(motivoFrustracao({ status: 'roubo', passou_correios: true })).toBe('roubo'); // roubo é roubo
+    expect(motivoFrustracao({ status: 'cancelados' })).toBe('cancelado');
+    expect(motivoFrustracao({ status: 'frustrados' })).toBe('frustrado');
+    expect(motivoFrustracao({ status: 'extraviado' })).toBe('outros');
   });
 
   it('card de Frustrados igual ao BlueSales (setembro/2026: 5 pedidos, R$ 3.675)', () => {
@@ -95,7 +106,17 @@ describe('indicadores', () => {
     expect(ind.pct_frustracao).toBeCloseTo(0.2, 5);
     // Em valor: 2 × 735 de 9 × 735 + 535 agendados.
     expect(ind.pct_frustracao_valor).toBeCloseTo(1470 / (9 * 735 + 535), 5);
-    expect(ind.frustracao_por_status.map((f) => f.rotulo).sort()).toEqual(['Devolvido', 'Frustrado']);
+    // Os seis motivos aparecem sempre, mesmo zerados; "Outros" só com pedido.
+    expect(ind.frustracao_por_motivo.map((f) => f.motivo)).toEqual([
+      'devolvido',
+      'cancelado',
+      'roubo',
+      'aguardando_devolucao',
+      'correios',
+      'frustrado',
+    ]);
+    const qtd = Object.fromEntries(ind.frustracao_por_motivo.map((f) => [f.motivo, f.qtd]));
+    expect(qtd).toMatchObject({ devolvido: 1, frustrado: 1, cancelado: 0, roubo: 0, correios: 0 });
   });
 
   it('taxa de recebimento vem só dos pedidos já resolvidos', () => {

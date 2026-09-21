@@ -252,20 +252,33 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
               <div className="text-[10.5px] text-dim2 leading-snug">produto + frete que saíram</div>
             </div>
           </div>
-          {ind.frustracao_por_status.length > 0 ? (
-            <div className="divide-y divide-line">
-              <div className="px-[18px] py-2 grid grid-cols-[1fr_auto_auto] gap-x-4 text-[9.5px] uppercase tracking-[0.1em] font-bold text-dim2">
-                <span>Etapa</span>
-                <span className="w-[62px] text-right">Pedidos</span>
-                <span className="w-[62px] text-right">Valor</span>
-              </div>
-              {ind.frustracao_por_status.map((f) => (
-                <div key={f.status} className="px-[18px] py-3 grid grid-cols-[1fr_auto_auto] gap-x-4 items-center">
+          {/* Todos os motivos, sempre — zerado também é informação. */}
+          <div className="divide-y divide-line">
+            <div className="px-[18px] py-2 grid grid-cols-[1fr_auto_auto] gap-x-4 text-[9.5px] uppercase tracking-[0.1em] font-bold text-dim2">
+              <span>Motivo</span>
+              <span className="w-[62px] text-right">Pedidos</span>
+              <span className="w-[62px] text-right">Valor</span>
+            </div>
+            {ind.frustracao_por_motivo.map((f) => {
+              const zerado = f.qtd === 0;
+              return (
+                <div
+                  key={f.motivo}
+                  className={`px-[18px] py-3 grid grid-cols-[1fr_auto_auto] gap-x-4 items-center ${zerado ? 'opacity-50' : ''}`}
+                >
                   <div className="min-w-0">
-                    <div className="text-[13px] text-tx">{f.rotulo}</div>
-                    <div className="text-[10.5px] text-dim2">
-                      {f.qtd} pedido{f.qtd === 1 ? '' : 's'} · {formatBRL(f.valor)} ·{' '}
-                      <span className="text-red">perda {formatBRL(f.perda)}</span>
+                    <div className="flex items-baseline gap-2 min-w-0">
+                      <span className="text-[13px] text-tx">{f.rotulo}</span>
+                      <span className={`mono text-[12px] font-bold ${zerado ? 'text-dim2' : 'text-red'}`}>{f.qtd}</span>
+                    </div>
+                    <div className="text-[10.5px] text-dim2 leading-snug">
+                      {zerado ? (
+                        f.nota
+                      ) : (
+                        <>
+                          {f.nota} · {formatBRL(f.valor)} · <span className="text-red">perda {formatBRL(f.perda)}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="w-[62px] text-right mono text-[13px] font-bold text-tx">
@@ -275,11 +288,9 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
                     {formatPercent(ind.valor_agendado ? f.valor / ind.valor_agendado : 0)}
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="px-[18px] py-8 text-center text-[13px] text-dim2">Nenhum pedido frustrado neste período.</div>
-          )}
+              );
+            })}
+          </div>
           <div className="px-[18px] py-3 border-t border-line flex items-start gap-2 text-[11px] text-dim2 leading-relaxed">
             <Wallet size={13} className="text-gold shrink-0 mt-[2px]" />
             Conta os pedidos agendados no período. Em meses recentes ainda há pedidos a caminho — o percentual final

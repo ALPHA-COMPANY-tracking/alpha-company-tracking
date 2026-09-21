@@ -109,6 +109,7 @@ export class SupabaseBackend implements Backend {
       metodo_pagamento: r.metodo_pagamento ?? null,
       vendedor: r.vendedor ?? null,
       rastreamento: r.rastreamento ?? null,
+      passou_correios: r.passou_correios === true,
     }));
 
     return {
