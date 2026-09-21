@@ -129,8 +129,10 @@ export interface Indicadores {
 
   /** Onde está hoje cada pedido agendado no período. */
   situacao: Record<Situacao, Fatia>;
-  /** Frustração dos agendados do período ÷ agendados do período. */
+  /** Frustração dos agendados do período ÷ agendados do período (em pedidos). */
   pct_frustracao: number;
+  /** O mesmo, em VALOR: valor dos pedidos frustrados ÷ valor agendado. */
+  pct_frustracao_valor: number;
   frustracao_por_status: FrustracaoPorStatus[];
 
   projecao: Projecao;
@@ -226,6 +228,7 @@ export function calcularIndicadores(
 
     situacao,
     pct_frustracao: safeDiv(situacao.frustracao.qtd, pnl.qtd_agendados),
+    pct_frustracao_valor: safeDiv(situacao.frustracao.valor, pnl.valor_agendado),
     frustracao_por_status,
 
     projecao: {

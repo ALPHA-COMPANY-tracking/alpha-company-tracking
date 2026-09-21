@@ -169,7 +169,7 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
           color={COR.vermelho}
           label="Frustração geral"
           value={formatPercent(ind.pct_frustracao)}
-          sub={`${sit.frustracao.qtd} de ${ind.qtd_agendados} agendados`}
+          sub={`${sit.frustracao.qtd} de ${ind.qtd_agendados} · ${formatPercent(ind.pct_frustracao_valor)} do valor`}
         />
       </div>
 
@@ -223,34 +223,56 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
 
         {/* Frustração geral */}
         <Panel title="Frustração geral" hint="com devolução, roubo, extravio">
-          <div className="px-[18px] py-5 flex items-end justify-between gap-4 border-b border-line">
-            <div>
-              <div className="mono text-[30px] lg:text-[34px] font-extrabold text-red tracking-tight leading-none">
+          {/* Três leituras da mesma frustração: quantos pedidos, quanto
+              valiam (preço do produto) e quanto saiu de fato do caixa. */}
+          <div className="grid grid-cols-3 gap-2 p-[14px] border-b border-line">
+            <div className="rounded-[12px] border border-red/25 bg-red/[0.06] px-3 py-3 min-w-0">
+              <div className="text-[10.5px] text-dim">Por pedidos</div>
+              <div className="mono text-[22px] lg:text-[26px] font-extrabold text-red tracking-tight leading-tight mt-0.5">
                 {formatPercent(ind.pct_frustracao)}
               </div>
-              <div className="text-[12px] text-dim mt-2">
-                {sit.frustracao.qtd} de {ind.qtd_agendados} pedidos agendados no período
+              <div className="text-[10.5px] text-dim2 leading-snug">
+                {sit.frustracao.qtd} de {ind.qtd_agendados} pedidos
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-[10.5px] text-dim2">Perda real</div>
-              <div className="mono text-[17px] font-bold text-red">{formatBRL(pr.perda_frustracao)}</div>
-              <div className="text-[10.5px] text-dim2">{formatBRL(sit.frustracao.valor)} em pedidos</div>
+            <div className="rounded-[12px] border border-red/25 bg-red/[0.06] px-3 py-3 min-w-0">
+              <div className="text-[10.5px] text-dim">Por valor do produto</div>
+              <div className="mono text-[22px] lg:text-[26px] font-extrabold text-red tracking-tight leading-tight mt-0.5">
+                {formatPercent(ind.pct_frustracao_valor)}
+              </div>
+              <div className="text-[10.5px] text-dim2 leading-snug">
+                {formatBRL(sit.frustracao.valor)} de {formatBRL(ind.valor_agendado)}
+              </div>
+            </div>
+            <div className="rounded-[12px] border border-line bg-card2 px-3 py-3 min-w-0">
+              <div className="text-[10.5px] text-dim">Perda real</div>
+              <div className="mono text-[17px] lg:text-[20px] font-extrabold text-red tracking-tight leading-tight mt-1">
+                {formatBRL(pr.perda_frustracao)}
+              </div>
+              <div className="text-[10.5px] text-dim2 leading-snug">produto + frete que saíram</div>
             </div>
           </div>
           {ind.frustracao_por_status.length > 0 ? (
             <div className="divide-y divide-line">
+              <div className="px-[18px] py-2 grid grid-cols-[1fr_auto_auto] gap-x-4 text-[9.5px] uppercase tracking-[0.1em] font-bold text-dim2">
+                <span>Etapa</span>
+                <span className="w-[62px] text-right">Pedidos</span>
+                <span className="w-[62px] text-right">Valor</span>
+              </div>
               {ind.frustracao_por_status.map((f) => (
-                <div key={f.status} className="px-[18px] py-3 flex items-center justify-between gap-3">
+                <div key={f.status} className="px-[18px] py-3 grid grid-cols-[1fr_auto_auto] gap-x-4 items-center">
                   <div className="min-w-0">
                     <div className="text-[13px] text-tx">{f.rotulo}</div>
                     <div className="text-[10.5px] text-dim2">
-                      {f.qtd} pedido{f.qtd === 1 ? '' : 's'} · {formatBRL(f.valor)}
+                      {f.qtd} pedido{f.qtd === 1 ? '' : 's'} · {formatBRL(f.valor)} ·{' '}
+                      <span className="text-red">perda {formatBRL(f.perda)}</span>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <div className="mono text-[13px] font-bold text-tx">{formatPercent(ind.qtd_agendados ? f.qtd / ind.qtd_agendados : 0)}</div>
-                    <div className="mono text-[10.5px] text-red">perda {formatBRL(f.perda)}</div>
+                  <div className="w-[62px] text-right mono text-[13px] font-bold text-tx">
+                    {formatPercent(ind.qtd_agendados ? f.qtd / ind.qtd_agendados : 0)}
+                  </div>
+                  <div className="w-[62px] text-right mono text-[13px] font-bold text-tx">
+                    {formatPercent(ind.valor_agendado ? f.valor / ind.valor_agendado : 0)}
                   </div>
                 </div>
               ))}

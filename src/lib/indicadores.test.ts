@@ -93,6 +93,8 @@ describe('indicadores', () => {
     expect(ind.situacao.negociacao.qtd).toBe(1);
     expect(ind.situacao.frustracao.qtd).toBe(2);
     expect(ind.pct_frustracao).toBeCloseTo(0.2, 5);
+    // Em valor: 2 × 735 de 9 × 735 + 535 agendados.
+    expect(ind.pct_frustracao_valor).toBeCloseTo(1470 / (9 * 735 + 535), 5);
     expect(ind.frustracao_por_status.map((f) => f.rotulo).sort()).toEqual(['Devolvido', 'Frustrado']);
   });
 
