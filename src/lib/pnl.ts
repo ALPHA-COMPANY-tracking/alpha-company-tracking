@@ -4,7 +4,7 @@
 // (0..1) para percentuais. Regras vindas da spec, sem improviso.
 // ─────────────────────────────────────────────────────────────
 
-import type { AfterpayDaily, CustoVariavel, IsoDate, Pedido, Periodo } from '@/types';
+import type { AfterpayDaily, CustoVariavel, Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
 import { agregarPedidos } from '@/lib/pedidos';
 import {
@@ -16,7 +16,6 @@ import {
 } from '@/lib/custosConfig';
 import { taxasDoPeriodo } from '@/lib/taxas';
 import {
-  diasDoPeriodo,
   diasInclusivos,
   diasNoMes,
   isDentro,
@@ -71,14 +70,6 @@ export interface CategoriaAgregada {
   categoria_id: string | null;
   total: Cents;
   qtd: number;
-}
-
-/** Ponto da série diária (para gráficos). Valores em centavos. */
-export interface PontoDiario {
-  data: IsoDate;
-  receita: Cents;
-  custos: Cents;
-  lucro: Cents;
 }
 
 /** O que os pedidos frustrados descontam do Lucro Real. */
@@ -181,25 +172,6 @@ export interface PnlResult {
   roas: number;
   roi_real: number;
   custo_por_real: number;
-}
-
-/**
- * Série diária de receita, custos totais reais e lucro real.
- * Reusa calcularPnl por dia (o rateio de mensais vira parcela diária).
- * Sem os pedidos a receita sairia só do lançamento manual — zerada
- * desde que o BlueSales virou a fonte.
- */
-export function serieDiaria(
-  dailies: AfterpayDaily[],
-  custos: CustoVariavel[],
-  periodo: Periodo,
-  opts: PnlOptions = {},
-  pedidos: Pedido[] = [],
-): PontoDiario[] {
-  return diasDoPeriodo(periodo.inicio, periodo.fim).map((dia) => {
-    const p = calcularPnl(dailies, custos, { inicio: dia, fim: dia }, opts, pedidos);
-    return { data: dia, receita: p.receita_aprovada, custos: p.custos_totais_reais, lucro: p.lucro_real };
-  });
 }
 
 /** Calcula o P&L completo de um período. */
