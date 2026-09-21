@@ -36,8 +36,8 @@ function norm(s: string | null | undefined): string {
 }
 
 // Por padrão de texto: status novo do BlueSales com uma dessas palavras
-// já cai no grupo certo. A ordem importa — frustração primeiro.
-const FRUSTRACAO = /frustr|devol|roub|furt|extravi|sinistr|recus/;
+// já cai no grupo certo. Frustração (roubo, cancelado, devolução…) vem de
+// statusBucket — a mesma regra do card de Frustrados.
 const NEGOCIACAO = /negocia|atencao/;
 const AGUARDANDO = /entregue|cobrad/;
 
@@ -47,12 +47,14 @@ const AGUARDANDO = /entregue|cobrad/;
  *                 entrega, retirar nos correios: a caminho do cliente
  *   aguardando  → entregue / cobrado: chegou, falta pagar
  *   negociacao  → negociação, requer atenção: travado, sem previsão
- *   frustracao  → frustrado, devolvido, aguardando devolução, roubo…
+ *   frustracao  → frustrado, roubo, cancelado, devolvido, aguardando
+ *                 devolução… (o card "Frustrados" do BlueSales)
  */
 export function situacaoDoPedido(status: string | null | undefined): Situacao {
-  if (statusBucket(status) === 'aprovado') return 'pago';
+  const bucket = statusBucket(status);
+  if (bucket === 'aprovado') return 'pago';
+  if (bucket === 'frustrado') return 'frustracao';
   const s = norm(status);
-  if (FRUSTRACAO.test(s)) return 'frustracao';
   if (NEGOCIACAO.test(s)) return 'negociacao';
   if (AGUARDANDO.test(s)) return 'aguardando';
   return 'rota';
@@ -64,6 +66,7 @@ function rotuloStatus(status: string): string {
   if (s === 'frustrados' || s === 'frustrado') return 'Frustrado';
   if (s === 'devolvido' || s === 'devolvidos') return 'Devolvido';
   if (s === 'aguardando_devolucao') return 'Aguardando devolução';
+  if (s === 'cancelados' || s === 'cancelado') return 'Cancelado';
   const t = s.replace(/_/g, ' ');
   return t.charAt(0).toUpperCase() + t.slice(1);
 }

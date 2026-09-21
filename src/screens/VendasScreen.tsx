@@ -27,7 +27,8 @@ function selo(p: Pedido): { texto: string; classe: string } {
   const bucket = statusBucket(p.status);
   const cru = (p.status ?? '').replace(/_/g, ' ');
   if (bucket === 'aprovado') return { texto: 'Pago', classe: 'text-grn border-grn/35 bg-grn/10' };
-  if (bucket === 'frustrado') return { texto: 'Frustrado', classe: 'text-red border-red/35 bg-red/10' };
+  // Frustração mostra a etapa de verdade: roubo, cancelados, devolvido…
+  if (bucket === 'frustrado') return { texto: cru || 'frustrado', classe: 'text-red border-red/35 bg-red/10' };
   return { texto: cru || 'agendado', classe: 'text-dim border-line2 bg-chip' };
 }
 

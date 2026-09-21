@@ -21,14 +21,18 @@ function norm(s: string | null | undefined): string {
 // O singular entra por segurança: o backfill veio "Pagos" e o webhook manda
 // "pagos", mas não custa aceitar as duas formas.
 const APROVADO = new Set(['pagos', 'pago']);
-// Status que contam como FRUSTRADO (perda) — aba "Frustrados".
-// (Devolvido, Cobrados, Negociação, Enviados etc. ficam como pipeline.)
-const FRUSTRADO = new Set(['frustrados', 'frustrado']);
+// Status que contam como FRUSTRADO (pedido perdido). É a mesma conta do
+// card "Frustrados" do BlueSales, conferida em 21/09/2026: setembro deu
+// 5 pedidos / R$ 3.675 = Roubo (3) + Aguard. Devolução (1) + Cancelados (1).
+// Só "frustrados" deixava roubo, devolução e cancelamento de fora.
+// Por padrão de texto: etapa nova com uma dessas palavras já entra.
+// (Negociação, Atenção, Cobrados, Enviados etc. seguem como pipeline.)
+const FRUSTRADO = /frustr|devol|roub|furt|extravi|sinistr|recus|cancel/;
 
 export function statusBucket(status: string | null | undefined): 'aprovado' | 'frustrado' | 'pipeline' {
   const s = norm(status);
   if (APROVADO.has(s)) return 'aprovado';
-  if (FRUSTRADO.has(s)) return 'frustrado';
+  if (FRUSTRADO.test(s)) return 'frustrado';
   return 'pipeline';
 }
 

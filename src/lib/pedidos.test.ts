@@ -16,7 +16,13 @@ describe('statusBucket', () => {
     expect(statusBucket('Frustrados')).toBe('frustrado');
     expect(statusBucket('frustrado')).toBe('frustrado'); // singular, por segurança
     expect(statusBucket('pago')).toBe('aprovado');
-    expect(statusBucket('devolvido')).toBe('pipeline'); // Devolvido != frustrado (aba separada)
+    // Aba separada no BlueSales, mas o card "Frustrados" soma tudo que é
+    // perda: setembro/2026 = Roubo 3 + Aguard. Devolução 1 + Cancelados 1.
+    expect(statusBucket('devolvido')).toBe('frustrado');
+    expect(statusBucket('aguardando_devolucao')).toBe('frustrado');
+    expect(statusBucket('roubo')).toBe('frustrado');
+    expect(statusBucket('cancelados')).toBe('frustrado');
+    expect(statusBucket('negociação')).toBe('pipeline'); // ainda pode pagar
     expect(statusBucket('cadastrados')).toBe('pipeline');
     expect(statusBucket('enviados')).toBe('pipeline');
     expect(statusBucket('Cobrados')).toBe('pipeline');

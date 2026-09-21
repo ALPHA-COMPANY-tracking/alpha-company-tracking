@@ -31,8 +31,24 @@ describe('situação do pedido', () => {
       expect(situacaoDoPedido(s)).toBe('rota');
     for (const s of ['entregues', 'cobrados']) expect(situacaoDoPedido(s)).toBe('aguardando');
     for (const s of ['negociação', 'requer_atencao']) expect(situacaoDoPedido(s)).toBe('negociacao');
-    for (const s of ['frustrados', 'devolvido', 'aguardando_devolucao', 'Roubado', 'extraviado', 'sinistro'])
+    for (const s of ['frustrados', 'devolvido', 'aguardando_devolucao', 'roubo', 'Roubado', 'cancelados', 'extraviado', 'sinistro'])
       expect(situacaoDoPedido(s)).toBe('frustracao');
+    expect(situacaoDoPedido('confirmados')).toBe('rota'); // etapa nova de 21/09: antes do envio
+  });
+
+  it('card de Frustrados igual ao BlueSales (setembro/2026: 5 pedidos, R$ 3.675)', () => {
+    // Roubo (#576, #577, #593) + Aguard. Devolução (#850) + Cancelados (#1488).
+    const setembro: Pedido[] = [
+      ped('roubo', '2026-09-02'),
+      ped('roubo', '2026-09-02'),
+      ped('roubo', '2026-09-02'),
+      ped('aguardando_devolucao', '2026-09-08'),
+      ped('cancelados', '2026-09-18'),
+      ped('negociação', '2026-09-10'), // não é perda: ainda pode pagar
+    ];
+    const pnl = calcularPnl([], [], P, {}, setembro);
+    expect(pnl.qtd_frustrados).toBe(5);
+    expect(pnl.valor_frustrado).toBe(367_500);
   });
 });
 
