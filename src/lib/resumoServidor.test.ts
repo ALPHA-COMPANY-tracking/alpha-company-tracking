@@ -42,6 +42,18 @@ function pedido(over: Partial<Parameters<typeof montarResumo>[1][number]> = {}) 
   };
 }
 
+describe('taxa automática no resumo', () => {
+  it('sem lançamento, R$ 2,50 por boleto pago — igual à tela', () => {
+    expect(servidor.TAXA_BOLETO).toBe(app.TAXA_BOLETO);
+    const boleto = pedido({ metodo_pagamento: 'boleto' });
+    const pix = pedido({ metodo_pagamento: 'pix' });
+    const comLancada = montarResumo(DIA, [boleto, pix], 0, 2.5);
+    const automatica = montarResumo(DIA, [boleto, pix], 0, null);
+    expect(automatica.lucro).toBe(comLancada.lucro); // 1 boleto = R$ 2,50
+    expect(montarResumo(DIA, [pix], 0, null).lucro).toBe(montarResumo(DIA, [pix], 0, 0).lucro); // pix não paga
+  });
+});
+
 describe('montarResumo', () => {
   it('calcula lucro e ROAS do dia', () => {
     // 1 venda de 735 (6 potes) paga hoje, com R$ 200 de Ads e R$ 2,50 de taxa.

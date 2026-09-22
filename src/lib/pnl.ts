@@ -14,7 +14,7 @@ import {
   custosDeAgendados,
   custosDePedidos,
 } from '@/lib/custosConfig';
-import { taxasDoPeriodo } from '@/lib/taxas';
+import { taxaPorPagamento, taxasDoPeriodo } from '@/lib/taxas';
 import {
   diasInclusivos,
   diasNoMes,
@@ -174,6 +174,18 @@ export interface PnlResult {
   custo_por_real: number;
 }
 
+/**
+ * Chave de um vendedor: ignora maiúsculas e acentos. O BlueSales manda
+ * "Matheus" e a configuração usa "MATHEUS" — sem isso a mesma pessoa vira
+ * duas linhas.
+ */
+export function chaveVendedor(nome: string): string {
+  return (nome.trim() || 'Sem atendente')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase();
+}
+
 /** Calcula o P&L completo de um período. */
 /**
  * Comissão dos vendedores, cada um com o seu percentual. Duas visões, as
@@ -192,15 +204,11 @@ export function comissaoVendedores(
   porAtendente: { nome: string; receita: number; valor_agendado: number; pedidos: number }[],
   receitaTotal: Cents,
   taxas: Cents,
+  /** Taxa dos pagamentos de cada vendedor (chave de chaveVendedor). Sem ela,
+   *  a taxa é rateada pela receita. */
+  taxaPorVendedor?: Map<string, Cents>,
 ): ComissaoVendedor[] {
-  // Agrupa ignorando maiúsculas e acentos: o BlueSales manda "Matheus" e a
-  // configuração usa "MATHEUS" — sem isso a mesma pessoa vira duas linhas.
-  const chave = (s: string) =>
-    s
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .trim()
-      .toUpperCase();
+  const chave = chaveVendedor;
 
   type Acc = { nome: string; receita: Cents; agendado: Cents; qtd_agendados: number };
   const porPessoa = new Map<string, Acc>();
@@ -225,7 +233,11 @@ export function comissaoVendedores(
   return [...porPessoa.values()]
     .map(({ nome, receita, agendado, qtd_agendados }) => {
       const pct = comissaoDoVendedor(nome);
-      const taxasV = receitaTotal > 0 ? Math.round(taxas * (receita / receitaTotal)) : 0;
+      const taxasV = taxaPorVendedor
+        ? (taxaPorVendedor.get(chave(nome)) ?? 0)
+        : receitaTotal > 0
+          ? Math.round(taxas * (receita / receitaTotal))
+          : 0;
       const comissao = receita > 0 ? Math.round(receita * pct) : 0;
       const liquida = receita > 0 ? Math.round((receita - taxasV) * pct) : 0;
       return { nome, pct, receita, agendado, qtd_agendados, comissao, taxa_descontada: comissao - liquida };
@@ -291,12 +303,21 @@ export function calcularPnl(
     const cc = custosDePedidos(pedidos, periodo);
     custo_produtos = cc.custo_produtos;
     frete = cc.frete;
-    // A taxa de plataforma NÃO é derivável dos pedidos (dias com pagamentos
-    // idênticos têm taxas diferentes no BlueSales): é dado, não conta. Vem
-    // do próprio pagamento quando o BlueSales informa e, quando não,
-    // do total do dia. Ver lib/taxas.ts.
+    // Taxa: R$ 2,50 por boleto pago, ou o valor lançado na tela Taxas.
+    // Ver lib/taxas.ts.
     taxas_plataforma = taxasDoPeriodo(pedidos, dailies, periodo);
-    comissoes_por_vendedor = comissaoVendedores(agg.porAtendente, receita_aprovada, taxas_plataforma);
+    // Cada vendedor desconta a taxa dos PRÓPRIOS boletos — é assim que a
+    // linha "Comissões Vendedor" do BlueSales fecha no centavo
+    // (01–16/09: PETER 18 boletos, Matheus 3 → R$ 1.667,20).
+    const taxaDoPagamento = taxaPorPagamento(pedidos, dailies, periodo);
+    const taxaPorVendedor = new Map<string, Cents>();
+    for (const p of pedidos) {
+      const t = taxaDoPagamento.get(p.id); // só tem os pagamentos do período
+      if (!t) continue;
+      const k = chaveVendedor(p.vendedor ?? '');
+      taxaPorVendedor.set(k, (taxaPorVendedor.get(k) ?? 0) + t);
+    }
+    comissoes_por_vendedor = comissaoVendedores(agg.porAtendente, receita_aprovada, taxas_plataforma, taxaPorVendedor);
     // A linha do P&L é a comissão MENOS a parte da taxa (como a linha do
     // BlueSales); cada vendedor, na quebra, recebe o valor cheio.
     comissoes_vendedor = comissoes_por_vendedor.reduce((s, c) => s + c.comissao - c.taxa_descontada, 0);

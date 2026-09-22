@@ -26,14 +26,23 @@ export const CUSTO_PRODUTO: { match: RegExp; custo: number }[] = [
 export const FRETE_POR_PEDIDO = 33.0;
 
 /**
- * A taxa de plataforma NÃO é calculável a partir dos pedidos: no P&L do
- * BlueSales, dias com pagamentos idênticos aparecem com taxas diferentes
- * (14/08 e 15/08 tiveram 2× R$ 735 e cobraram R$ 5,00 e R$ 0,00).
- * Por isso ela é lançada por dia em `afterpay_daily.taxas_plataforma`,
- * com o valor real do BlueSales.
+ * Taxa de plataforma do BlueSales: R$ 2,50 por pagamento em BOLETO.
+ * Pix e cartão não pagam. Descoberto em 22/09/2026 conferindo setembro
+ * dia a dia — bate em todos: 01–08/09 = 12 boletos = R$ 30,00; 11/09 =
+ * 4 boletos = R$ 10,00; 14/09 = nenhum = R$ 0,00; 01–16/09 = 21 boletos =
+ * R$ 52,50. Explica também 14/08 (R$ 5,00) × 15/08 (R$ 0,00) com os mesmos
+ * 2× R$ 735: um dia foi boleto, o outro não.
+ * O BlueSales não manda a taxa no webhook; a dashboard calcula por aqui e o
+ * valor lançado à mão na tela Taxas continua tendo prioridade.
  */
+export const TAXA_BOLETO = 2.5;
 
-/** Comissões: vendedor % da (receita − taxas); cobrança 1% da receita. */
+/** O pagamento é boleto? (o BlueSales manda "boleto" em payment.method) */
+export function ehBoleto(p: Pick<Pedido, 'metodo_pagamento'>): boolean {
+  return /boleto/i.test(p.metodo_pagamento ?? '');
+}
+
+/** Comissões: vendedor % da receita (no P&L, menos a taxa); cobrança 1% da receita. */
 export const COMISSAO_VENDEDOR = 0.05; // padrão de quem não está na lista
 export const COMISSAO_COBRANCA = 0.01;
 

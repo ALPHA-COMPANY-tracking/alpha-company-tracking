@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Check, Info, Pencil, Receipt, X, Zap } from 'lucide-react';
+import { Check, Info, Pencil, Receipt, RotateCcw, X, Zap } from 'lucide-react';
 import type { AfterpayDaily, Periodo } from '@/types';
 import { formatBRL, reaisToCents } from '@/lib/money';
 import { diasDaTabelaDeTaxas, pagamentosPorDia } from '@/lib/taxas';
+import { ehBoleto, TAXA_BOLETO } from '@/lib/custosConfig';
 import { hojeIso } from '@/lib/dates';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
@@ -42,9 +43,7 @@ export function TaxasScreen({ periodo }: { periodo: Periodo }) {
 
   const total = linhas.reduce((s, l) => s + l.cents, 0);
   const pagamentos = linhas.reduce((s, l) => s + l.qtd_pagamentos, 0);
-  // Dias que tiveram pagamento e continuam sem taxa: é aqui que a comissão
-  // começa a divergir do BlueSales, então vale destacar.
-  const emAberto = linhas.filter((l) => l.fonte === 'ausente' && l.qtd_pagamentos > 0).length;
+  const boletos = [...porDia.values()].flat().filter(ehBoleto).length;
 
   function abrir(data: string, cents: number) {
     setEditando(data);
@@ -55,9 +54,15 @@ export function TaxasScreen({ periodo }: { periodo: Periodo }) {
     // Parte do que já existe: gravar do zero apagaria Ads e leads do dia.
     const base = dailies.find((d) => d.data === data) ?? zeroDaily(data);
     // Marca como conferido mesmo quando o valor é R$ 0,00: é resposta,
-    // não ausência de resposta.
+    // não ausência de resposta. O lançado passa a valer no lugar da regra.
     lancarDaily({ ...base, taxas_plataforma: rascunho / 100, taxa_conferida: true });
     setEditando(null);
+  }
+
+  /** Tira o lançamento à mão: o dia volta a ser calculado pelos boletos. */
+  function voltarAoAutomatico(data: string) {
+    const base = dailies.find((d) => d.data === data) ?? zeroDaily(data);
+    lancarDaily({ ...base, taxas_plataforma: 0, taxa_conferida: false });
   }
 
   return (
@@ -81,18 +86,14 @@ export function TaxasScreen({ periodo }: { periodo: Periodo }) {
           <div className="mono text-[16px] lg:text-[21px] font-extrabold text-grn">{pagamentos}</div>
           <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px]">aprovados no período</div>
         </div>
-        <div className={`bg-card border rounded-kpi px-2.5 lg:px-4 py-3 lg:py-[15px] ${emAberto > 0 ? 'border-yel/40' : 'border-line'}`}>
-          <div className="text-[10px] lg:text-[11px] text-dim font-medium mb-[3px] leading-tight">Dias sem taxa</div>
-          <div className={`mono text-[16px] lg:text-[21px] font-extrabold ${emAberto > 0 ? 'text-yel' : 'text-dim'}`}>
-            {emAberto}
-          </div>
-          <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px]">
-            {emAberto > 0 ? 'confira no BlueSales' : 'tudo conferido'}
-          </div>
+        <div className="bg-card border border-line rounded-kpi px-2.5 lg:px-4 py-3 lg:py-[15px]">
+          <div className="text-[10px] lg:text-[11px] text-dim font-medium mb-[3px] leading-tight">Boletos pagos</div>
+          <div className="mono text-[16px] lg:text-[21px] font-extrabold text-gold2">{boletos}</div>
+          <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px]">× {formatBRL(reaisToCents(TAXA_BOLETO))} de taxa cada</div>
         </div>
       </div>
 
-      <Panel title="Taxa por dia" hint="clique no lápis para lançar o valor do BlueSales">
+      <Panel title="Taxa por dia" hint="automática pelos boletos · o lápis corrige um dia">
         <div className="overflow-x-auto">
           <table className="w-full text-[13px] min-w-[330px] sm:min-w-[640px]">
             <thead>
@@ -117,9 +118,10 @@ export function TaxasScreen({ periodo }: { periodo: Periodo }) {
                   const emEdicao = editando === l.data;
                   // Dia que já veio taxado pelo BlueSales não se edita aqui:
                   // o valor está preso a cada pagamento.
-                  const automatico = l.fonte === 'pagamento';
+                  const doBlueSales = l.fonte === 'pagamento';
                   const futuro = l.data > hoje;
-                  const semPagamento = l.qtd_pagamentos === 0;
+                  // Lançado à mão num dia com pagamento: dá para voltar à regra.
+                  const podeVoltar = l.fonte === 'dia' && l.qtd_pagamentos > 0;
                   return (
                     <tr
                       key={l.data}
@@ -147,18 +149,20 @@ export function TaxasScreen({ periodo }: { periodo: Periodo }) {
                             <div className="text-[10px] text-dim2 mt-[2px] flex items-center justify-end gap-1">
                               {futuro ? (
                                 'ainda não chegou'
-                              ) : automatico ? (
+                              ) : doBlueSales ? (
                                 <>
                                   <Zap size={10} className="text-grn" />
-                                  automático · {l.qtd_com_taxa} de {l.qtd_pagamentos}
+                                  veio do BlueSales · {l.qtd_com_taxa} de {l.qtd_pagamentos}
+                                </>
+                              ) : l.fonte === 'regra' ? (
+                                <>
+                                  <Zap size={10} className="text-grn" />
+                                  automático · {l.qtd_com_taxa === 0 ? 'nenhum boleto' : `${l.qtd_com_taxa} boleto${l.qtd_com_taxa === 1 ? '' : 's'}`}
                                 </>
                               ) : l.fonte === 'dia' ? (
                                 'lançado por você'
-                              ) : semPagamento ? (
-                                'não lançada'
                               ) : (
-                                // Dia com pagamento e sem taxa: é o que desalinha a comissão.
-                                <span className="text-yel">não lançada</span>
+                                'sem pagamento'
                               )}
                             </div>
                           </div>
@@ -182,16 +186,27 @@ export function TaxasScreen({ periodo }: { periodo: Periodo }) {
                               <X size={15} />
                             </button>
                           </div>
-                        ) : automatico ? (
+                        ) : doBlueSales ? (
                           <span className="hidden sm:inline text-[10.5px] text-dim2">vem do BlueSales</span>
                         ) : futuro ? null : (
-                          <button
-                            onClick={() => abrir(l.data, l.cents)}
-                            title="Lançar a taxa deste dia"
-                            className="grid place-items-center w-8 h-8 rounded-lg text-dim2 hover:text-tx hover:bg-white/5 ml-auto"
-                          >
-                            <Pencil size={14} />
-                          </button>
+                          <div className="inline-flex gap-1">
+                            {podeVoltar && (
+                              <button
+                                onClick={() => voltarAoAutomatico(l.data)}
+                                title="Voltar ao automático (R$ 2,50 por boleto)"
+                                className="grid place-items-center w-8 h-8 rounded-lg text-dim2 hover:text-gold hover:bg-gold/10"
+                              >
+                                <RotateCcw size={14} />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => abrir(l.data, l.cents)}
+                              title="Corrigir a taxa deste dia"
+                              className="grid place-items-center w-8 h-8 rounded-lg text-dim2 hover:text-tx hover:bg-white/5"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -206,19 +221,19 @@ export function TaxasScreen({ periodo }: { periodo: Periodo }) {
       <div className="flex items-start gap-3 rounded-[12px] border border-line2 bg-card2 px-4 py-[13px]">
         <Info size={16} className="text-gold shrink-0 mt-[2px]" />
         <p className="m-0 text-[12.5px] text-dim leading-relaxed">
-          A taxa não dá para calcular a partir dos pedidos — dias com pagamentos idênticos são cobrados de forma
-          diferente. Quando o BlueSales manda a taxa junto com o pagamento, ela entra sozinha (
-          <b className="text-dim">automático</b>). Enquanto não mandar, pegue o valor no{' '}
-          <b className="text-dim">Resultado Diário</b> do BlueSales e lance aqui.
+          O BlueSales cobra <b className="text-dim">R$ 2,50 por pagamento no boleto</b> — pix e cartão não pagam. Ele
+          não manda essa taxa para a dashboard, então ela é <b className="text-dim">calculada sozinha</b> pelos boletos
+          pagos em cada dia (<b className="text-dim">automático</b>). Se algum dia o valor do BlueSales for diferente,
+          corrija no lápis; a seta volta o dia para o automático.
         </p>
       </div>
 
       <div className="flex items-start gap-3 rounded-[12px] border border-line2 bg-card2 px-4 py-[13px]">
         <Receipt size={16} className="text-gold shrink-0 mt-[2px]" />
         <p className="m-0 text-[12.5px] text-dim leading-relaxed">
-          Esta taxa é <b className="text-dim">deduzida antes da comissão</b>: o vendedor recebe sobre{' '}
-          <b className="text-dim">receita − taxa</b>. Um dia sem taxa lançada deixa a comissão acima da do BlueSales —
-          foi o caso de R$ 58,50 aqui contra R$ 58,25 lá (5% dos R$ 5,00 que faltavam).
+          Na linha <b className="text-dim">Comissões Vendedor</b> do P&amp;L, cada vendedor desconta a taxa dos{' '}
+          <b className="text-dim">boletos das próprias vendas</b> — igual ao BlueSales. Na comissão que o vendedor
+          recebe, nada é descontado.
         </p>
       </div>
     </div>

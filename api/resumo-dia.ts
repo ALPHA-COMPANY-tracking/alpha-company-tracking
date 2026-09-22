@@ -41,7 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Pedidos que podem entrar no dia: criados hoje OU pagos hoje.
     const { data: pedidos, error: erroPedidos } = await db
       .from('bluesales_pedidos')
-      .select('status,data,data_aprovacao,valor,valor_agendado,produto_plano,vendedor')
+      .select('status,data,data_aprovacao,valor,valor_agendado,produto_plano,vendedor,metodo_pagamento')
       .eq('user_id', userId)
       .or(`data.eq.${dia},data_aprovacao.eq.${dia}`);
     if (erroPedidos) return res.status(200).json({ ok: false, aviso: 'Banco: ' + erroPedidos.message });
@@ -49,16 +49,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Ads e taxa do dia (lançados na tela de Marketing).
     const { data: diario } = await db
       .from('afterpay_daily')
-      .select('investimento_ads,taxas_plataforma')
+      .select('investimento_ads,taxas_plataforma,taxa_conferida')
       .eq('user_id', userId)
       .eq('data', dia)
       .maybeSingle();
+
+    // Taxa: a lançada na tela Taxas vale; sem lançamento, o resumo calcula
+    // R$ 2,50 por boleto pago — a mesma regra da tela.
+    const taxaLancada = Number(diario?.taxas_plataforma ?? 0);
+    const conferida = taxaLancada > 0 || diario?.taxa_conferida === true;
 
     const resumo = montarResumo(
       dia,
       pedidos ?? [],
       Number(diario?.investimento_ads ?? 0),
-      Number(diario?.taxas_plataforma ?? 0),
+      conferida ? taxaLancada : null,
     );
 
     // Nada aconteceu no dia: não vale acordar o celular.

@@ -3,7 +3,7 @@
 // Mesmas regras do P&L da tela (ver src/lib/pnl.ts).
 // ─────────────────────────────────────────────────────────────
 
-import { COMISSAO_COBRANCA, FRETE_POR_PEDIDO, comissaoDoVendedor, custoProdutoDoPlano, ehPago } from './lib-custos.js';
+import { COMISSAO_COBRANCA, FRETE_POR_PEDIDO, TAXA_BOLETO, comissaoDoVendedor, custoProdutoDoPlano, ehBoleto, ehPago } from './lib-custos.js';
 
 export interface ResumoDia {
   data: string;
@@ -24,6 +24,7 @@ interface LinhaPedido {
   valor_agendado: number | null;
   produto_plano: string | null;
   vendedor: string | null;
+  metodo_pagamento?: string | null;
 }
 
 /** Data de hoje no fuso de São Paulo, no formato YYYY-MM-DD. */
@@ -77,7 +78,8 @@ export function montarResumo(
   dia: string,
   pedidos: LinhaPedido[],
   ads: number,
-  taxaPlataforma: number,
+  /** Taxa lançada à mão na tela Taxas; null = calcular (R$ 2,50 por boleto). */
+  taxaLancada: number | null,
 ): ResumoDia {
   let valor_agendado = 0;
   let qtd_agendados = 0;
@@ -86,6 +88,7 @@ export function montarResumo(
   let custoProdutos = 0;
   let frete = 0;
   const receitaPorVendedor = new Map<string, number>();
+  const boletosPorVendedor = new Map<string, number>();
 
   for (const p of pedidos) {
     if (p.data === dia) {
@@ -100,14 +103,24 @@ export function montarResumo(
       frete += FRETE_POR_PEDIDO;
       const nome = (p.vendedor ?? '').trim() || 'Sem atendente';
       receitaPorVendedor.set(nome, (receitaPorVendedor.get(nome) ?? 0) + v);
+      if (ehBoleto(p.metodo_pagamento)) boletosPorVendedor.set(nome, (boletosPorVendedor.get(nome) ?? 0) + 1);
     }
   }
 
-  // Comissão por vendedor, sobre a receita dele menos a parte proporcional
-  // das taxas — igual ao P&L da tela.
+  // Taxa do dia: a lançada à mão, ou R$ 2,50 por boleto pago.
+  const automatica = taxaLancada == null;
+  const boletos = [...boletosPorVendedor.values()].reduce((s, n) => s + n, 0);
+  const taxaPlataforma = automatica ? boletos * TAXA_BOLETO : taxaLancada;
+
+  // Comissão por vendedor, sobre a receita dele menos a taxa DOS BOLETOS
+  // DELE (automática) ou a parte proporcional da lançada — igual à tela.
   let comissaoVendedor = 0;
   for (const [nome, rec] of receitaPorVendedor) {
-    const taxaDele = receita > 0 ? (taxaPlataforma * rec) / receita : 0;
+    const taxaDele = automatica
+      ? (boletosPorVendedor.get(nome) ?? 0) * TAXA_BOLETO
+      : receita > 0
+        ? (taxaPlataforma * rec) / receita
+        : 0;
     comissaoVendedor += (rec - taxaDele) * comissaoDoVendedor(nome);
   }
   const comissaoCobranca = receita * COMISSAO_COBRANCA;

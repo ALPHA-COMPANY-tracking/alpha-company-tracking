@@ -17,6 +17,12 @@ export const CUSTO_PRODUTO: { match: RegExp; custo: number }[] = [
 ];
 
 export const FRETE_POR_PEDIDO = 33.0;
+
+/** Taxa do BlueSales: R$ 2,50 por pagamento em boleto (igual ao app). */
+export const TAXA_BOLETO = 2.5;
+export function ehBoleto(metodo?: string | null): boolean {
+  return /boleto/i.test(metodo ?? '');
+}
 export const COMISSAO_VENDEDOR = 0.05;
 export const COMISSAO_COBRANCA = 0.01;
 

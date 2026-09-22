@@ -107,6 +107,25 @@ describe('comissão no P&L', () => {
     expect(pnl.comissoes_vendedor).toBe(166_712); // R$ 1.667,12 (BlueSales: 1.667,20)
   });
 
+  it('linha do P&L = BlueSales no centavo: cada um desconta a taxa dos próprios boletos', () => {
+    // 01–16/09: PETER aprovou R$ 22.436,00 com 18 boletos; Matheus
+    // R$ 9.135,00 com 3 boletos. O BlueSales mostrou R$ 1.667,20 — o
+    // rateio pela receita dava R$ 1.667,12.
+    const boletos = (vendedor: string, qtd: number, prefixo: string) =>
+      Array.from({ length: qtd }, (_, i) => ({ ...pago(`${prefixo}${i}`, 0.01, vendedor), metodo_pagamento: 'boleto' }));
+    const pedidos = [
+      pago('p', 22_436 - 18 * 0.01, 'PETER'),
+      ...boletos('PETER', 18, 'pb'),
+      pago('m', 9_135 - 3 * 0.01, 'Matheus'),
+      ...boletos('Matheus', 3, 'mb'),
+    ];
+    const pnl = calcularPnl([], [], periodo, {}, pedidos);
+    expect(pnl.taxas_plataforma).toBe(5_250); // 21 boletos × R$ 2,50
+    expect(pnl.comissoes_vendedor).toBe(166_720); // R$ 1.667,20, igual ao BlueSales
+    const peter = pnl.comissoes_por_vendedor.find((v) => v.nome === 'PETER')!;
+    expect(peter.comissao).toBe(112_180); // o vendedor recebe o cheio
+  });
+
   it('não duplica quem está configurado com outra caixa (Matheus/MATHEUS)', () => {
     // O BlueSales manda "Matheus"; a configuração usa "MATHEUS".
     const pnl = calcularPnl([], [], periodo, {}, [pago('m1', 500, 'Matheus'), pago('p1', 1000, 'PETER')]);

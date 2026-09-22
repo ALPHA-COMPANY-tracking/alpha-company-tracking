@@ -5,7 +5,7 @@
 // novos (taxa por pagamento) some os dois sem contar nada duas vezes.
 import { describe, expect, it } from 'vitest';
 import type { AfterpayDaily, Pedido, Periodo } from '@/types';
-import { diasDaTabelaDeTaxas, taxasDoPeriodo, taxasPorDia } from '@/lib/taxas';
+import { diasDaTabelaDeTaxas, taxaPorPagamento, taxasDoPeriodo, taxasPorDia } from '@/lib/taxas';
 import { calcularPnl } from '@/lib/pnl';
 
 const periodo: Periodo = { inicio: '2026-08-01', fim: '2026-08-31' };
@@ -60,10 +60,19 @@ describe('taxasPorDia', () => {
     expect(linha.qtd_com_taxa).toBe(1);
   });
 
-  it('dia com pagamento e nada lançado fica marcado como ausente', () => {
-    const [linha] = taxasPorDia([pago('a', 735, '2026-08-14')], [], periodo);
-    expect(linha.cents).toBe(0);
-    expect(linha.fonte).toBe('ausente');
+  it('dia com pagamento e nada lançado entra automático: R$ 2,50 por boleto', () => {
+    const pix = { ...pago('a', 735, '2026-08-14'), metodo_pagamento: 'pix' };
+    const boleto = { ...pago('b', 735, '2026-08-14'), metodo_pagamento: 'boleto' };
+    const [linha] = taxasPorDia([pix, boleto], [], periodo);
+    expect(linha.fonte).toBe('regra');
+    expect(linha.cents).toBe(250);
+    expect(linha.qtd_com_taxa).toBe(1); // 1 boleto
+  });
+
+  it('o lançado à mão continua mandando sobre a regra', () => {
+    const boleto = { ...pago('b', 735, '2026-08-14'), metodo_pagamento: 'boleto' };
+    const [linha] = taxasPorDia([boleto], [daily('2026-08-14', 0, true)], periodo);
+    expect(linha).toMatchObject({ fonte: 'dia', cents: 0 });
   });
 
   it('R$ 0,00 conferido NÃO é o mesmo que taxa faltando', () => {
@@ -81,6 +90,37 @@ describe('taxasPorDia', () => {
     ];
     const total = taxasDoPeriodo(pedidos, [daily('2026-08-14', 5), daily('2026-08-28', 99)], periodo);
     expect(total).toBe(500 + 250); // R$ 7,50
+  });
+});
+
+describe('regra do boleto (conferida com setembro/2026)', () => {
+  // Métodos reais dos pagamentos de 01 a 16/09 (b = boleto).
+  const dias: Record<string, string[]> = {
+    '01': ['b', 'b', 'b'], '02': ['b', 'pix', 'cartao', 'cartao'],
+    '04': ['b', 'b', 'pix', 'b', 'b', 'pix', 'pix', 'b', 'b', 'pix'], '05': ['b'], '07': ['pix'], '08': ['b'],
+    '09': ['b', 'b', 'cartao', 'pix', 'b'], '10': ['cartao'],
+    '11': ['cartao', 'b', 'b', 'b', 'pix', 'cartao', 'b', 'pix', 'pix', 'cartao', 'cartao'],
+    '14': ['cartao', 'pix', 'cartao', 'pix', 'cartao'], '15': ['pix', 'cartao', 'cartao', 'b', 'b'], '16': ['pix', 'pix', 'pix'],
+  };
+  const pedidos: Pedido[] = Object.entries(dias).flatMap(([d, metodos]) =>
+    metodos.map((m, i) => ({ ...pago(`${d}-${i}`, 735, `2026-09-${d}`), metodo_pagamento: m === 'b' ? 'boleto' : m })),
+  );
+  const set = (inicio: string, fim: string) => ({ inicio, fim });
+
+  it('bate com o BlueSales: 01–08/09 = R$ 30,00 · 11/09 = R$ 10,00 · 01–16/09 = R$ 52,50', () => {
+    expect(taxasDoPeriodo(pedidos, [], set('2026-09-01', '2026-09-08'))).toBe(3_000);
+    expect(taxasDoPeriodo(pedidos, [], set('2026-09-11', '2026-09-11'))).toBe(1_000);
+    expect(taxasDoPeriodo(pedidos, [], set('2026-09-14', '2026-09-14'))).toBe(0);
+    expect(taxasDoPeriodo(pedidos, [], set('2026-09-15', '2026-09-15'))).toBe(500);
+    expect(taxasDoPeriodo(pedidos, [], set('2026-09-01', '2026-09-16'))).toBe(5_250);
+  });
+
+  it('cada boleto leva a sua taxa; dia lançado à mão reparte entre os boletos', () => {
+    const t = taxaPorPagamento(pedidos, [], set('2026-09-15', '2026-09-15'));
+    expect([...t.values()].sort()).toEqual([0, 0, 0, 250, 250]);
+    const manual = taxaPorPagamento(pedidos, [daily('2026-09-15', 6, true)], set('2026-09-15', '2026-09-15'));
+    expect([...manual.values()].reduce((s, v) => s + v, 0)).toBe(600); // nenhum centavo perdido
+    expect([...manual.values()].filter((v) => v > 0)).toHaveLength(2); // só nos 2 boletos
   });
 });
 
