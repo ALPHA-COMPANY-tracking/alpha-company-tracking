@@ -122,7 +122,7 @@ export function AdsScreen(_props: { periodo: Periodo }) {
             <p className="m-0 text-[12.5px] text-dim leading-relaxed">
               A dashboard busca o gasto de <b className="text-tx">hoje e de ontem</b> direto no Meta a cada 30 minutos,
               no fechamento das 23h e quando você toca em <b className="text-tx">Atualizar</b>. Gasto em dólar é
-              convertido para reais pela cotação do dia.
+              convertido para reais pela mesma cotação do BlueSales (R$ 5,40).
             </p>
             <div className="flex flex-wrap gap-2">
               <button

@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buscarGastoConta,
+  COTACAO_BLUESALES,
   buscarPtax,
   consolidar,
   cotacaoNaData,
@@ -99,6 +100,23 @@ describe('soma por dia em reais', () => {
     expect(dias[0]).toEqual({ data: '2026-09-20', reais: 0, partes: [] });
     expect(dias[1].reais).toBe(2383.34); // 432,10 × 5,40 = 2.333,34 + 50,00
     expect(dias[1].partes[0]).toMatchObject({ moeda: 'USD', cotacao: 5.4, reais: 2333.34 });
+  });
+
+  it('cotação do BlueSales (R$ 5,40) reproduz os valores dele no centavo', () => {
+    // Setembro/2026: US$ do Meta → R$ mostrado no BlueSales.
+    const casos: [string, number, number][] = [
+      ['2026-09-16', 429.83, 2321.08],
+      ['2026-09-17', 400.44, 2162.38],
+      ['2026-09-18', 466.7, 2520.18],
+      ['2026-09-19', 613.89, 3315.01],
+      ['2026-09-21', 498.39, 2691.31],
+    ];
+    const dias = consolidar({
+      gastos: casos.map(([data, valor]) => ({ conta: '1', moeda: 'USD', data, valor })),
+      dias: casos.map(([data]) => data),
+      cotacao: () => COTACAO_BLUESALES,
+    });
+    expect(dias.map((d) => d.reais)).toEqual(casos.map(([, , reais]) => reais));
   });
 
   it('sem cotação não inventa número', () => {

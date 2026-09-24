@@ -12,7 +12,7 @@
 // Configuração (variáveis na Vercel):
 //   META_ACCESS_TOKEN     token de usuário do sistema, permissão ads_read
 //   META_AD_ACCOUNT_IDS   contas de anúncio separadas por vírgula (act_… ou só o número)
-//   META_COTACAO          opcional: cotação fixa do dólar (senão, PTAX do dia)
+//   META_COTACAO          opcional: cotação do dólar (padrão R$ 5,40 do BlueSales; "ptax" = Banco Central)
 //   META_ACRESCIMO_PCT    opcional: % sobre a cotação (ex.: IOF)
 //
 // Sem imports estáticos de módulos locais: eles derrubam a função
@@ -110,7 +110,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       desde,
       ate,
       versao: process.env.META_API_VERSION || undefined,
-      cotacaoFixa: numeroOuNulo(process.env.META_COTACAO),
+      // Padrão: a mesma cotação fixa do BlueSales. META_COTACAO=ptax usa a
+      // do Banco Central; um número usa esse número.
+      cotacaoFixa:
+        process.env.META_COTACAO?.trim().toLowerCase() === 'ptax'
+          ? null
+          : (numeroOuNulo(process.env.META_COTACAO) ?? meta.COTACAO_BLUESALES),
       acrescimoPct: numeroOuNulo(process.env.META_ACRESCIMO_PCT) ?? 0,
     });
 

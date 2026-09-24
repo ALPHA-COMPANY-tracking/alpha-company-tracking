@@ -174,6 +174,15 @@ export function consolidar(opts: {
   });
 }
 
+/**
+ * Cotação que o BlueSales usa para o dólar do Meta: R$ 5,40 fixos.
+ * Conferido em 24/09/2026 com 16, 17, 18, 19 e 21/09 — US$ × 5,40 dá o
+ * valor dele no centavo (ex.: US$ 429,83 × 5,40 = R$ 2.321,08). A PTAX
+ * do dia (~5,15) deixava ~R$ 100 por dia de diferença.
+ * Para mudar sem código: META_COTACAO na Vercel (um número, ou "ptax").
+ */
+export const COTACAO_BLUESALES = 5.4;
+
 export interface ConfigMeta {
   fetch: Fetch;
   token: string;
