@@ -60,7 +60,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (!autorizado) return res.status(401).json({ error: 'Não autorizado' });
 
-    const token = process.env.META_ACCESS_TOKEN?.trim();
+    // Colar na Vercel às vezes traz espaço, quebra de linha, aspas ou um
+    // "Bearer" na frente — nada disso faz parte do token.
+    const token = (process.env.META_ACCESS_TOKEN ?? '').replace(/["'\s]/g, '').replace(/^Bearer/i, '');
     const contas = (process.env.META_AD_ACCOUNT_IDS ?? '')
       .split(/[\s,;]+/)
       .map(meta.normalizarConta)
@@ -88,6 +90,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ ok: false, aviso: 'Período inválido (máximo de 62 dias).' });
     }
     const simular = q('simular') === '1';
+
+    // Token do Meta sempre começa com "EAA". Se não, diz o que tem — sem
+    // mostrar o valor (só o tamanho e se o começo bate).
+    if (!token.startsWith('EAA')) {
+      return res.status(200).json({
+        ok: false,
+        configurado: false,
+        aviso:
+          `o valor de META_ACCESS_TOKEN não parece um token do Meta (tem ${token.length} caracteres e não começa com "EAA"). ` +
+          'Gere de novo em Usuários do sistema → Gerar novo token e cole o texto inteiro',
+      });
+    }
 
     const gasto = await meta.gastoMetaPorDia({
       fetch: (url) => fetch(url),
