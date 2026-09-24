@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Check, Save, Trash2 } from 'lucide-react';
+import { Check, RefreshCw, Save, Scale, Trash2, TriangleAlert, Zap } from 'lucide-react';
 import type { AfterpayDaily, Periodo } from '@/types';
 import { formatBRL, reaisToCents } from '@/lib/money';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
 import { MoneyInput } from '@/components/MoneyInput';
+import { type RespostaMeta, metaDisponivel, sincronizarMeta } from '@/lib/metaAds';
+import { addDias } from '@/lib/dates';
+import { haQuanto } from '@/lib/saudacao';
 
 /** Data local (America/Sao_Paulo ~ horário do usuário) no formato YYYY-MM-DD. */
 function hojeLocal(): string {
@@ -30,7 +33,7 @@ function zeroDaily(data: string): AfterpayDaily {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function AdsScreen(_props: { periodo: Periodo }) {
-  const { dailies, lancarDaily } = useData();
+  const { dailies, lancarDaily, recarregar } = useData();
   const [data, setData] = useState(hojeLocal());
   const [cents, setCents] = useState(0);
   const [leads, setLeads] = useState(0);
@@ -53,7 +56,10 @@ export function AdsScreen(_props: { periodo: Periodo }) {
     if (!data) return;
     // Parte do que já existe: gravar do zero apagaria os outros campos do dia.
     const base = doDia(data) ?? zeroDaily(data);
-    lancarDaily({ ...base, investimento_ads: cents / 100, leads });
+    const mudouGasto = reaisToCents(base.investimento_ads) !== cents;
+    // Valor digitado vira "manual" — só se a coluna existe (migração 0017).
+    const origem = base.ads_origem !== undefined && mudouGasto ? { ads_origem: 'manual', ads_detalhe: null } : {};
+    lancarDaily({ ...base, ...origem, investimento_ads: cents / 100, leads });
     setSalvo(true);
     setTimeout(() => setSalvo(false), 2000);
   }
@@ -73,12 +79,73 @@ export function AdsScreen(_props: { periodo: Periodo }) {
     [dailies],
   );
 
+  // ── Meta Ads automático ──
+  const [ocupado, setOcupado] = useState<'sincronizar' | 'comparar' | null>(null);
+  const [resposta, setResposta] = useState<RespostaMeta | null>(null);
+  const ultimaSync = useMemo(() => {
+    const vezes = dailies.map((d) => d.ads_sincronizado_em).filter((v): v is string => !!v);
+    return vezes.length ? Math.max(...vezes.map((v) => Date.parse(v))) : null;
+  }, [dailies]);
+
+  async function sincronizar() {
+    setOcupado('sincronizar');
+    const r = await sincronizarMeta({ dias: 2 });
+    setResposta(r);
+    if (r.ok) await recarregar();
+    setOcupado(null);
+  }
+
+  async function comparar() {
+    // Os 7 dias antes de ontem: dias já fechados, com o valor do BlueSales
+    // na dashboard. Não grava nada — só mostra lado a lado.
+    setOcupado('comparar');
+    const hoje = hojeLocal();
+    setResposta(await sincronizarMeta({ desde: addDias(hoje, -8), ate: addDias(hoje, -2), simular: true }));
+    setOcupado(null);
+  }
+
   return (
     <div className="flex flex-col gap-5 w-full">
       <div>
         <h1 className="text-[21px] lg:text-[26px] font-extrabold text-tx tracking-tight">Marketing</h1>
-        <p className="text-[13px] text-dim mt-0.5">Registre o gasto geral de anúncios e a quantidade de leads por dia</p>
+        <p className="text-[13px] text-dim mt-0.5">
+          O gasto do Meta Ads entra sozinho · aqui você confere e lança os leads
+        </p>
       </div>
+
+      {metaDisponivel && (
+        <Panel
+          title="Meta Ads automático"
+          hint={ultimaSync ? `última sincronização ${haQuanto(ultimaSync)}` : 'ainda não sincronizou'}
+        >
+          <div className="p-3.5 lg:p-5 flex flex-col gap-4">
+            <p className="m-0 text-[12.5px] text-dim leading-relaxed">
+              A dashboard busca o gasto de <b className="text-tx">hoje e de ontem</b> direto no Meta a cada 30 minutos,
+              no fechamento das 23h e quando você toca em <b className="text-tx">Atualizar</b>. Gasto em dólar é
+              convertido para reais pela cotação do dia.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={sincronizar}
+                disabled={ocupado !== null}
+                className="inline-flex items-center gap-2 px-4 py-[9px] rounded-[10px] text-[13px] font-semibold text-[#15120a] bg-gold-metal disabled:opacity-60"
+              >
+                <RefreshCw size={15} className={ocupado === 'sincronizar' ? 'animate-spin' : ''} />
+                Sincronizar agora
+              </button>
+              <button
+                onClick={comparar}
+                disabled={ocupado !== null}
+                className="inline-flex items-center gap-2 px-4 py-[9px] rounded-[10px] text-[13px] font-semibold text-tx border border-line2 hover:bg-white/[0.04] disabled:opacity-60"
+              >
+                <Scale size={15} className={ocupado === 'comparar' ? 'animate-pulse' : ''} />
+                Comparar com a dashboard (7 dias)
+              </button>
+            </div>
+            {resposta && <ResultadoMeta r={resposta} />}
+          </div>
+        </Panel>
+      )}
 
       <Panel title="Adicionar / Atualizar Métrica">
         <div className="p-3.5 lg:p-5">
@@ -124,8 +191,15 @@ export function AdsScreen(_props: { periodo: Periodo }) {
           </div>
 
           <p className="text-[12px] text-dim2 mt-4 leading-relaxed">
-            O lançamento manual <b className="text-dim">SOMA</b> ao gasto sincronizado do Meta Ads do mesmo dia, não o
-            substitui. Use para o que a integração não enxerga (outras plataformas, criativo, influenciador).
+            {metaDisponivel ? (
+              <>
+                Hoje e ontem vêm do <b className="text-dim">Meta automaticamente</b> — um valor digitado nesses dias é
+                trocado pelo do Meta na próxima sincronização. Use o formulário para <b className="text-dim">leads</b> e
+                para dias mais antigos.
+              </>
+            ) : (
+              'Lance o gasto geral de anúncios e os leads de cada dia.'
+            )}
           </p>
         </div>
       </Panel>
@@ -151,7 +225,23 @@ export function AdsScreen(_props: { periodo: Periodo }) {
                 historico.map((d) => (
                   <tr key={d.data} className="border-t border-line/70 hover:bg-white/[0.015]">
                     <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-tx font-medium">{formatData(d.data)}</td>
-                    <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-dim">Geral</td>
+                    <td className="px-3 lg:px-5 py-3.5 lg:py-4">
+                      {d.ads_origem === 'meta' ? (
+                        <span className="inline-flex items-center gap-1.5 text-grn text-[12.5px]">
+                          <Zap size={12} /> Meta Ads · automático
+                          {d.ads_detalhe?.some((p) => p.moeda !== 'BRL') && (
+                            <span className="text-dim2 mono text-[10.5px]">
+                              {d.ads_detalhe
+                                .filter((p) => p.moeda !== 'BRL')
+                                .map((p) => `${p.moeda} ${p.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} × ${p.cotacao.toLocaleString('pt-BR', { maximumFractionDigits: 4 })}`)
+                                .join(' + ')}
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-dim">{d.ads_origem === 'manual' ? 'Manual' : 'Geral'}</span>
+                      )}
+                    </td>
                     <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-right text-tx mono">{formatBRL(reaisToCents(d.investimento_ads))}</td>
                     <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-right text-tx mono">{d.leads ?? 0}</td>
                     <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-right">
@@ -170,6 +260,76 @@ export function AdsScreen(_props: { periodo: Periodo }) {
           </table>
         </div>
       </Panel>
+    </div>
+  );
+}
+
+/** Resultado de uma sincronização ou comparação com o Meta. */
+function ResultadoMeta({ r }: { r: RespostaMeta }) {
+  if (!r.ok) {
+    return (
+      <div className="flex items-start gap-2.5 rounded-[10px] border border-yel/40 bg-yel/[0.07] px-3.5 py-3 text-[12.5px] text-dim leading-relaxed">
+        <TriangleAlert size={15} className="text-yel shrink-0 mt-[2px]" />
+        <span>
+          {r.configurado === false ? (
+            <>
+              <b className="text-yel">Falta ligar a dashboard ao Meta.</b> Cadastre o token e a conta de anúncio na Vercel
+              (META_ACCESS_TOKEN e META_AD_ACCOUNT_IDS).
+            </>
+          ) : (
+            r.aviso
+          )}
+        </span>
+      </div>
+    );
+  }
+  const brl = (v: number) => formatBRL(reaisToCents(v));
+  return (
+    <div className="rounded-[12px] border border-line overflow-hidden">
+      <div className="px-3.5 py-2.5 text-[11.5px] text-dim bg-card2 border-b border-line">
+        {r.simulado
+          ? 'Comparação — nada foi gravado. "Na dashboard" é o valor lançado hoje em cada dia.'
+          : 'Sincronizado: estes valores já estão na dashboard.'}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[12.5px] min-w-[520px]">
+          <thead>
+            <tr className="text-dim2 text-[10.5px] uppercase tracking-wide">
+              <th className="text-left font-semibold px-3.5 py-2">Data</th>
+              <th className="text-right font-semibold px-3.5 py-2">No Meta</th>
+              <th className="text-right font-semibold px-3.5 py-2">Em R$</th>
+              <th className="text-right font-semibold px-3.5 py-2">{r.simulado ? 'Na dashboard' : 'Antes'}</th>
+              <th className="text-right font-semibold px-3.5 py-2">Diferença</th>
+            </tr>
+          </thead>
+          <tbody>
+            {r.dias.map((d) => {
+              const dif = Math.round((d.reais - d.na_dashboard) * 100) / 100;
+              return (
+                <tr key={d.data} className="border-t border-line/70">
+                  <td className="px-3.5 py-2 text-tx">{formatData(d.data)}</td>
+                  <td className="px-3.5 py-2 text-right mono text-dim">
+                    {d.partes.length === 0
+                      ? '—'
+                      : d.partes
+                          .map((p) =>
+                            p.moeda === 'BRL'
+                              ? brl(p.valor)
+                              : `${p.moeda} ${p.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} × ${p.cotacao.toLocaleString('pt-BR', { maximumFractionDigits: 4 })}`,
+                          )
+                          .join(' + ')}
+                  </td>
+                  <td className="px-3.5 py-2 text-right mono text-tx font-semibold">{brl(d.reais)}</td>
+                  <td className="px-3.5 py-2 text-right mono text-dim">{brl(d.na_dashboard)}</td>
+                  <td className={`px-3.5 py-2 text-right mono ${dif === 0 ? 'text-grn' : 'text-yel'}`}>
+                    {dif === 0 ? 'igual' : `${dif > 0 ? '+' : ''}${brl(dif)}`}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

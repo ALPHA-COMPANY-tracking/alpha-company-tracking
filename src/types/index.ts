@@ -31,6 +31,12 @@ export interface AfterpayDaily {
   investimento_ads: number;
   taxas_investimento: number;
   leads?: number; // qtd de leads do dia (lançamento manual)
+  /** De onde veio o investimento: 'meta' (sincronizado) ou 'manual'.
+   *  undefined = coluna ainda não existe no banco (migração 0017). */
+  ads_origem?: string | null;
+  /** Como cada conta de anúncio entrou no valor (moeda, cotação, R$). */
+  ads_detalhe?: { conta: string; moeda: string; valor: number; cotacao: number; reais: number }[] | null;
+  ads_sincronizado_em?: string | null;
 
   // Perdas
   valor_frustrado: number;
