@@ -286,6 +286,13 @@ export interface ConfigMeta {
 /** Imposto do Meta nas contas em real (as em dólar não pagam). */
 export const IMPOSTO_BRL_PADRAO = 12.5;
 
+/**
+ * Primeiro dia puxado do Meta — quando o BlueSales começou a sincronizar
+ * (16/09/2026). Antes disso o gasto foi lançado à mão ("Geral") lá e aqui,
+ * e a sincronização nunca pode sobrescrever esses dias.
+ */
+export const INICIO_INTEGRACAO = '2026-09-16';
+
 /** Busca, converte e consolida o gasto de todas as contas no período. */
 export async function gastoMetaPorDia(cfg: ConfigMeta): Promise<GastoDoDia[]> {
   const gastos: GastoConta[] = [];

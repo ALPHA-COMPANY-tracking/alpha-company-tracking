@@ -42,7 +42,7 @@ jobs:
           CRON_TOKEN: ${{ secrets.CRON_TOKEN }}
         run: |
           curl -s -m 60 -X POST -H "Authorization: Bearer $CRON_TOKEN" \
-            "https://alpha-company-tracking-eight.vercel.app/api/meta-ads?dias=2" || true
+            "https://alpha-company-tracking-eight.vercel.app/api/meta-ads?dias=3" || true
 
       - name: Enviar resumo
         env:

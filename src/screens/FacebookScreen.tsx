@@ -92,8 +92,8 @@ export function FacebookScreen() {
     setCfg({ cotacao: r.config.cotacao_usd, imposto: r.config.imposto_brl_pct });
     setAviso(
       qual === 'contas'
-        ? 'Seleção salva. Toque em Sincronizar agora para trazer o gasto de hoje e de ontem.'
-        : 'Salvo. Vale a partir da próxima sincronização (hoje e ontem).',
+        ? 'Seleção salva. Toque em Sincronizar agora para refazer o gasto com as contas novas.'
+        : 'Salvo. Vale a partir da próxima sincronização.',
     );
   }
 
@@ -107,7 +107,9 @@ export function FacebookScreen() {
 
   async function sincronizar() {
     setOcupado('sincronizar');
-    const r = await sincronizarMeta({ dias: 2 });
+    // Refaz tudo o que vem do Meta (o servidor começa em 16/09, quando a
+    // integração começou): pega os ajustes que o Meta faz nos dias seguintes.
+    const r = await sincronizarMeta({ desde: addDias(hojeIso(), -29) });
     setResposta(r);
     if (r.ok) await recarregar();
     setOcupado(null);
@@ -168,8 +170,10 @@ export function FacebookScreen() {
       >
         <div className="p-3.5 lg:p-5 flex flex-col gap-4">
           <p className="m-0 text-[12.5px] text-dim leading-relaxed">
-            O gasto de <b className="text-tx">hoje e de ontem</b> das contas marcadas é buscado no Meta a cada 30 minutos,
-            antes do fechamento das 23h e quando alguém toca em <b className="text-tx">Atualizar</b>.
+            O gasto dos <b className="text-tx">últimos 3 dias</b> das contas marcadas é buscado no Meta a cada 30 minutos,
+            antes do fechamento das 23h e quando alguém toca em <b className="text-tx">Atualizar</b> — o Meta ainda ajusta um dia
+            depois que ele acaba. <b className="text-tx">Sincronizar agora</b> refaz todos os dias desde 16/09, quando a
+            integração começou; os dias antes disso, lançados à mão, não mudam.
           </p>
           <div className="flex flex-wrap gap-2">
             <button
@@ -323,8 +327,8 @@ export function FacebookScreen() {
           />
         </div>
         <div className="px-3.5 lg:px-5 pb-4 text-[11.5px] text-dim2 leading-relaxed">
-          A taxa e o imposto valem para as próximas sincronizações (hoje e ontem). Os dias anteriores ficam como foram
-          gravados — mudar aqui não reescreve o histórico do P&amp;L.
+          A taxa e o imposto valem a partir da próxima sincronização: a automática refaz os últimos 3 dias, e o botão
+          Sincronizar agora refaz desde 16/09.
         </div>
         {aviso && (
           <div className="mx-3.5 lg:mx-5 mb-4 rounded-[10px] border border-line2 bg-card2 px-3.5 py-2.5 text-[12px] text-dim">

@@ -95,7 +95,7 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
     if (atualizando) return;
     setAtualizando(true); // spinner até a página trocar
     if (metaDisponivel) {
-      await Promise.race([sincronizarMeta({ dias: 2 }), new Promise((r) => setTimeout(r, 8000))]).catch(() => undefined);
+      await Promise.race([sincronizarMeta({ dias: 3 }), new Promise((r) => setTimeout(r, 8000))]).catch(() => undefined);
     }
     window.location.reload();
   }

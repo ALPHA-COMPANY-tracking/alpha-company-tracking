@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────
 // Integração Facebook: contas de anúncio, configuração e gasto.
 //
-//   POST /api/meta-ads                    sincroniza hoje e ontem
-//   POST /api/meta-ads?dias=3             os últimos 3 dias
+//   POST /api/meta-ads                    sincroniza os últimos 3 dias
+//   POST /api/meta-ads?desde=2026-09-16   desde uma data (nunca antes de 16/09)
 //   POST /api/meta-ads?desde=…&ate=…&simular=1
 //        só mostra, não grava (para comparar com o BlueSales)
 //   POST /api/meta-ads?acao=contas        lista as contas que o token enxerga
@@ -154,14 +154,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: false, aviso: 'Nenhuma conta de anúncio marcada na Integração Facebook.' });
     }
 
+    // Padrão: os últimos 3 dias — o Meta ainda ajusta o gasto de um dia
+    // depois que ele acaba, e o BlueSales acompanha esses ajustes.
     const hoje = meta.hojeSP();
-    const dias = Math.min(Math.max(Math.floor(Number(q('dias') ?? 2)) || 2, 1), 62);
+    const dias = Math.min(Math.max(Math.floor(Number(q('dias') ?? 3)) || 3, 1), 62);
     const ate = q('ate') && DATA.test(q('ate')!) ? q('ate')! : hoje;
-    const desde = q('desde') && DATA.test(q('desde')!) ? q('desde')! : meta.somarDias(ate, -(dias - 1));
+    let desde = q('desde') && DATA.test(q('desde')!) ? q('desde')! : meta.somarDias(ate, -(dias - 1));
+    const simular = q('simular') === '1';
+    // Gravar nunca volta antes do início da integração: os dias lançados à
+    // mão (como no BlueSales) ficam como estão. Comparar pode ver qualquer dia.
+    if (!simular && desde < meta.INICIO_INTEGRACAO) desde = meta.INICIO_INTEGRACAO;
     if (desde > ate || meta.diasEntre(desde, ate).length > 62) {
       return res.status(400).json({ ok: false, aviso: 'Período inválido (máximo de 62 dias).' });
     }
-    const simular = q('simular') === '1';
 
     const gasto = await meta.gastoMetaPorDia({
       fetch: (url) => fetch(url),
