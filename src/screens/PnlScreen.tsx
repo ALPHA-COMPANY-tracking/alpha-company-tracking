@@ -16,10 +16,13 @@ import { COR } from '@/lib/cores';
 import { saudacao } from '@/lib/saudacao';
 
 export function PnlScreen({
+  nome = 'Jonas',
   periodo,
   onAddCusto,
   onLancarManual,
 }: {
+  /** Quem está logado — para a saudação no celular. */
+  nome?: string;
   periodo: Periodo;
   onAddCusto: () => void;
   onLancarManual?: () => void;
@@ -85,7 +88,7 @@ export function PnlScreen({
 
       {/* Saudação no celular — no computador ela fica na barra do topo. */}
       <div className="lg:hidden px-0.5">
-        <div className="text-[19px] font-extrabold text-tx tracking-tight">{saudacao()}, Jonas! 👋</div>
+        <div className="text-[19px] font-extrabold text-tx tracking-tight">{saudacao()}, {nome}! 👋</div>
         <div className="text-[12.5px] text-dim mt-0.5">Aqui está o resumo da sua operação.</div>
       </div>
 

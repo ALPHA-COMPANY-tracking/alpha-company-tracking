@@ -50,7 +50,7 @@ function abaInicial(): Tab {
   return 'pnl';
 }
 
-export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: string }) {
+export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => void; email?: string; socio?: boolean }) {
   const { preset, periodo, selecionarPreset, definirPersonalizado } = usePeriodo();
   const [tab, setTab] = useState<Tab>(abaInicial);
   const [modal, setModal] = useState(false);
@@ -91,6 +91,8 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
   }
 
   const nome = email ? email.split('@')[0] : 'Jonas';
+  // Saudação: o dono é o Jonas; um sócio é chamado pelo começo do e-mail.
+  const primeiroNome = socio && email ? nome.charAt(0).toUpperCase() + nome.slice(1).split(/[._-]/)[0] : 'Jonas';
 
   return (
     <div className="min-h-screen w-full lg:flex">
@@ -173,7 +175,7 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
           <div className="flex-1 min-w-0">
             {tab === 'pnl' && (
               <>
-                <div className="text-[19px] font-extrabold text-tx tracking-tight truncate">{saudacao()}, Jonas! 👋</div>
+                <div className="text-[19px] font-extrabold text-tx tracking-tight truncate">{saudacao()}, {primeiroNome}! 👋</div>
                 <div className="text-[12.5px] text-dim leading-snug">Aqui está o resumo da sua operação {resumoDoPeriodo(preset)}.</div>
               </>
             )}
@@ -195,7 +197,7 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
           </div>
         </div>
 
-        {tab === 'pnl' && <PnlScreen periodo={periodo} onAddCusto={() => setModal(true)} onLancarManual={() => setTab('ads')} />}
+        {tab === 'pnl' && <PnlScreen nome={primeiroNome} periodo={periodo} onAddCusto={() => setModal(true)} onLancarManual={() => setTab('ads')} />}
         {tab === 'vendas' && <VendasScreen periodo={periodo} />}
         {tab === 'ranking' && <RankingScreen periodo={periodo} />}
         {tab === 'instagram' && <InstagramScreen periodo={periodo} />}

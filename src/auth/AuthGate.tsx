@@ -18,16 +18,32 @@ export function AuthGate() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // Memoiza pelo ID do usuário, não pelo objeto `session`: o Supabase emite
-  // uma nova sessão a cada renovação de token, e recriar o backend aí
-  // remontaria o DataProvider (a tela ficava preta no meio do "Atualizar").
+  // De qual conta são os dados: a do dono, se este login for de um sócio
+  // (migração 0017); a própria, para o dono. Sem a migração, a função não
+  // existe e fica a própria conta — como sempre foi.
   const userId = session?.user.id ?? null;
+  const [conta, setConta] = useState<{ de: string; id: string } | null>(null);
+  useEffect(() => {
+    if (!supabase || !userId) return;
+    let vivo = true;
+    supabase.rpc('conta_do_usuario').then(({ data, error }) => {
+      if (vivo) setConta({ de: userId, id: !error && typeof data === 'string' ? data : userId });
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [userId]);
+  const contaId = conta && conta.de === userId ? conta.id : null;
+
+  // Memoiza pelo ID, não pelo objeto `session`: o Supabase emite uma nova
+  // sessão a cada renovação de token, e recriar o backend aí remontaria o
+  // DataProvider (a tela ficava preta no meio do "Atualizar").
   const backend = useMemo(
-    () => (supabase && userId ? new SupabaseBackend(supabase, userId) : null),
-    [userId],
+    () => (supabase && contaId ? new SupabaseBackend(supabase, contaId) : null),
+    [contaId],
   );
 
-  if (session === undefined) {
+  if (session === undefined || (session && !contaId)) {
     return (
       <div className="min-h-screen grid place-items-center text-dim">
         <Loader2 className="animate-spin" size={20} />
@@ -39,7 +55,11 @@ export function AuthGate() {
 
   return (
     <DataProvider backend={backend}>
-      <AppShell onLogout={() => supabase?.auth.signOut()} email={session.user.email ?? undefined} />
+      <AppShell
+        onLogout={() => supabase?.auth.signOut()}
+        email={session.user.email ?? undefined}
+        socio={contaId !== session.user.id}
+      />
     </DataProvider>
   );
 }

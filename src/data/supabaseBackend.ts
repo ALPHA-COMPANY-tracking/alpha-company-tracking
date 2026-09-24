@@ -43,10 +43,12 @@ export class SupabaseBackend implements Backend {
 
   async load(): Promise<Dataset> {
     const [cats, custos, dailies, pedidos] = await Promise.all([
-      this.db.from('categorias_custo').select('*').order('ordem'),
-      this.db.from('custos_variaveis').select('*').order('data', { ascending: false }),
-      this.db.from('afterpay_daily').select('*').order('data'),
-      this.db.from('bluesales_pedidos').select('*').order('data', { ascending: false }),
+      // Sempre filtrado pela conta: um sócio também enxerga as linhas do
+      // próprio login (ex.: categorias-padrão), que não são desta dashboard.
+      this.db.from('categorias_custo').select('*').eq('user_id', this.userId).order('ordem'),
+      this.db.from('custos_variaveis').select('*').eq('user_id', this.userId).order('data', { ascending: false }),
+      this.db.from('afterpay_daily').select('*').eq('user_id', this.userId).order('data'),
+      this.db.from('bluesales_pedidos').select('*').eq('user_id', this.userId).order('data', { ascending: false }),
     ]);
     if (cats.error) throw cats.error;
     if (custos.error) throw custos.error;
