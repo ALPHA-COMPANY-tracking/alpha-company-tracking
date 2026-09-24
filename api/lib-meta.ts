@@ -65,11 +65,19 @@ function statusConta(codigo: number): string {
  * ao usuário do sistema no Business. Em ordem de nome.
  */
 export async function buscarContas(opts: { fetch: Fetch; token: string; versao?: string }): Promise<ContaAnuncio[]> {
-  const params = new URLSearchParams({
-    fields: 'name,account_id,currency,account_status,business{name}',
-    limit: '200',
-    access_token: opts.token,
-  });
+  // O nome do portfólio (business) exige a permissão business_management,
+  // que o token de só-leitura (ads_read) não tem: tenta com ele e, se o
+  // Meta recusar, busca a lista sem — as contas é que importam.
+  try {
+    return await listarContas(opts, 'name,account_id,currency,account_status,business{name}');
+  } catch (e) {
+    if (!/business/i.test(e instanceof Error ? e.message : '')) throw e;
+    return listarContas(opts, 'name,account_id,currency,account_status');
+  }
+}
+
+async function listarContas(opts: { fetch: Fetch; token: string; versao?: string }, fields: string): Promise<ContaAnuncio[]> {
+  const params = new URLSearchParams({ fields, limit: '200', access_token: opts.token });
   let url: string | null = `https://graph.facebook.com/${opts.versao ?? 'v23.0'}/me/adaccounts?${params}`;
   const contas: ContaAnuncio[] = [];
   while (url) {

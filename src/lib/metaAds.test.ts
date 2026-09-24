@@ -89,6 +89,20 @@ describe('contas de anúncio', () => {
   });
 });
 
+describe('contas sem permissão de portfólio', () => {
+  it('se o Meta recusar o campo business, lista as contas sem ele', async () => {
+    const { f, chamadas } = fetchFalso([
+      [/business/, { error: { message: '(#100) Requires business_management permission to access the field.' } }, 400],
+      [/adaccounts/, { data: [{ name: 'BM 03 - Valentin_Wafer 01', account_id: '652943883845467', currency: 'USD', account_status: 1 }] }],
+    ]);
+    const contas = await buscarContas({ fetch: f, token: 't' });
+    expect(contas).toEqual([
+      { id: '652943883845467', nome: 'BM 03 - Valentin_Wafer 01', moeda: 'USD', ativa: true, status: 'Ativa', business: null },
+    ]);
+    expect(chamadas).toHaveLength(2);
+  });
+});
+
 describe('dólar', () => {
   it('PTAX: vale a última cotação do dia; fim de semana usa a de sexta', async () => {
     const { f } = fetchFalso([
