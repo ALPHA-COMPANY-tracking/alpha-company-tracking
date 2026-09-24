@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BarChart3, Camera, Download, LogOut, Megaphone, PieChart, Receipt, RefreshCw, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
+import { BarChart3, Camera, Download, LogOut, Megaphone, PieChart, Plug, Receipt, RefreshCw, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { usePeriodo } from '@/store/usePeriodo';
@@ -13,6 +13,7 @@ import { FrustradosScreen } from '@/screens/FrustradosScreen';
 import { VizScreen } from '@/screens/VizScreen';
 import { ExportScreen } from '@/screens/ExportScreen';
 import { AdsScreen } from '@/screens/AdsScreen';
+import { FacebookScreen } from '@/screens/FacebookScreen';
 import { TaxasScreen } from '@/screens/TaxasScreen';
 import { VendasScreen } from '@/screens/VendasScreen';
 import { RankingScreen } from '@/screens/RankingScreen';
@@ -20,7 +21,7 @@ import { InstagramScreen } from '@/screens/InstagramScreen';
 import { haQuanto, resumoDoPeriodo, saudacao } from '@/lib/saudacao';
 import { metaDisponivel, sincronizarMeta } from '@/lib/metaAds';
 
-type Tab = 'pnl' | 'vendas' | 'ranking' | 'instagram' | 'ads' | 'custos' | 'taxas' | 'frustrados' | 'viz' | 'export';
+type Tab = 'pnl' | 'vendas' | 'ranking' | 'instagram' | 'ads' | 'facebook' | 'custos' | 'taxas' | 'frustrados' | 'viz' | 'export';
 
 /** `curto` é o rótulo da barra inferior no celular, onde só cabe uma palavra. */
 const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
@@ -29,6 +30,7 @@ const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
   { id: 'ranking', label: 'Ranking de Vendas', curto: 'Ranking', Icon: Trophy },
   { id: 'instagram', label: 'Instagram', curto: 'Insta', Icon: Camera },
   { id: 'ads', label: 'Anúncios (Meta)', curto: 'Ads', Icon: Megaphone },
+  { id: 'facebook', label: 'Integração Facebook', curto: 'Face', Icon: Plug },
   { id: 'custos', label: 'Custos Variáveis', curto: 'Custos', Icon: Wallet },
   { id: 'taxas', label: 'Taxas de Plataforma', curto: 'Taxas', Icon: Receipt },
   { id: 'frustrados', label: 'Frustrados', curto: 'Perdas', Icon: TriangleAlert },
@@ -210,6 +212,7 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
         {tab === 'ranking' && <RankingScreen periodo={periodo} />}
         {tab === 'instagram' && <InstagramScreen periodo={periodo} />}
         {tab === 'ads' && <AdsScreen periodo={periodo} />}
+        {tab === 'facebook' && <FacebookScreen />}
         {tab === 'custos' && <CustosScreen periodo={periodo} />}
         {tab === 'taxas' && <TaxasScreen periodo={periodo} />}
         {tab === 'frustrados' && <FrustradosScreen periodo={periodo} />}

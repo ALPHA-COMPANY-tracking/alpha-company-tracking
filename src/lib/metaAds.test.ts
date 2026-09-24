@@ -1,6 +1,7 @@
 // Gasto do Meta Ads: busca, conversão do dólar e soma por dia.
 import { describe, expect, it } from 'vitest';
 import {
+  buscarContas,
   buscarGastoConta,
   COTACAO_BLUESALES,
   buscarPtax,
@@ -65,6 +66,29 @@ describe('Meta', () => {
   });
 });
 
+describe('contas de anúncio', () => {
+  it('lista as contas com moeda e status, em ordem de nome, seguindo a paginação', async () => {
+    const { f, chamadas } = fetchFalso([
+      [/after=P2/, { data: [{ name: 'ANUNCIOS GREEN', account_id: '1122006140000052', currency: 'BRL', account_status: 1 }] }],
+      [
+        /adaccounts/,
+        {
+          data: [
+            { name: 'CA 02', account_id: '3036837756510015', currency: 'USD', account_status: 2, business: { name: 'Valentin Wafer' } },
+            { name: 'BM 03 - Valentin_Wafer 01', account_id: '652943883845467', currency: 'USD', account_status: 1 },
+          ],
+          paging: { next: 'https://graph.facebook.com/v23.0/me/adaccounts?after=P2' },
+        },
+      ],
+    ]);
+    const contas = await buscarContas({ fetch: f, token: 't' });
+    expect(contas.map((c) => c.nome)).toEqual(['ANUNCIOS GREEN', 'BM 03 - Valentin_Wafer 01', 'CA 02']);
+    expect(contas[0]).toMatchObject({ id: '1122006140000052', moeda: 'BRL', ativa: true, status: 'Ativa' });
+    expect(contas[2]).toMatchObject({ moeda: 'USD', ativa: false, status: 'Desativada', business: 'Valentin Wafer' });
+    expect(decodeURIComponent(chamadas[0])).toContain('fields=name,account_id,currency,account_status');
+  });
+});
+
 describe('dólar', () => {
   it('PTAX: vale a última cotação do dia; fim de semana usa a de sexta', async () => {
     const { f } = fetchFalso([
@@ -117,6 +141,23 @@ describe('soma por dia em reais', () => {
       cotacao: () => COTACAO_BLUESALES,
     });
     expect(dias.map((d) => d.reais)).toEqual(casos.map(([, , reais]) => reais));
+  });
+
+  it('imposto do Meta (12,5%) só nas contas em real; dólar não paga', () => {
+    const dias = consolidar({
+      gastos: [
+        { conta: '1', moeda: 'USD', data: '2026-09-24', valor: 100 },
+        { conta: '2', moeda: 'BRL', data: '2026-09-24', valor: 200 },
+      ],
+      dias: ['2026-09-24'],
+      cotacao: () => 5.4,
+      impostoBrlPct: 12.5,
+    });
+    const [usd, brl] = dias[0].partes;
+    expect(usd).toMatchObject({ reais: 540 }); // 100 × 5,40, sem imposto
+    expect(usd.imposto).toBeUndefined();
+    expect(brl).toMatchObject({ reais: 225, imposto: 12.5 }); // 200 × 1,125
+    expect(dias[0].reais).toBe(765);
   });
 
   it('sem cotação não inventa número', () => {

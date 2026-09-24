@@ -29,7 +29,71 @@ export interface ParteGasto {
   moeda: string;
   valor: number;
   cotacao: number;
+  /** Imposto do Meta aplicado, em % (só contas em real). */
+  imposto?: number;
   reais: number;
+}
+
+/** Conta de anúncio que o token enxerga. */
+export interface ContaAnuncio {
+  id: string;
+  nome: string;
+  moeda: string;
+  ativa: boolean;
+  status: string;
+  /** Portfólio (Business Manager) dono da conta, quando o Meta informa. */
+  business: string | null;
+}
+
+/** account_status do Meta → texto. 1 = ativa; o resto não veicula. */
+function statusConta(codigo: number): string {
+  const nomes: Record<number, string> = {
+    1: 'Ativa',
+    2: 'Desativada',
+    3: 'Pagamento pendente',
+    7: 'Em análise',
+    8: 'Pagamento pendente',
+    9: 'Período de carência',
+    100: 'Encerrando',
+    101: 'Encerrada',
+  };
+  return nomes[codigo] ?? 'Inativa';
+}
+
+/**
+ * Todas as contas de anúncio que o token enxerga — as que foram atribuídas
+ * ao usuário do sistema no Business. Em ordem de nome.
+ */
+export async function buscarContas(opts: { fetch: Fetch; token: string; versao?: string }): Promise<ContaAnuncio[]> {
+  const params = new URLSearchParams({
+    fields: 'name,account_id,currency,account_status,business{name}',
+    limit: '200',
+    access_token: opts.token,
+  });
+  let url: string | null = `https://graph.facebook.com/${opts.versao ?? 'v23.0'}/me/adaccounts?${params}`;
+  const contas: ContaAnuncio[] = [];
+  while (url) {
+    const r = await opts.fetch(url);
+    const corpo = (await r.json()) as {
+      data?: { name?: string; account_id?: string; currency?: string; account_status?: number; business?: { name?: string } }[];
+      paging?: { next?: string };
+      error?: { message?: string };
+    };
+    if (!r.ok || corpo.error) throw new Error(`Meta: ${corpo.error?.message ?? `erro ${r.status}`}`);
+    for (const c of corpo.data ?? []) {
+      if (!c.account_id) continue;
+      contas.push({
+        id: normalizarConta(c.account_id),
+        nome: c.name?.trim() || `Conta ${c.account_id}`,
+        moeda: (c.currency ?? 'BRL').toUpperCase(),
+        ativa: c.account_status === 1,
+        status: statusConta(Number(c.account_status)),
+        business: c.business?.name ?? null,
+      });
+    }
+    url = corpo.paging?.next ?? null;
+  }
+  return contas.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
 export interface GastoDoDia {
@@ -155,12 +219,17 @@ export function cotacaoNaData(cotacoes: { data: string; venda: number }[], dia: 
  * Soma as contas em reais, dia a dia. Todos os dias do período aparecem
  * (dia sem gasto = R$ 0,00). Conta em outra moeda sem cotação derruba o
  * cálculo: melhor não gravar do que gravar um número errado.
+ *
+ * Imposto: o Meta cobra imposto (12,5%) por cima do gasto nas contas em
+ * REAL; nas contas em dólar não há. O valor da API vem sem ele.
  */
 export function consolidar(opts: {
   gastos: GastoConta[];
   dias: string[];
   cotacao: (moeda: string, dia: string) => number | null;
+  impostoBrlPct?: number;
 }): GastoDoDia[] {
+  const imposto = opts.impostoBrlPct ?? 0;
   return opts.dias.map((data) => {
     const partes: ParteGasto[] = opts.gastos
       .filter((g) => g.data === data)
@@ -168,7 +237,15 @@ export function consolidar(opts: {
         const moeda = g.moeda.toUpperCase();
         const cotacao = moeda === 'BRL' ? 1 : opts.cotacao(moeda, data);
         if (cotacao == null) throw new Error(`Sem cotação de ${moeda} para ${data}`);
-        return { conta: g.conta, moeda, valor: arred(g.valor), cotacao, reais: arred(g.valor * cotacao) };
+        const pct = moeda === 'BRL' ? imposto : 0;
+        return {
+          conta: g.conta,
+          moeda,
+          valor: arred(g.valor),
+          cotacao,
+          ...(pct > 0 ? { imposto: pct } : {}),
+          reais: arred(g.valor * cotacao * (1 + pct / 100)),
+        };
       });
     return { data, reais: arred(partes.reduce((s, p) => s + p.reais, 0)), partes };
   });
@@ -194,7 +271,12 @@ export interface ConfigMeta {
   cotacaoFixa?: number | null;
   /** Acréscimo sobre a cotação, em % (ex.: 3,5 de IOF do cartão). */
   acrescimoPct?: number;
+  /** Imposto do Meta sobre as contas em real, em % (padrão da tela: 12,5). */
+  impostoBrlPct?: number;
 }
+
+/** Imposto do Meta nas contas em real (as em dólar não pagam). */
+export const IMPOSTO_BRL_PADRAO = 12.5;
 
 /** Busca, converte e consolida o gasto de todas as contas no período. */
 export async function gastoMetaPorDia(cfg: ConfigMeta): Promise<GastoDoDia[]> {
@@ -211,6 +293,7 @@ export async function gastoMetaPorDia(cfg: ConfigMeta): Promise<GastoDoDia[]> {
   return consolidar({
     gastos,
     dias: diasEntre(cfg.desde, cfg.ate),
+    impostoBrlPct: cfg.impostoBrlPct,
     cotacao: (moeda, dia) => {
       if (moeda !== 'USD') return null;
       const base = cfg.cotacaoFixa ?? cotacaoNaData(ptax, dia);
