@@ -29,6 +29,15 @@ function mapDaily(r: Record<string, unknown>): AfterpayDaily {
     qtd_frustrados: N(r.qtd_frustrados),
     valor_agendado: N(r.valor_agendado),
     qtd_agendados: N(r.qtd_agendados),
+    // Só com a migração 0018: sem a coluna, a chave fica de fora e nada
+    // tenta gravá-la de volta.
+    ...('ads_origem' in r
+      ? {
+          ads_origem: (r.ads_origem as string | null) ?? null,
+          ads_detalhe: (r.ads_detalhe as AfterpayDaily['ads_detalhe']) ?? null,
+          ads_sincronizado_em: (r.ads_sincronizado_em as string | null) ?? null,
+        }
+      : {}),
   };
 }
 
