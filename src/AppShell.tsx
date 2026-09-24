@@ -18,7 +18,6 @@ import { VendasScreen } from '@/screens/VendasScreen';
 import { RankingScreen } from '@/screens/RankingScreen';
 import { InstagramScreen } from '@/screens/InstagramScreen';
 import { haQuanto, resumoDoPeriodo, saudacao } from '@/lib/saudacao';
-import { metaDisponivel, sincronizarMeta } from '@/lib/metaAds';
 
 type Tab = 'pnl' | 'vendas' | 'ranking' | 'instagram' | 'ads' | 'custos' | 'taxas' | 'frustrados' | 'viz' | 'export';
 
@@ -84,17 +83,10 @@ export function AppShell({ onLogout, email }: { onLogout?: () => void; email?: s
       ?.scrollIntoView({ inline: 'center', block: 'nearest' });
   }, [tab]);
 
-  /**
-   * Busca o gasto do Meta de hoje e recarrega a página inteira, como um F5 —
-   * nada de estado antigo em tela. O Meta tem 8 s: se demorar ou falhar, a
-   * página recarrega assim mesmo (o agendamento sincroniza depois).
-   */
-  async function atualizar() {
+  /** Recarrega a página inteira, como um F5 — nada de estado antigo em tela. */
+  function atualizar() {
     if (atualizando) return;
     setAtualizando(true); // spinner até a página trocar
-    if (metaDisponivel) {
-      await Promise.race([sincronizarMeta({ dias: 2 }), new Promise((r) => setTimeout(r, 8000))]).catch(() => undefined);
-    }
     window.location.reload();
   }
 

@@ -36,14 +36,6 @@ jobs:
   notificar:
     runs-on: ubuntu-latest
     steps:
-      # O fechamento sai com o gasto do Meta de agora, não o da última meia hora.
-      - name: Atualizar gasto do Meta
-        env:
-          CRON_TOKEN: ${{ secrets.CRON_TOKEN }}
-        run: |
-          curl -s -m 60 -X POST -H "Authorization: Bearer $CRON_TOKEN" \
-            "https://alpha-company-tracking-eight.vercel.app/api/meta-ads?dias=2" || true
-
       - name: Enviar resumo
         env:
           CRON_TOKEN: ${{ secrets.CRON_TOKEN }}
