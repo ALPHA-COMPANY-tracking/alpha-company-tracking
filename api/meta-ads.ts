@@ -66,11 +66,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .map(meta.normalizarConta)
       .filter(Boolean);
     if (!token || contas.length === 0) {
-      return res.status(200).json({
-        ok: false,
-        configurado: false,
-        aviso: 'Falta configurar META_ACCESS_TOKEN e META_AD_ACCOUNT_IDS na Vercel.',
-      });
+      // Diz exatamente o que falta: é o que se confere na Vercel.
+      const brutoContas = (process.env.META_AD_ACCOUNT_IDS ?? '').trim();
+      const problemas = [
+        !token && 'META_ACCESS_TOKEN não chegou (confira o nome e se está em Production)',
+        contas.length === 0 &&
+          (brutoContas
+            ? 'META_AD_ACCOUNT_IDS não tem número de conta (use só os números depois de act=)'
+            : 'META_AD_ACCOUNT_IDS não chegou (confira o nome e se está em Production)'),
+      ].filter(Boolean);
+      return res.status(200).json({ ok: false, configurado: false, aviso: problemas.join(' · ') });
     }
 
     // Período: por padrão hoje e ontem (o Meta ainda ajusta o dia anterior).

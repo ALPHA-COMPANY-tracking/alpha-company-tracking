@@ -273,8 +273,8 @@ function ResultadoMeta({ r }: { r: RespostaMeta }) {
         <span>
           {r.configurado === false ? (
             <>
-              <b className="text-yel">Falta ligar a dashboard ao Meta.</b> Cadastre o token e a conta de anúncio na Vercel
-              (META_ACCESS_TOKEN e META_AD_ACCOUNT_IDS).
+              <b className="text-yel">Falta ligar a dashboard ao Meta.</b> {r.aviso}. Depois de corrigir na Vercel, faça
+              o Redeploy e espere ficar Ready.
             </>
           ) : (
             r.aviso
