@@ -40,11 +40,43 @@ export interface ConfigMeta {
   imposto_brl_pct: number;
 }
 
+/** Conta do cadastro (Importar BM ou Manual). O token nunca vem para a tela. */
+export interface ContaCadastro extends ContaMeta {
+  bm_id: string | null;
+  origem: 'bm' | 'manual';
+  /** De onde sai o token: a BM importada, a Vercel ou nenhum. */
+  token: 'bm' | 'vercel' | 'falta';
+}
+
 export type RespostaContas =
-  | { ok: true; contas: ContaMeta[]; config: ConfigMeta; salva: boolean; migracao: boolean }
+  | {
+      ok: true;
+      /** null = migração 0020 não rodada (a lista vem do token da Vercel). */
+      cadastro: ContaCadastro[] | null;
+      contas: ContaMeta[];
+      config: ConfigMeta;
+      salva: boolean;
+      migracao: boolean;
+    }
   | { ok: false; aviso: string; configurado?: boolean };
 
 export type RespostaSalvar = { ok: true; config: ConfigMeta } | { ok: false; aviso: string };
+
+export type ResultadoBusca = (ContaMeta & { ok: true; cadastrada: boolean }) | { id: string; ok: false; erro: string };
+
+export type RespostaBusca = { ok: true; resultados: ResultadoBusca[] } | { ok: false; aviso: string };
+
+export type RespostaCadastro =
+  | { ok: true; cadastro: ContaCadastro[]; config: ConfigMeta; cadastradas?: number; erros?: { id: string; erro: string }[] }
+  | { ok: false; aviso: string };
+
+export interface ImportarBM {
+  bm_id: string;
+  /** Vazio = o token já guardado desta BM (ou o da Vercel). */
+  token: string;
+  /** Account IDs colados; vazio = todas as contas que o token enxerga. */
+  ids: string;
+}
 
 export const metaDisponivel = Boolean(supabase);
 
@@ -77,9 +109,34 @@ export function sincronizarMeta(opts: { desde?: string; ate?: string; dias?: num
   return chamar<RespostaMeta>(q) as Promise<RespostaMeta>;
 }
 
-/** Contas de anúncio que o token enxerga + a configuração em uso. */
+/** Cadastro de contas + a configuração em uso. */
 export function listarContasMeta() {
   return chamar<RespostaContas>(new URLSearchParams({ acao: 'contas' })) as Promise<RespostaContas>;
+}
+
+/** Importar BM, passo 1: nome, moeda e status de cada Account ID. */
+export function buscarNomesMeta(dados: ImportarBM) {
+  return chamar<RespostaBusca>(new URLSearchParams({ acao: 'buscar' }), dados) as Promise<RespostaBusca>;
+}
+
+/** Importar BM, passo 2: cadastra as contas escolhidas e guarda o token da BM. */
+export function cadastrarContasMeta(dados: { bm_id: string; token: string; ids: string[] }) {
+  return chamar<RespostaCadastro>(new URLSearchParams({ acao: 'cadastrar' }), dados) as Promise<RespostaCadastro>;
+}
+
+/** Cadastro manual, sem consultar o Meta. */
+export function cadastrarManualMeta(dados: { id: string; nome: string; moeda: 'BRL' | 'USD'; bm_id: string }) {
+  return chamar<RespostaCadastro>(new URLSearchParams({ acao: 'manual' }), dados) as Promise<RespostaCadastro>;
+}
+
+/** Tira a conta do cadastro (e da seleção do P&L). */
+export function removerContaMeta(id: string) {
+  return chamar<RespostaCadastro>(new URLSearchParams({ acao: 'remover' }), { id }) as Promise<RespostaCadastro>;
+}
+
+/** Busca de novo nome, moeda e status de todas as contas cadastradas. */
+export function redetectarContasMeta() {
+  return chamar<RespostaCadastro>(new URLSearchParams({ acao: 'redetectar' }), {}) as Promise<RespostaCadastro>;
 }
 
 /** Grava contas marcadas, taxa do dólar e/ou imposto das contas em real. */

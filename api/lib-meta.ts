@@ -115,6 +115,157 @@ export function normalizarConta(id: string): string {
   return id.replace(/^act_/i, '').replace(/\D/g, '');
 }
 
+// ── Cadastro de contas (Importar BM / Manual), como no BlueSales ──
+
+/** Conta cadastrada na tela: é daqui que sai a lista para marcar no P&L. */
+export interface ContaCadastrada {
+  id: string;
+  nome: string;
+  moeda: string;
+  status: string;
+  ativa: boolean;
+  business: string | null;
+  /** BM importada — o token dela busca o gasto. null = token da Vercel. */
+  bm_id: string | null;
+  origem: 'bm' | 'manual';
+}
+
+/** Lista de Account IDs colada: vírgula, quebra de linha, espaço ou ";". */
+export function lerIds(texto: unknown): string[] {
+  const partes = Array.isArray(texto) ? texto.map(String) : String(texto ?? '').split(/[\s,;]+/);
+  return [...new Set(partes.map(normalizarConta).filter(Boolean))];
+}
+
+/** Colar o token às vezes traz espaço, aspas ou "Bearer". */
+export function limparToken(t: unknown): string {
+  return String(t ?? '')
+    .replace(/["'\s]/g, '')
+    .replace(/^Bearer/i, '');
+}
+
+/** O que o Meta responde, em português e sem nada do token. */
+export function explicarErroMeta(msg: string): string {
+  if (/does not exist|missing permission|cannot be loaded/i.test(msg)) {
+    return 'o token não tem acesso a esta conta (atribua a conta ao usuário do sistema na BM)';
+  }
+  if (/invalid oauth|access token|session has expired|error validating/i.test(msg)) {
+    return 'token inválido ou expirado — gere um novo na BM';
+  }
+  return msg;
+}
+
+/** Nome, moeda e status de uma conta, pelo Account ID. */
+export async function buscarConta(opts: {
+  fetch: Fetch;
+  token: string;
+  conta: string;
+  versao?: string;
+}): Promise<ContaAnuncio> {
+  const id = normalizarConta(opts.conta);
+  const pedir = async (fields: string) => {
+    const params = new URLSearchParams({ fields, access_token: opts.token });
+    const r = await opts.fetch(`https://graph.facebook.com/${opts.versao ?? 'v23.0'}/act_${id}?${params}`);
+    const corpo = (await r.json()) as {
+      name?: string;
+      currency?: string;
+      account_status?: number;
+      business?: { name?: string };
+      error?: { message?: string };
+    };
+    // O token vai na URL: a mensagem de erro nunca pode repetir a URL.
+    if (!r.ok || corpo.error) throw new Error(corpo.error?.message ?? `erro ${r.status}`);
+    return corpo;
+  };
+  // Mesmo cuidado da lista: o portfólio exige business_management.
+  let c;
+  try {
+    c = await pedir('name,account_id,currency,account_status,business{name}');
+  } catch (e) {
+    if (!/business/i.test(e instanceof Error ? e.message : '')) throw e;
+    c = await pedir('name,account_id,currency,account_status');
+  }
+  return {
+    id,
+    nome: c.name?.trim() || `Conta ${id}`,
+    moeda: (c.currency ?? 'BRL').toUpperCase(),
+    ativa: c.account_status === 1,
+    status: statusConta(Number(c.account_status)),
+    business: c.business?.name ?? null,
+  };
+}
+
+export type ResultadoConta = { id: string; ok: true; conta: ContaAnuncio } | { id: string; ok: false; erro: string };
+
+/** Busca várias contas; a que falhar vem com o motivo, sem derrubar as outras. */
+export async function buscarContasPorId(opts: {
+  fetch: Fetch;
+  token: string;
+  ids: string[];
+  versao?: string;
+}): Promise<ResultadoConta[]> {
+  const out: ResultadoConta[] = [];
+  // De 10 em 10: rápido sem esbarrar no limite de chamadas do Meta.
+  for (let i = 0; i < opts.ids.length; i += 10) {
+    const lote = await Promise.all(
+      opts.ids.slice(i, i + 10).map(async (id): Promise<ResultadoConta> => {
+        try {
+          return { id, ok: true, conta: await buscarConta({ fetch: opts.fetch, token: opts.token, conta: id, versao: opts.versao }) };
+        } catch (e) {
+          return { id, ok: false, erro: explicarErroMeta(e instanceof Error ? e.message : String(e)) };
+        }
+      }),
+    );
+    out.push(...lote);
+  }
+  return out;
+}
+
+/** Entra ou substitui (mesmo Account ID) no cadastro; em ordem de nome. */
+export function mesclarCadastro(atual: ContaCadastrada[], novas: ContaCadastrada[]): ContaCadastrada[] {
+  const porId = new Map(atual.map((c) => [c.id, c]));
+  for (const c of novas) porId.set(c.id, c);
+  return [...porId.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
+/** Cadastro vindo do banco (jsonb): só o que tem Account ID. */
+export function lerCadastro(bruto: unknown): ContaCadastrada[] {
+  if (!Array.isArray(bruto)) return [];
+  return bruto
+    .map((c: Record<string, unknown>) => ({
+      id: normalizarConta(String(c?.id ?? '')),
+      nome: String(c?.nome ?? '').trim(),
+      moeda: String(c?.moeda ?? 'BRL').toUpperCase(),
+      status: String(c?.status ?? ''),
+      ativa: c?.ativa !== false,
+      business: c?.business ? String(c.business) : null,
+      bm_id: c?.bm_id ? String(c.bm_id) : null,
+      origem: c?.origem === 'manual' ? ('manual' as const) : ('bm' as const),
+    }))
+    .filter((c) => c.id)
+    .map((c) => ({ ...c, nome: c.nome || `Conta ${c.id}` }));
+}
+
+/**
+ * Token de cada conta marcada: o da BM em que ela foi importada; sem ele,
+ * o da Vercel. As que ficam sem nenhum vêm em `faltando`.
+ */
+export function tokensDasContas(opts: {
+  contas: string[];
+  cadastro: ContaCadastrada[];
+  tokensBm: Map<string, string>;
+  tokenVercel: string | null;
+}): { tokens: Record<string, string>; faltando: string[] } {
+  const tokens: Record<string, string> = {};
+  const faltando: string[] = [];
+  for (const id of opts.contas) {
+    const bm = opts.cadastro.find((c) => c.id === id)?.bm_id;
+    const t = (bm && opts.tokensBm.get(bm)) || opts.tokenVercel;
+    if (t) tokens[id] = t;
+    else faltando.push(id);
+  }
+  return { tokens, faltando };
+}
+
 /** Data de hoje em São Paulo, 'YYYY-MM-DD'. */
 export function hojeSP(agora: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', {
@@ -271,6 +422,8 @@ export const COTACAO_BLUESALES = 5.4;
 export interface ConfigMeta {
   fetch: Fetch;
   token: string;
+  /** Token por conta (BMs importadas); a conta sem ele usa `token`. */
+  tokens?: Record<string, string>;
   contas: string[];
   desde: string;
   ate: string;
@@ -297,7 +450,8 @@ export const INICIO_INTEGRACAO = '2026-09-16';
 export async function gastoMetaPorDia(cfg: ConfigMeta): Promise<GastoDoDia[]> {
   const gastos: GastoConta[] = [];
   for (const conta of cfg.contas) {
-    const r = await buscarGastoConta({ fetch: cfg.fetch, token: cfg.token, conta, desde: cfg.desde, ate: cfg.ate, versao: cfg.versao });
+    const token = cfg.tokens?.[conta] ?? cfg.token;
+    const r = await buscarGastoConta({ fetch: cfg.fetch, token, conta, desde: cfg.desde, ate: cfg.ate, versao: cfg.versao });
     gastos.push(...r.dias);
   }
 
