@@ -262,7 +262,9 @@ export function Demonstrativo({
   // comparar sem precisar clicar em cada uma.
   const lucroSemFrustrados = pnl.lucro_real + pnl.desconto_frustrados;
   const opcoesFrustrados: { id: DescontoFrustrados; label: string; hint: string; lucro: Cents }[] = [
-    { id: 'nenhum', label: 'Nada', hint: 'igual ao BlueSales', lucro: lucroSemFrustrados },
+    // O BlueSales também não desconta os frustrados — mas o lucro dele não
+    // tem os custos variáveis, então o número não é o mesmo.
+    { id: 'nenhum', label: 'Nada', hint: 'frustrados fora, como no BlueSales', lucro: lucroSemFrustrados },
     { id: 'real', label: 'Valor real perdido', hint: 'produto + frete', lucro: lucroSemFrustrados - pnl.perda_real_frustrados },
   ];
 
