@@ -20,6 +20,10 @@ import { RankingScreen } from '@/screens/RankingScreen';
 import { InstagramScreen } from '@/screens/InstagramScreen';
 import { haQuanto, resumoDoPeriodo, saudacao } from '@/lib/saudacao';
 import { metaDisponivel, sincronizarMeta } from '@/lib/metaAds';
+import { useData } from '@/store/DataProvider';
+
+/** De quanto em quanto tempo a dashboard aberta busca o gasto do Meta. */
+const SYNC_META_MS = 10 * 60_000;
 
 type Tab = 'pnl' | 'vendas' | 'ranking' | 'instagram' | 'ads' | 'facebook' | 'custos' | 'taxas' | 'frustrados' | 'viz' | 'export';
 
@@ -68,6 +72,47 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
     return () => clearInterval(t);
   }, []);
 
+  // Gasto do Meta sempre fresco com a dashboard aberta: ao abrir, a cada
+  // 10 minutos e ao voltar para a aba. O agendamento do GitHub, que devia
+  // rodar de 30 em 30 minutos, na prática roda de 3 em 3 horas.
+  const { recarregar } = useData();
+  useEffect(() => {
+    if (!metaDisponivel) return;
+    // Guardado na sessão: o Atualizar já sincroniza antes do F5, e a
+    // página que volta não precisa repetir.
+    const KEY = 'afterpay-pnl:sync-meta';
+    const ler = () => {
+      try {
+        return Number(sessionStorage.getItem(KEY)) || 0;
+      } catch {
+        return 0;
+      }
+    };
+    let parado = false;
+    async function sincronizar() {
+      if (document.visibilityState !== 'visible' || Date.now() - ler() < 2 * 60_000) return;
+      try {
+        sessionStorage.setItem(KEY, String(Date.now()));
+      } catch {
+        /* ignora */
+      }
+      const r = await sincronizarMeta({ dias: 3 }).catch(() => null);
+      // Só recarrega os dados se o Meta trouxe um valor diferente.
+      if (!parado && r?.ok && !r.simulado && r.dias.some((d) => Math.abs(d.reais - d.na_dashboard) >= 0.01)) {
+        await recarregar();
+      }
+    }
+    const primeira = setTimeout(sincronizar, 1500);
+    const t = setInterval(sincronizar, SYNC_META_MS);
+    document.addEventListener('visibilitychange', sincronizar);
+    return () => {
+      parado = true;
+      clearTimeout(primeira);
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', sincronizar);
+    };
+  }, [recarregar]);
+
   useEffect(() => {
     try {
       localStorage.setItem(KEY_ABA, tab);
@@ -96,6 +141,11 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
     setAtualizando(true); // spinner até a página trocar
     if (metaDisponivel) {
       await Promise.race([sincronizarMeta({ dias: 3 }), new Promise((r) => setTimeout(r, 8000))]).catch(() => undefined);
+      try {
+        sessionStorage.setItem('afterpay-pnl:sync-meta', String(Date.now()));
+      } catch {
+        /* ignora */
+      }
     }
     window.location.reload();
   }

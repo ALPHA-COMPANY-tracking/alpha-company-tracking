@@ -1,7 +1,10 @@
-# Busca o gasto do Meta Ads dos últimos 3 dias e grava na dashboard.
-# Roda a cada 30 minutos (fora dos :00, que é quando o agendador do
-# GitHub mais atrasa). Sem as variáveis do Meta na Vercel, a chamada só
-# responde "falta configurar" e nada é gravado.
+# Busca o gasto do Meta Ads dos últimos 3 dias e grava na dashboard,
+# para quando ninguém está com ela aberta (aberta, ela mesma sincroniza a
+# cada 10 minutos). Pedido a cada 30 minutos, fora dos :00 — mas o
+# agendador do GitHub é "melhor esforço" e na prática roda de 3 em 3 h.
+#
+# O log NÃO mostra a resposta: ela traz o gasto do dia, e o log das
+# Actions pode ser lido por outras pessoas. Só "ok" ou o aviso.
 name: Gasto do Meta Ads
 
 on:
@@ -20,5 +23,9 @@ jobs:
           RESPOSTA=$(curl -s -m 60 -X POST \
             -H "Authorization: Bearer $CRON_TOKEN" \
             "https://alpha-company-tracking-eight.vercel.app/api/meta-ads?dias=3")
-          echo "$RESPOSTA"
-          echo "$RESPOSTA" | grep -q '"ok":true' || echo "::warning::gasto do Meta não sincronizado"
+          if echo "$RESPOSTA" | grep -q '"ok":true'; then
+            echo "ok"
+          else
+            echo "::warning::gasto do Meta não sincronizado"
+            echo "$RESPOSTA" | grep -o '"aviso":"[^"]*"' || echo "sem resposta do servidor"
+          fi

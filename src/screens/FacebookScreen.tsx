@@ -205,9 +205,9 @@ export function FacebookScreen() {
       >
         <div className="p-3.5 lg:p-5 flex flex-col gap-4">
           <p className="m-0 text-[12.5px] text-dim leading-relaxed">
-            O gasto dos <b className="text-tx">últimos 3 dias</b> das contas marcadas é buscado no Meta a cada 30 minutos,
-            antes do fechamento das 23h e quando alguém toca em <b className="text-tx">Atualizar</b> — o Meta ainda ajusta um dia
-            depois que ele acaba. <b className="text-tx">Sincronizar agora</b> refaz todos os dias desde 16/09, quando a
+            O gasto dos <b className="text-tx">últimos 3 dias</b> das contas marcadas é buscado no Meta sempre que a dashboard
+            abre, a cada 10 minutos enquanto ela está aberta, no <b className="text-tx">Atualizar</b> e, com ela fechada, algumas
+            vezes por dia e antes do fechamento das 23h — o Meta ainda ajusta um dia depois que ele acaba. <b className="text-tx">Sincronizar agora</b> refaz todos os dias desde 16/09, quando a
             integração começou; os dias antes disso, lançados à mão, não mudam.
           </p>
           <div className="flex flex-wrap gap-2">

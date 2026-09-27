@@ -40,8 +40,9 @@ jobs:
       - name: Atualizar gasto do Meta
         env:
           CRON_TOKEN: ${{ secrets.CRON_TOKEN }}
+        # A resposta traz o gasto do dia: não vai para o log.
         run: |
-          curl -s -m 60 -X POST -H "Authorization: Bearer $CRON_TOKEN" \
+          curl -s -o /dev/null -m 60 -X POST -H "Authorization: Bearer $CRON_TOKEN" \
             "https://alpha-company-tracking-eight.vercel.app/api/meta-ads?dias=3" || true
 
       - name: Enviar resumo
@@ -61,5 +62,11 @@ jobs:
           RESPOSTA=$(curl -s -m 30 -X POST \
             -H "Authorization: Bearer $CRON_TOKEN" \
             "https://alpha-company-tracking-eight.vercel.app/api/resumo-dia?tipo=$TIPO")
-          echo "$RESPOSTA"
-          echo "$RESPOSTA" | grep -q '"ok":true' || echo "::warning::resumo não enviado"
+          # Só "ok" ou o aviso: a resposta traz os números do dia, e o log
+          # das Actions pode ser lido por outras pessoas.
+          if echo "$RESPOSTA" | grep -q '"ok":true'; then
+            echo "ok"
+          else
+            echo "::warning::resumo não enviado"
+            echo "$RESPOSTA" | grep -o '"aviso":"[^"]*"' || echo "sem resposta do servidor"
+          fi
