@@ -440,11 +440,14 @@ export interface ConfigMeta {
 export const IMPOSTO_BRL_PADRAO = 12.5;
 
 /**
- * Primeiro dia puxado do Meta — quando o BlueSales começou a sincronizar
- * (16/09/2026). Antes disso o gasto foi lançado à mão ("Geral") lá e aqui,
- * e a sincronização nunca pode sobrescrever esses dias.
+ * Primeiro dia puxado do Meta — o primeiro que o BlueSales sincroniza
+ * (15/09/2026: "Meta Ads · US$ (sincronizado)" R$ 1.793,45). Antes disso o
+ * gasto foi lançado à mão ("Geral") lá e aqui, e a sincronização nunca pode
+ * sobrescrever esses dias. Em 15/09 o BlueSales ficou com o "Geral" de
+ * R$ 1.720,00 E o do Meta (lá o manual SOMA ao sincronizado) — contado duas
+ * vezes; aqui vale só o do Meta.
  */
-export const INICIO_INTEGRACAO = '2026-09-16';
+export const INICIO_INTEGRACAO = '2026-09-15';
 
 /** Busca, converte e consolida o gasto de todas as contas no período. */
 export async function gastoMetaPorDia(cfg: ConfigMeta): Promise<GastoDoDia[]> {

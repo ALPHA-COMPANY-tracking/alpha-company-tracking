@@ -132,9 +132,9 @@ export function AdsScreen(_props: { periodo: Periodo }) {
           <p className="text-[12px] text-dim2 mt-4 leading-relaxed">
             {metaDisponivel ? (
               <>
-                Desde 16/09 o gasto vem do <b className="text-dim">Meta automaticamente</b> — um valor digitado nesses dias é
+                Desde 15/09 o gasto vem do <b className="text-dim">Meta automaticamente</b> — um valor digitado nesses dias é
                 trocado pelo do Meta na próxima sincronização. Use o formulário para <b className="text-dim">leads</b> e
-                para os dias antes de 16/09.
+                para os dias antes de 15/09.
               </>
             ) : (
               'Lance o gasto geral de anúncios e os leads de cada dia.'

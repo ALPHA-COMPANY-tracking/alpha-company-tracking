@@ -2,7 +2,7 @@
 // Integração Facebook: cadastro de contas, configuração e gasto.
 //
 //   POST /api/meta-ads                    sincroniza os últimos 3 dias
-//   POST /api/meta-ads?desde=2026-09-16   desde uma data (nunca antes de 16/09)
+//   POST /api/meta-ads?desde=2026-09-15   desde uma data (nunca antes de 15/09)
 //   POST /api/meta-ads?desde=…&ate=…&simular=1
 //        só mostra, não grava (para comparar com o BlueSales)
 //   POST /api/meta-ads?acao=contas        o cadastro de contas + a configuração

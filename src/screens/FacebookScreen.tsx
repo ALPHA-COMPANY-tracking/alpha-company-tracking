@@ -140,7 +140,7 @@ export function FacebookScreen() {
 
   async function sincronizar() {
     setOcupado('sincronizar');
-    // Refaz tudo o que vem do Meta (o servidor começa em 16/09, quando a
+    // Refaz tudo o que vem do Meta (o servidor começa em 15/09, quando a
     // integração começou): pega os ajustes que o Meta faz nos dias seguintes.
     const r = await sincronizarMeta({ desde: addDias(hojeIso(), -29) });
     setResposta(r);
@@ -207,7 +207,7 @@ export function FacebookScreen() {
           <p className="m-0 text-[12.5px] text-dim leading-relaxed">
             O gasto dos <b className="text-tx">últimos 3 dias</b> das contas marcadas é buscado no Meta sempre que a dashboard
             abre, a cada 10 minutos enquanto ela está aberta, no <b className="text-tx">Atualizar</b> e, com ela fechada, algumas
-            vezes por dia e antes do fechamento das 23h — o Meta ainda ajusta um dia depois que ele acaba. <b className="text-tx">Sincronizar agora</b> refaz todos os dias desde 16/09, quando a
+            vezes por dia e antes do fechamento das 23h — o Meta ainda ajusta um dia depois que ele acaba. <b className="text-tx">Sincronizar agora</b> refaz todos os dias desde 15/09, quando a
             integração começou; os dias antes disso, lançados à mão, não mudam.
           </p>
           <div className="flex flex-wrap gap-2">
@@ -376,7 +376,7 @@ export function FacebookScreen() {
         </div>
         <div className="px-3.5 lg:px-5 pb-4 text-[11.5px] text-dim2 leading-relaxed">
           A taxa e o imposto valem a partir da próxima sincronização: a automática refaz os últimos 3 dias, e o botão
-          Sincronizar agora refaz desde 16/09.
+          Sincronizar agora refaz desde 15/09.
         </div>
         {aviso && (
           <div className="mx-3.5 lg:mx-5 mb-4 rounded-[10px] border border-line2 bg-card2 px-3.5 py-2.5 text-[12px] text-dim">
