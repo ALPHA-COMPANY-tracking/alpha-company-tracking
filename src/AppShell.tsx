@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BarChart3, Camera, Download, LogOut, MapPinned, Megaphone, PieChart, Plug, Receipt, RefreshCw, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
+import { BarChart3, Briefcase, Camera, ChevronDown, Download, LogOut, MapPinned, Megaphone, PieChart, Plug, Receipt, RefreshCw, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { usePeriodo } from '@/store/usePeriodo';
@@ -44,7 +44,42 @@ const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
   { id: 'export', label: 'Exportador', curto: 'CSV', Icon: Download },
 ];
 
+/**
+ * Menu lateral: telas soltas e grupos que abrem e fecham na setinha.
+ * Tela nova entra aqui — solta ou dentro do grupo certo.
+ */
+type ItemMenu = { aba: Tab } | { grupo: string; label: string; Icon: LucideIcon; abas: Tab[] };
+const MENU: ItemMenu[] = [
+  { aba: 'pnl' },
+  { aba: 'vendas' },
+  { aba: 'viz' },
+  { aba: 'instagram' },
+  { grupo: 'meta', label: 'Meta Ads', Icon: Megaphone, abas: ['ads', 'facebook'] },
+  {
+    grupo: 'admin',
+    label: 'Gerenciamento Administrativo',
+    Icon: Briefcase,
+    abas: ['frustrados', 'mapa', 'taxas', 'custos', 'ranking'],
+  },
+  { aba: 'export' },
+];
+
+/** A mesma ordem do menu, sem os grupos — a barra de baixo do celular. */
+const ORDEM_ABAS: Tab[] = MENU.flatMap((m) => ('aba' in m ? [m.aba] : m.abas));
+const abaPorId = (id: Tab) => TABS.find((t) => t.id === id)!;
+
 const KEY_ABA = 'afterpay-pnl:aba';
+const KEY_GRUPOS = 'afterpay-pnl:menu-aberto';
+
+/** Grupos abertos da última visita (só neste aparelho). */
+function gruposIniciais(): string[] {
+  try {
+    const salvos = JSON.parse(localStorage.getItem(KEY_GRUPOS) ?? '[]');
+    return Array.isArray(salvos) ? salvos.map(String) : [];
+  } catch {
+    return [];
+  }
+}
 
 /** Aba salva da última visita. O botão Atualizar recarrega a página
  *  inteira (F5 de verdade), e sem isso o app sempre voltava para o P&L
@@ -62,6 +97,18 @@ function abaInicial(): Tab {
 export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => void; email?: string; socio?: boolean }) {
   const { preset, periodo, selecionarPreset, definirPersonalizado } = usePeriodo();
   const [tab, setTab] = useState<Tab>(abaInicial);
+  const [gruposAbertos, setGruposAbertos] = useState<string[]>(gruposIniciais);
+  function alternarGrupo(grupo: string, aberto: boolean) {
+    setGruposAbertos((atual) => {
+      const novo = aberto ? atual.filter((g) => g !== grupo) : [...atual, grupo];
+      try {
+        localStorage.setItem(KEY_GRUPOS, JSON.stringify(novo));
+      } catch {
+        /* ignora */
+      }
+      return novo;
+    });
+  }
   const [modal, setModal] = useState(false);
   const [atualizando, setAtualizando] = useState(false);
 
@@ -165,23 +212,36 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
           <Wordmark />
         </div>
 
-        <nav className="flex lg:flex-col gap-1.5">
-          {TABS.map(({ id, label, Icon }) => {
-            const ativo = tab === id;
+        <nav className="flex flex-col gap-1.5">
+          {MENU.map((m) => {
+            if ('aba' in m) return <BotaoAba key={m.aba} aba={m.aba} ativo={tab === m.aba} onClick={() => setTab(m.aba)} />;
+            // O grupo da tela aberta fica aberto — senão ela sumiria do menu.
+            const temAtiva = m.abas.includes(tab);
+            const aberto = gruposAbertos.includes(m.grupo) || temAtiva;
             return (
-              <button
-                key={id}
-                onClick={() => setTab(id)}
-                className={`inline-flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-[13px] font-semibold whitespace-nowrap shrink-0 lg:w-full text-left transition-colors ${
-                  ativo
-                    ? 'bg-white/[0.05] text-tx border border-line2'
-                    : 'text-dim hover:text-tx hover:bg-white/[0.025] border border-transparent'
-                }`}
-              >
-                <Icon size={16} className={`shrink-0 ${ativo ? 'text-gold' : 'text-dim2'}`} />
-                {/* No menu lateral, nome longo quebra linha em vez de espremer o ícone. */}
-                <span className="lg:whitespace-normal leading-snug">{label}</span>
-              </button>
+              <div key={m.grupo}>
+                <button
+                  onClick={() => alternarGrupo(m.grupo, aberto)}
+                  aria-expanded={aberto}
+                  className={`w-full inline-flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-[13px] font-semibold text-left transition-colors border border-transparent hover:bg-white/[0.025] ${
+                    temAtiva ? 'text-tx' : 'text-dim hover:text-tx'
+                  }`}
+                >
+                  <m.Icon size={16} className={`shrink-0 ${temAtiva ? 'text-gold' : 'text-dim2'}`} />
+                  <span className="flex-1 whitespace-normal leading-snug">{m.label}</span>
+                  <ChevronDown
+                    size={15}
+                    className={`shrink-0 text-dim2 transition-transform duration-200 ${aberto ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {aberto && (
+                  <div className="ml-[21px] mt-1 pl-2.5 border-l border-line2 flex flex-col gap-1">
+                    {m.abas.map((a) => (
+                      <BotaoAba key={a} aba={a} ativo={tab === a} onClick={() => setTab(a)} pequeno />
+                    ))}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
@@ -276,7 +336,7 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
       {/* ───────── Barra de navegação inferior (celular) ───────── */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card3/97 backdrop-blur-md border-t border-line2 pb-[env(safe-area-inset-bottom)]">
         <div ref={barraRef} className="flex overflow-x-auto no-scrollbar">
-          {TABS.map(({ id, curto, Icon }) => {
+          {ORDEM_ABAS.map(abaPorId).map(({ id, curto, Icon }) => {
             const ativo = tab === id;
             return (
               <button
@@ -299,5 +359,27 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
 
       <CustoModal aberto={modal} onClose={() => setModal(false)} />
     </div>
+  );
+}
+
+/** Uma tela no menu lateral (solta ou dentro de um grupo). */
+function BotaoAba({ aba, ativo, onClick, pequeno = false }: { aba: Tab; ativo: boolean; onClick: () => void; pequeno?: boolean }) {
+  const { label, Icon } = abaPorId(aba);
+  return (
+    <button
+      onClick={onClick}
+      aria-current={ativo ? 'page' : undefined}
+      className={`w-full inline-flex items-center gap-2.5 rounded-[10px] font-semibold text-left transition-colors ${
+        pequeno ? 'px-2.5 py-2 text-[12.5px]' : 'px-3 py-2.5 text-[13px]'
+      } ${
+        ativo
+          ? 'bg-white/[0.05] text-tx border border-line2'
+          : 'text-dim hover:text-tx hover:bg-white/[0.025] border border-transparent'
+      }`}
+    >
+      <Icon size={pequeno ? 15 : 16} className={`shrink-0 ${ativo ? 'text-gold' : 'text-dim2'}`} />
+      {/* Nome longo quebra linha em vez de espremer o ícone. */}
+      <span className="whitespace-normal leading-snug">{label}</span>
+    </button>
   );
 }
