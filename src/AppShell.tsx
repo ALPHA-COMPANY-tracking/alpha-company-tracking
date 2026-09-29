@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BarChart3, Briefcase, Camera, ChevronDown, Download, LogOut, MapPinned, Megaphone, PieChart, Plug, Receipt, RefreshCw, ShieldAlert, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
+import { BarChart3, Briefcase, Camera, ChevronDown, Download, LayoutDashboard, LogOut, MapPinned, Megaphone, PieChart, Plug, Receipt, RefreshCw, ShieldAlert, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { usePeriodo } from '@/store/usePeriodo';
@@ -53,16 +53,18 @@ const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
  */
 type ItemMenu = { aba: Tab } | { grupo: string; label: string; Icon: LucideIcon; abas: Tab[] };
 const MENU: ItemMenu[] = [
-  { aba: 'pnl' },
-  { aba: 'vendas' },
-  { aba: 'viz' },
-  { aba: 'instagram' },
+  {
+    grupo: 'vendas',
+    label: 'Dashboard | Vendas',
+    Icon: LayoutDashboard,
+    abas: ['pnl', 'vendas', 'viz', 'instagram', 'ranking'],
+  },
   { grupo: 'meta', label: 'Meta Ads', Icon: Megaphone, abas: ['ads', 'facebook'] },
   {
     grupo: 'admin',
     label: 'Gerenciamento Administrativo',
     Icon: Briefcase,
-    abas: ['frustrados', 'mapa', 'alertas', 'taxas', 'custos', 'ranking'],
+    abas: ['frustrados', 'mapa', 'alertas', 'taxas', 'custos'],
   },
   { aba: 'export' },
 ];
