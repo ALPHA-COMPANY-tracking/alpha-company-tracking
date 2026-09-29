@@ -40,7 +40,8 @@ function norm(s: string | null | undefined): string {
 // já cai no grupo certo. Frustração (roubo, cancelado, devolução…) vem de
 // statusBucket — a mesma regra do card de Frustrados.
 // Jurídico (etapa nova de set/2026): cobrança travada, não está a caminho.
-const NEGOCIACAO = /negocia|atencao|juridic/;
+// No webhook ele chega como "inadimplencias" (eventos COLLECTION_J1/J2).
+const NEGOCIACAO = /negocia|atencao|juridic|inadimpl/;
 const AGUARDANDO = /entregue|cobrad/;
 // Na rua: já saiu com a transportadora e ainda não foi entregue.
 const NA_RUA = /enviad|saiu|transit|rota|retir|correio/;

@@ -46,6 +46,12 @@ describe('situação do pedido', () => {
   it('Jurídico é cobrança travada (negociação), não em rota', () => {
     expect(situacaoDoPedido('juridico')).toBe('negociacao');
     expect(situacaoDoPedido('Jurídico')).toBe('negociacao');
+    expect(situacaoDoPedido('inadimplencias')).toBe('negociacao'); // como o webhook manda
+  });
+
+  it('retirar nos Correios é em rota; com etiqueta de devolução vira frustração', () => {
+    expect(situacaoDoPedido('retirar_nos_correios')).toBe('rota');
+    for (const s of ['voltando', 'aguardando_devolucao', 'devolvido']) expect(situacaoDoPedido(s)).toBe('frustracao');
   });
 
   it('P&L e Visualização: o que falta pagar sai da etapa dos agendados do período', () => {
