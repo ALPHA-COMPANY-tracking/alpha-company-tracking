@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Pedido } from '@/types';
 import { ESTADOS, lerRegioesDoCsv, nomeDeCidade, normalizarUf, perdasPorRegiao } from '@/lib/regiao';
 import { aplicarRegioes } from '@/data/backend';
+import brasil from '@svg-maps/brazil';
 import { mapearPedido, regiaoDoPayload } from '../../api/bluesales-webhook';
 
 const P = { inicio: '2026-09-01', fim: '2026-09-30' };
@@ -22,10 +23,10 @@ const ped = (status: string, uf: string | null, cidade: string | null = null, ex
 });
 
 describe('estado e cidade', () => {
-  it('os 27 estados, cada um num lugar do mapa', () => {
+  it('os 27 estados, os mesmos do desenho do mapa', () => {
     expect(Object.keys(ESTADOS)).toHaveLength(27);
-    const lugares = new Set(Object.values(ESTADOS).map((e) => `${e.col},${e.lin}`));
-    expect(lugares.size).toBe(27);
+    const doMapa = (brasil as unknown as { locations: { id: string }[] }).locations.map((l) => l.id.toUpperCase()).sort();
+    expect(doMapa).toEqual(Object.keys(ESTADOS).sort());
   });
 
   it('aceita sigla ou nome, com ou sem acento', () => {
