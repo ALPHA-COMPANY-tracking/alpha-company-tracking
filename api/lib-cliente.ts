@@ -80,7 +80,7 @@ export function codigosDoPayload(chave: string, body: Record<string, unknown>): 
 
 // ── Alerta ──
 
-export type NivelAlerta = 'roubo' | 'frustracao' | 'duplicado' | 'recompra';
+export type NivelAlerta = 'roubo' | 'frustracao' | 'duplicado' | 'whatsapp' | 'recompra';
 
 const ROUBO = /roub|furt/;
 const FRUSTRACAO = /frustr|devol|voltand|retorn|extravi|sinistr|recus|cancel/;
@@ -95,30 +95,38 @@ function norm(s: unknown): string {
 }
 
 /**
- * O que os OUTROS pedidos da mesma cliente dizem sobre um pedido novo, do
- * mais grave para o mais leve: já roubou > já frustrou > tem pedido em
- * aberto (duplicado) > já comprou e pagou (recompra, só informação).
+ * O que os OUTROS pedidos dizem sobre um pedido novo, do mais grave para
+ * o mais leve: já roubou > já frustrou > tem pedido em aberto (duplicado)
+ * > mesmo WhatsApp com outro CPF > já comprou e pagou (recompra). Roubo e
+ * frustração valem mesmo quando só o WhatsApp se repete (`outroCpf`).
  */
-export function nivelDoAlerta(outros: { status: string | null }[]): NivelAlerta | null {
+export function nivelDoAlerta(outros: { status: string | null; outroCpf?: boolean }[]): NivelAlerta | null {
   const st = outros.map((o) => norm(o.status));
   if (st.some((s) => ROUBO.test(s))) return 'roubo';
   if (st.some((s) => FRUSTRACAO.test(s))) return 'frustracao';
-  if (st.some((s) => s && !PAGO.has(s))) return 'duplicado';
+  if (outros.some((o, i) => !o.outroCpf && st[i] && !PAGO.has(st[i]))) return 'duplicado';
+  if (outros.some((o) => o.outroCpf)) return 'whatsapp';
   if (st.length) return 'recompra';
   return null;
 }
 
 /** Frase curta para a notificação do celular. */
-export function textoDoAlerta(nivel: NivelAlerta, outros: { internal_id?: unknown; status: string | null; data?: unknown }[]): string {
-  const ref = (filtro: (s: string) => boolean) => {
-    const o = outros.find((x) => filtro(norm(x.status)));
+export function textoDoAlerta(
+  nivel: NivelAlerta,
+  outros: { internal_id?: unknown; status: string | null; data?: unknown; outroCpf?: boolean }[],
+): string {
+  const ref = (filtro: (s: string, outroCpf: boolean) => boolean) => {
+    const o = outros.find((x) => filtro(norm(x.status), Boolean(x.outroCpf)));
     if (!o) return '';
     const [, m, d] = String(o.data ?? '').split('-');
     return ` no #${o.internal_id ?? '?'}${d ? ` (${d}/${m})` : ''}`;
   };
   if (nivel === 'roubo') return `🚨 Cliente com ROUBO${ref((s) => ROUBO.test(s))} — confirme antes de enviar.`;
   if (nivel === 'frustracao') return `⚠️ Cliente já frustrou${ref((s) => FRUSTRACAO.test(s))} — confirme antes de enviar.`;
-  if (nivel === 'duplicado') return `⚠️ Possível pedido DUPLICADO: a cliente já tem pedido em aberto${ref((s) => !!s && !PAGO.has(s))}.`;
+  if (nivel === 'duplicado') {
+    return `⚠️ Possível pedido DUPLICADO: a cliente já tem pedido em aberto${ref((s, outro) => !outro && !!s && !PAGO.has(s))}.`;
+  }
+  if (nivel === 'whatsapp') return `⚠️ Mesmo WhatsApp de outra cliente (outro CPF)${ref((_s, outro) => outro)} — confirme quem é.`;
   return `Cliente já comprou e pagou${ref((s) => PAGO.has(s))} (recompra).`;
 }
 

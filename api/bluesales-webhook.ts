@@ -385,15 +385,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .join(',');
     const { data: outros } = await supabase()
       .from('bluesales_pedidos')
-      .select('internal_id,status,data')
+      .select('internal_id,status,data,cpf_hash')
       .eq('user_id', userId)
       .neq('id', pedido.id as string)
       .is('removido_em', null)
       .or(filtros)
       .order('data', { ascending: false })
       .limit(20);
-    const nivel = libCliente.nivelDoAlerta(outros ?? []);
-    if (nivel) alerta = { nivel, texto: libCliente.textoDoAlerta(nivel, outros ?? []) };
+    // Mesmo WhatsApp com CPF diferente: pode ser outra pessoa no mesmo celular.
+    const ligados = (outros ?? []).map((o) => ({
+      ...o,
+      outroCpf: Boolean(pedido.cpf_hash && o.cpf_hash && o.cpf_hash !== pedido.cpf_hash),
+    }));
+    const nivel = libCliente.nivelDoAlerta(ligados);
+    if (nivel) alerta = { nivel, texto: libCliente.textoDoAlerta(nivel, ligados) };
   }
 
   // A notificação NÃO depende da gravação ter dado certo: são coisas

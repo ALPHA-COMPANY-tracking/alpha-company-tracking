@@ -12,6 +12,8 @@ export interface PedidoVerificado {
   /** Só para o dono/sócio. */
   vendedor?: string | null;
   por: 'cpf' | 'telefone';
+  /** Achado pelo WhatsApp, mas com outro CPF. */
+  outroCpf?: boolean;
 }
 
 export type RespostaVerificar = { ok: true; pedidos: PedidoVerificado[] } | { ok: false; aviso: string };
@@ -63,11 +65,18 @@ export async function alertasDoVendedor(): Promise<Map<string, AlertaCliente>> {
   if (!supabase) return mapa;
   const { data, error } = await supabase.rpc('alertas_vendedor');
   if (error || !Array.isArray(data)) return mapa;
-  type Linha = { pedido_id: string; outro_numero: number | null; outro_status: string | null; outro_data: string; por: string };
+  type Linha = {
+    pedido_id: string;
+    outro_numero: number | null;
+    outro_status: string | null;
+    outro_data: string;
+    por: string;
+    outro_cpf?: boolean;
+  };
   const porPedido = new Map<string, { outros: AlertaCliente['outros']; por: 'cpf' | 'telefone' }>();
   for (const r of data as Linha[]) {
     const g = porPedido.get(r.pedido_id) ?? { outros: [], por: 'telefone' };
-    g.outros.push({ status: r.outro_status, internal_id: r.outro_numero, data: String(r.outro_data) });
+    g.outros.push({ status: r.outro_status, internal_id: r.outro_numero, data: String(r.outro_data), outroCpf: r.outro_cpf === true });
     if (r.por === 'cpf') g.por = 'cpf';
     porPedido.set(r.pedido_id, g);
   }

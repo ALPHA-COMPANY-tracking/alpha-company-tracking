@@ -15,6 +15,7 @@ const FRASE: Record<NivelAlerta, string> = {
   roubo: 'Esta cliente já teve pedido ROUBADO. Não agende sem confirmar.',
   frustracao: 'Esta cliente já frustrou um pedido (devolveu, cancelou ou não pagou). Confirme antes de agendar.',
   duplicado: 'Esta cliente já tem um pedido EM ABERTO. Pode ser pedido duplicado.',
+  whatsapp: 'Este WhatsApp já foi usado por OUTRA pessoa (outro CPF). Confirme quem é antes de agendar.',
   recompra: 'Cliente que já comprou e pagou. Pode agendar.',
 };
 

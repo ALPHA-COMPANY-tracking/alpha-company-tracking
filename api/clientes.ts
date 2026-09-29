@@ -73,6 +73,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // O vendedor só aparece para o dono/sócio.
         ...(papel === 'dono' ? { vendedor: p.vendedor } : {}),
         por: cod.cpf_hash && p.cpf_hash === cod.cpf_hash ? 'cpf' : 'telefone',
+        // Achado pelo WhatsApp, mas com outro CPF: pode ser outra pessoa.
+        outroCpf: Boolean(cod.cpf_hash && p.cpf_hash && p.cpf_hash !== cod.cpf_hash),
       }));
       return res.status(200).json({ ok: true, nivel: lib.nivelDoAlerta(pedidos), pedidos });
     }

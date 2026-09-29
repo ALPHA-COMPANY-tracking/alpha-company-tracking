@@ -108,6 +108,22 @@ describe('alertas dos pedidos (dashboard)', () => {
     expect(alertasDosPedidos([soPrimeiroNome, outraAna]).has(outraAna.id)).toBe(false);
   });
 
+  it('mesmo WhatsApp com outro CPF: aviso próprio — mas roubo continua roubo', () => {
+    // O caso de 21/09: duas clientes, nomes e CPFs diferentes, o mesmo WhatsApp.
+    const elizabete = ped('cobrados', { tel_hash: 't9', cpf_hash: 'cA' });
+    const maria = ped('saiu_para_entrega', { tel_hash: 't9', cpf_hash: 'cB' });
+    const a = alertasDosPedidos([elizabete, maria]);
+    expect(a.get(maria.id)).toMatchObject({ nivel: 'whatsapp', por: 'telefone' });
+    expect(pedidoDoMotivo(a.get(maria.id)!)?.internal_id).toBe(elizabete.internal_id);
+
+    const ladra = ped('roubo', { tel_hash: 't8', cpf_hash: 'cC' });
+    const novoNome = ped('cadastrados', { tel_hash: 't8', cpf_hash: 'cD' });
+    expect(alertasDosPedidos([ladra, novoNome]).get(novoNome.id)?.nivel).toBe('roubo');
+
+    expect(nivelServidor([{ status: 'enviados', outroCpf: true }])).toBe('whatsapp');
+    expect(nivelServidor([{ status: 'roubo', outroCpf: true }])).toBe('roubo');
+  });
+
   it('frustração vale mais que pedido em aberto', () => {
     expect(nivelDoAlerta([{ status: 'enviados' }, { status: 'voltando' }])).toBe('frustracao');
   });

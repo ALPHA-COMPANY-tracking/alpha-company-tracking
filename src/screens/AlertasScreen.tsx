@@ -16,7 +16,7 @@ import { pedidosAtivos } from '@/lib/pedidos';
 import { SeloAlerta } from '@/components/alertas/SeloAlerta';
 import { VerificarCliente } from '@/components/alertas/VerificarCliente';
 
-const GRAVIDADE: Record<NivelAlerta, number> = { roubo: 0, frustracao: 1, duplicado: 2, recompra: 3 };
+const GRAVIDADE: Record<NivelAlerta, number> = { roubo: 0, frustracao: 1, duplicado: 2, whatsapp: 3, recompra: 4 };
 
 /** "saiu_para_entrega" → "Saiu para entrega". */
 function etapa(status: string | null): string {
@@ -43,7 +43,7 @@ export function AlertasScreen() {
     [pedidos, alertas, filtro],
   );
   const contagem = useMemo(() => {
-    const c: Record<NivelAlerta, number> = { roubo: 0, frustracao: 0, duplicado: 0, recompra: 0 };
+    const c: Record<NivelAlerta, number> = { roubo: 0, frustracao: 0, duplicado: 0, whatsapp: 0, recompra: 0 };
     for (const a of alertas.values()) c[a.nivel] += 1;
     return c;
   }, [alertas]);
@@ -90,7 +90,7 @@ export function AlertasScreen() {
         title="Pedidos em aberto com alerta"
         right={
           <div className="flex flex-wrap gap-1 rounded-[10px] border border-line2 p-[3px]">
-            {(['todos', 'roubo', 'frustracao', 'duplicado'] as const).map((f) => (
+            {(['todos', 'roubo', 'frustracao', 'duplicado', 'whatsapp'] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFiltro(f)}

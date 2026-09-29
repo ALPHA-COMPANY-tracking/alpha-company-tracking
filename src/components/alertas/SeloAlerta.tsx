@@ -5,6 +5,7 @@ export const COR_ALERTA: Record<NivelAlerta, string> = {
   roubo: 'text-red border-red/45 bg-red/10',
   frustracao: 'text-yel border-yel/40 bg-yel/10',
   duplicado: 'text-yel border-yel/40 bg-yel/10',
+  whatsapp: 'text-yel border-yel/40 bg-yel/10',
   recompra: 'text-grn border-grn/35 bg-grn/10',
 };
 
