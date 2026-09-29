@@ -95,7 +95,10 @@ export function normalizarUf(v: unknown): string | undefined {
 function nomeDeCidade(v: unknown): string | undefined {
   const s = String(v ?? '').trim().replace(/\s+/g, ' ').slice(0, 80);
   if (!s || /\d/.test(s)) return undefined;
-  return s.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (_m, sep: string, l: string) => sep + l.toUpperCase());
+  return s
+    .toLowerCase()
+    .replace(/(^|[\s'-])(\p{L})/gu, (_m, sep: string, l: string) => sep + l.toUpperCase())
+    .replace(/ (Da|De|Do|Das|Dos|E)(?= )/g, (m) => m.toLowerCase()); // "Rio de Janeiro"
 }
 
 const CHAVES_UF = ['state', 'uf', 'estado', 'state_code', 'province'];

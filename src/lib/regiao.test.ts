@@ -33,7 +33,8 @@ describe('estado e cidade', () => {
     expect(normalizarUf('São Paulo')).toBe('SP');
     expect(normalizarUf('ESPIRITO SANTO')).toBe('ES');
     expect(normalizarUf('Sudeste')).toBeNull();
-    expect(nomeDeCidade('SÃO JOSÉ DOS CAMPOS')).toBe('São José Dos Campos');
+    expect(nomeDeCidade('SÃO JOSÉ DOS CAMPOS')).toBe('São José dos Campos');
+    expect(nomeDeCidade('Rio De Janeiro')).toBe('Rio de Janeiro');
     expect(nomeDeCidade('  ')).toBeNull();
   });
 });
@@ -48,7 +49,7 @@ describe('CSV do BlueSales', () => {
     const r = lerRegioesDoCsv(csv);
     expect(r.itens).toEqual([
       { internal_id: 1664, uf: 'SP', cidade: 'Campinas' },
-      { internal_id: 1599, uf: 'RJ', cidade: 'Rio De Janeiro' },
+      { internal_id: 1599, uf: 'RJ', cidade: 'Rio de Janeiro' },
     ]);
     expect(r.linhas).toBe(3);
     expect(r.semRegiao).toBe(1);

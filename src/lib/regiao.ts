@@ -60,7 +60,10 @@ export function normalizarUf(v: unknown): string | null {
 export function nomeDeCidade(v: unknown): string | null {
   const s = String(v ?? '').trim().replace(/\s+/g, ' ').slice(0, 80);
   if (!s || /\d/.test(s)) return null;
-  return s.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (_m, sep: string, l: string) => sep + l.toUpperCase());
+  return s
+    .toLowerCase()
+    .replace(/(^|[\s'-])(\p{L})/gu, (_m, sep: string, l: string) => sep + l.toUpperCase())
+    .replace(/ (Da|De|Do|Das|Dos|E)(?= )/g, (m) => m.toLowerCase()); // "Rio de Janeiro"
 }
 
 /** CSV com aspas (o endereço tem vírgula e quebra de linha dentro). */
