@@ -3,7 +3,16 @@
 // A chave pública VAPID vem de VITE_VAPID_PUBLIC_KEY.
 // ─────────────────────────────────────────────────────────────
 
+import { supabase } from '@/lib/supabase';
+
 const CHAVE_PUBLICA = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
+
+/** O servidor só aceita o dono ou um sócio logado: vai a sessão junto. */
+async function cabecalhos(): Promise<Record<string, string>> {
+  const { data } = (await supabase?.auth.getSession()) ?? { data: { session: null } };
+  const token = data.session?.access_token;
+  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
 
 /** base64url (VAPID) → bytes, formato exigido pelo navegador. */
 function base64ParaBytes(base64: string): ArrayBuffer {
@@ -69,7 +78,7 @@ export async function ligarPush(): Promise<EstadoPush> {
   const dados = inscricao.toJSON() as { endpoint?: string; keys?: Record<string, string> };
   const resp = await fetch('/api/push-subscribe', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await cabecalhos(),
     body: JSON.stringify({
       endpoint: dados.endpoint,
       keys: dados.keys,
@@ -83,7 +92,7 @@ export async function ligarPush(): Promise<EstadoPush> {
 
 /** Pede ao servidor uma notificação de teste. Devolve o texto do resultado. */
 export async function enviarTeste(): Promise<string> {
-  const resp = await fetch('/api/push-test', { method: 'POST' });
+  const resp = await fetch('/api/push-test', { method: 'POST', headers: await cabecalhos() });
   const dados = (await resp.json().catch(() => ({}))) as {
     ok?: boolean;
     enviados?: number;
@@ -103,7 +112,7 @@ export async function desligarPush(): Promise<EstadoPush> {
   if (inscricao) {
     await fetch('/api/push-subscribe', {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await cabecalhos(),
       body: JSON.stringify({ endpoint: inscricao.endpoint }),
     }).catch(() => undefined);
     await inscricao.unsubscribe();

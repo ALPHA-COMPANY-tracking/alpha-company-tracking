@@ -24,6 +24,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const userId = process.env.DASHBOARD_USER_ID;
   if (!userId) return res.status(500).json({ error: 'DASHBOARD_USER_ID não configurado' });
 
+  // Só o dono ou um sócio logado: sem isso, qualquer um que chamasse este
+  // endereço passaria a receber os avisos (vendas, resumo do dia).
+  const { donoOuSocio } = await import('./lib-auth.js');
+  if (!(await donoOuSocio(supabase(), req.headers['authorization'], userId))) {
+    return res.status(401).json({ error: 'Não autorizado' });
+  }
+
   const body = (typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body) ?? {};
   const endpoint = String(body.endpoint ?? '');
   if (!endpoint.startsWith('http')) return res.status(400).json({ error: 'endpoint inválido' });
