@@ -1,17 +1,30 @@
 // O registro de alertas de clientes, sempre em dia na dashboard aberta:
 // carrega ao abrir e a cada minuto (o servidor grava sozinho a cada pedido
 // que chega) e completa o que faltar com os pedidos carregados.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Pedido } from '@/types';
 import { supabase } from '@/lib/supabase';
-import { alertasDosPedidos } from '@/lib/clientes';
-import { type AlertaRegistrado, alertasFaltantes, carregarRegistro, marcarVistos, registrar } from '@/lib/alertasRegistro';
+import { type AlertaCliente, alertasDosPedidos } from '@/lib/clientes';
+import {
+  type AlertaRegistrado,
+  type NivelRegistrado,
+  alertasFaltantes,
+  carregarRegistro,
+  descartar as descartarNoBanco,
+  foiDescartado,
+  marcarVistos,
+  registrar,
+} from '@/lib/alertasRegistro';
 
 export interface RegistroAlertas {
   /** null = ainda carregando ou tabela inexistente (migração 0024). */
   registro: AlertaRegistrado[] | null;
   disponivel: boolean;
   marcarVisto: (ids: number[]) => Promise<void>;
+  /** O alerta deste pedido foi descartado (erro de cadastro)? */
+  descartado: (pedidoId: string, a: AlertaCliente | undefined) => boolean;
+  /** Tira o alerta da tela (fica no registro). Devolve o erro, se houver. */
+  descartar: (pedido: Pedido, a: AlertaCliente, motivo: string) => Promise<string | null>;
 }
 
 export function useRegistroAlertas(pedidos: Pedido[]): RegistroAlertas {
@@ -68,5 +81,22 @@ export function useRegistroAlertas(pedidos: Pedido[]): RegistroAlertas {
     [],
   );
 
-  return { registro, disponivel, marcarVisto };
+  const porPedido = useMemo(() => new Map((registro ?? []).map((r) => [r.pedido_id, r])), [registro]);
+  const descartado = useCallback(
+    (pedidoId: string, a: AlertaCliente | undefined) => foiDescartado(a, porPedido.get(pedidoId)),
+    [porPedido],
+  );
+
+  const descartar = useCallback(
+    async (pedido: Pedido, a: AlertaCliente, motivo: string) => {
+      if (!conta) return 'Ainda carregando — tente de novo em alguns segundos.';
+      if (a.nivel === 'recompra') return null;
+      const erro = await descartarNoBanco(conta, pedido, a as AlertaCliente & { nivel: NivelRegistrado }, motivo);
+      await recarregar();
+      return erro;
+    },
+    [conta, recarregar],
+  );
+
+  return { registro, disponivel, marcarVisto, descartado, descartar };
 }

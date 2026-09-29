@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { useMemo, useRef, useState } from 'react';
-import { Check, FileUp, Loader2, ShieldAlert, TriangleAlert } from 'lucide-react';
+import { Check, FileUp, Loader2, ShieldAlert, TriangleAlert, X } from 'lucide-react';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
 import { formatBRL, reaisToCents } from '@/lib/money';
@@ -34,17 +34,19 @@ export function AlertasScreen({ registro }: { registro: RegistroAlertas }) {
       pedidosAtivos(pedidos)
         .filter((p) => {
           const a = alertas.get(p.id);
-          return a && a.nivel !== 'recompra' && (filtro === 'todos' || a.nivel === filtro);
+          return (
+            a && a.nivel !== 'recompra' && !registro.descartado(p.id, a) && (filtro === 'todos' || a.nivel === filtro)
+          );
         })
         .sort(
           (a, b) =>
             GRAVIDADE[alertas.get(a.id)!.nivel] - GRAVIDADE[alertas.get(b.id)!.nivel] || b.data.localeCompare(a.data),
         ),
-    [pedidos, alertas, filtro],
+    [pedidos, alertas, filtro, registro],
   );
   const contagem = useMemo(() => {
     const c: Record<NivelAlerta, number> = { roubo: 0, frustracao: 0, duplicado: 0, whatsapp: 0, recompra: 0 };
-    for (const a of alertas.values()) c[a.nivel] += 1;
+    for (const [id, a] of alertas) if (!registro.descartado(id, a)) c[a.nivel] += 1;
     return c;
   }, [alertas]);
 
@@ -123,6 +125,7 @@ export function AlertasScreen({ registro }: { registro: RegistroAlertas }) {
                 <span className="mono text-[12.5px] font-bold text-tx w-[86px] text-right">
                   {formatBRL(reaisToCents(Number(p.valor_agendado ?? p.valor) || 0))}
                 </span>
+                <BotaoDescartar onDescartar={() => registro.descartar(p, alertas.get(p.id)!, 'Erro de cadastro — descartado na tela')} />
               </div>
             ))}
           </div>
@@ -214,8 +217,11 @@ function RegistroDeAlertas({ registro }: { registro: RegistroAlertas }) {
                     {a.texto && ` · ${a.texto}`}
                   </div>
                 </div>
-                <span className={`text-[11px] shrink-0 ${a.visto_em ? 'text-dim2' : 'text-gold2 font-semibold'}`}>
-                  {a.visto_em ? `visto ${quando(a.visto_em)}` : 'novo'}
+                <span
+                  title={a.motivo_descarte ?? undefined}
+                  className={`text-[11px] shrink-0 ${a.descartado_em || a.visto_em ? 'text-dim2' : 'text-gold2 font-semibold'}`}
+                >
+                  {a.descartado_em ? `descartado ${quando(a.descartado_em)}` : a.visto_em ? `visto ${quando(a.visto_em)}` : 'novo'}
                 </span>
               </div>
             );
@@ -231,5 +237,47 @@ function RegistroDeAlertas({ registro }: { registro: RegistroAlertas }) {
         </div>
       )}
     </Panel>
+  );
+}
+
+/** Descartar com confirmação na própria linha (o alerta fica no registro). */
+function BotaoDescartar({ onDescartar }: { onDescartar: () => Promise<string | null> }) {
+  const [confirmando, setConfirmando] = useState(false);
+  const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  if (ocupado) return <Loader2 size={15} className="animate-spin text-dim2" />;
+  if (confirmando) {
+    return (
+      <span className="inline-flex items-center gap-2 text-[11.5px]">
+        <span className="text-dim">Erro de cadastro?</span>
+        <button
+          onClick={async () => {
+            setOcupado(true);
+            const e = await onDescartar();
+            setOcupado(false);
+            setConfirmando(false);
+            setErro(e);
+          }}
+          className="font-semibold text-gold2 hover:text-gold"
+        >
+          Descartar
+        </button>
+        <button onClick={() => setConfirmando(false)} className="text-dim2 hover:text-tx">
+          Cancelar
+        </button>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-2">
+      {erro && <span className="text-[11px] text-yel">{erro}</span>}
+      <button
+        onClick={() => setConfirmando(true)}
+        title="Foi erro (ex.: WhatsApp cadastrado errado): tira da lista, fica no registro"
+        className="inline-flex items-center gap-1 px-2.5 py-[5px] rounded-[8px] text-[11.5px] font-semibold text-dim hover:text-tx border border-line2"
+      >
+        <X size={12} /> Descartar
+      </button>
+    </span>
   );
 }

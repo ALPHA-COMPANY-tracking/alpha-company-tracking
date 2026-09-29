@@ -2,9 +2,9 @@
 // que já roubou ou frustrou.
 import { describe, expect, it } from 'vitest';
 import type { Pedido } from '@/types';
-import { alertasDosPedidos, nivelDoAlerta, pedidoDoMotivo } from '@/lib/clientes';
+import { type AlertaCliente, alertasDosPedidos, nivelDoAlerta, pedidoDoMotivo } from '@/lib/clientes';
 import { lerClientesDoCsv } from '@/lib/csvBluesales';
-import { type AlertaRegistrado, alertasFaltantes } from '@/lib/alertasRegistro';
+import { type AlertaRegistrado, alertasFaltantes, foiDescartado } from '@/lib/alertasRegistro';
 import { alertasNovos } from '@/components/alertas/AvisoAlertas';
 import {
   codigosDe,
@@ -163,6 +163,15 @@ describe('registro automático de alertas', () => {
     expect(alertasFaltantes(calculados, [reg(novo.id, 'duplicado')])).toHaveLength(1);
     // Já está como roubo: nada a fazer.
     expect(alertasFaltantes(calculados, [reg(novo.id, 'roubo')])).toHaveLength(0);
+  });
+
+  it('descartado (erro de cadastro) sai da tela — mas volta se o alerta piorar', () => {
+    const a: AlertaCliente = { nivel: 'whatsapp', por: 'telefone', outros: [] };
+    const r = { ...reg('p1', 'whatsapp'), descartado_em: '2026-09-29T13:00:00Z' };
+    expect(foiDescartado(a, r)).toBe(true);
+    expect(foiDescartado({ ...a, nivel: 'roubo' }, r)).toBe(false);
+    expect(foiDescartado(a, reg('p1', 'whatsapp'))).toBe(false);
+    expect(alertasNovos([r], [])).toHaveLength(0);
   });
 
   it('o aviso da tela principal: só os não vistos, de pedido que ainda dá para segurar, roubo primeiro', () => {

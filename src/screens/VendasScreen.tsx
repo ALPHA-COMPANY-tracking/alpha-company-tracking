@@ -5,6 +5,7 @@ import { formatBRL, reaisToCents } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
 import { agendadoPorDia, casaComBusca, possiveisDuplicados, statusBucket } from '@/lib/pedidos';
 import { alertasDosPedidos } from '@/lib/clientes';
+import type { RegistroAlertas } from '@/store/useRegistroAlertas';
 import { SeloAlerta } from '@/components/alertas/SeloAlerta';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
@@ -34,7 +35,7 @@ function selo(p: Pedido): { texto: string; classe: string } {
   return { texto: cru || 'agendado', classe: 'text-dim border-line2 bg-chip' };
 }
 
-export function VendasScreen({ periodo }: { periodo: Periodo }) {
+export function VendasScreen({ periodo, registro }: { periodo: Periodo; registro?: RegistroAlertas }) {
   const { pedidos, removerPedido, definirClientePedido } = useData();
   const [confirmando, setConfirmando] = useState<string | null>(null);
   const [editando, setEditando] = useState<string | null>(null);
@@ -165,7 +166,7 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
             <span className="hidden sm:inline text-dim2">{p.internal_id != null ? " · " : ""}{p.id}</span>
           </div>
           {/* Cliente com roubo, frustração ou outro pedido em aberto. */}
-          {!removido && alertas.get(p.id) && alertas.get(p.id)!.nivel !== 'recompra' && (
+          {!removido && alertas.get(p.id) && alertas.get(p.id)!.nivel !== 'recompra' && !registro?.descartado(p.id, alertas.get(p.id)) && (
             <div className="mt-1">
               <SeloAlerta alerta={alertas.get(p.id)!} />
             </div>

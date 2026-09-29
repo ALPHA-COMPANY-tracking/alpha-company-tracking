@@ -14,7 +14,7 @@ const MAX = 5;
 export function alertasNovos(registro: AlertaRegistrado[], pedidos: Pedido[]): { a: AlertaRegistrado; p: Pedido | undefined }[] {
   const porId = new Map(pedidos.map((p) => [p.id, p]));
   return registro
-    .filter((a) => !a.visto_em)
+    .filter((a) => !a.visto_em && !a.descartado_em)
     .map((a) => ({ a, p: porId.get(a.pedido_id) }))
     .filter(({ p }) => !p || (!p.removido_em && pedidoEmAberto(p)))
     .sort((x, y) => GRAVIDADE[x.a.nivel] - GRAVIDADE[y.a.nivel] || y.a.criado_em.localeCompare(x.a.criado_em));

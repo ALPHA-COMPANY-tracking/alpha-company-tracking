@@ -333,7 +333,7 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
             alertas={registroAlertas}
             onVerAlertas={() => setTab('alertas')}
           />}
-        {tab === 'vendas' && <VendasScreen periodo={periodo} />}
+        {tab === 'vendas' && <VendasScreen periodo={periodo} registro={registroAlertas} />}
         {tab === 'ranking' && <RankingScreen periodo={periodo} />}
         {tab === 'instagram' && <InstagramScreen periodo={periodo} />}
         {tab === 'ads' && <AdsScreen periodo={periodo} />}
