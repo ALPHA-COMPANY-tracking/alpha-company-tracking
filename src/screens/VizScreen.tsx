@@ -41,13 +41,30 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
       cor: 'bg-grn',
       texto: 'text-grn',
     },
-    { id: 'rota', nome: 'Em rota', qtd: sit.rota.qtd, valor: sit.rota.valor, nota: 'a receber', cor: 'bg-gold', texto: 'text-gold2' },
+    {
+      id: 'rota',
+      nome: 'Em rota',
+      qtd: sit.rota.qtd,
+      valor: sit.rota.valor,
+      nota: 'na rua · a receber',
+      cor: 'bg-gold',
+      texto: 'text-gold2',
+    },
+    {
+      id: 'preparo',
+      nome: 'A enviar',
+      qtd: sit.preparo.qtd,
+      valor: sit.preparo.valor,
+      nota: 'ainda não saiu',
+      cor: 'bg-dim',
+      texto: 'text-tx',
+    },
     {
       id: 'aguardando',
       nome: 'Entregues',
       qtd: sit.aguardando.qtd,
       valor: sit.aguardando.valor,
-      nota: 'entregues e cobrados, sem pagar',
+      nota: 'entregues, sem pagar',
       cor: 'bg-gold3',
       texto: 'text-tx',
     },
@@ -56,7 +73,7 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
       nome: 'Negociação',
       qtd: sit.negociacao.qtd,
       valor: sit.negociacao.valor,
-      nota: 'e requer atenção',
+      nota: 'requer atenção e jurídico',
       cor: 'bg-yel',
       texto: 'text-yel',
     },
@@ -92,7 +109,7 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 lg:gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 lg:gap-3">
             {blocos.map((b) => (
               <div key={b.id} className="min-w-0 rounded-[12px] border border-line bg-card/70 px-3 py-2.5">
                 <div className="flex items-center gap-1.5 text-[11px] text-dim">
@@ -199,8 +216,8 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
             />
           </div>
           <div className="px-[18px] py-2.5 border-t border-line text-[10.5px] text-dim2 leading-relaxed">
-            Fora da projeção: {sit.negociacao.qtd} em negociação/atenção, {sit.aguardando.qtd} entregues sem pagar e{' '}
-            {sit.frustracao.qtd} em frustração.
+            Fora da projeção: {sit.preparo.qtd} a enviar, {sit.negociacao.qtd} em negociação/jurídico,{' '}
+            {sit.aguardando.qtd} entregues sem pagar e {sit.frustracao.qtd} em frustração.
           </div>
           <div
             className={`px-[18px] py-5 border-t flex items-end justify-between gap-4 bg-gradient-to-br ${

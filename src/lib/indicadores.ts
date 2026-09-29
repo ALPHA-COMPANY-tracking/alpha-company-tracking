@@ -6,10 +6,11 @@
 //     pedidos agendados antes do período e pagos dentro dele.
 //   · Anúncio ÷ venda (CPA, ROAS): o gasto do período contra o que o
 //     período agendou ou recebeu. Mesmas regras da Demonstração.
-//   · Situação dos agendados do período: em rota, aguardando pagamento,
-//     negociação/atenção e frustração (frustrado, devolvido, roubo…).
+//   · Situação dos agendados do período: em rota (na rua), a enviar,
+//     entregues sem pagar, negociação/jurídico e frustração (frustrado,
+//     devolvido, roubo…).
 //   · Projeção: o lucro real de hoje + o que os pedidos EM ROTA devem
-//     render. Negociação, frustrado e cobrança parada não entram.
+//     render. A enviar, negociação, frustrado e cobrança parada não entram.
 // ─────────────────────────────────────────────────────────────
 
 import type { AfterpayDaily, CustoVariavel, Pedido, Periodo } from '@/types';
@@ -25,7 +26,7 @@ import {
   perdaRealDePedido,
 } from '@/lib/custosConfig';
 
-export type Situacao = 'pago' | 'rota' | 'aguardando' | 'negociacao' | 'frustracao';
+export type Situacao = 'pago' | 'rota' | 'preparo' | 'aguardando' | 'negociacao' | 'frustracao';
 
 function norm(s: string | null | undefined): string {
   return (s ?? '')
@@ -38,17 +39,22 @@ function norm(s: string | null | undefined): string {
 // Por padrão de texto: status novo do BlueSales com uma dessas palavras
 // já cai no grupo certo. Frustração (roubo, cancelado, devolução…) vem de
 // statusBucket — a mesma regra do card de Frustrados.
-const NEGOCIACAO = /negocia|atencao/;
+// Jurídico (etapa nova de set/2026): cobrança travada, não está a caminho.
+const NEGOCIACAO = /negocia|atencao|juridic/;
 const AGUARDANDO = /entregue|cobrad/;
+// Na rua: já saiu com a transportadora e ainda não foi entregue.
+const NA_RUA = /enviad|saiu|transit|rota|retir|correio/;
 
 /**
  * Onde o pedido está:
- *   rota        → cadastrado, aguardando coleta, enviado, saiu para
- *                 entrega, retirar nos correios: a caminho do cliente
+ *   rota        → EM ROTA de verdade: enviado, saiu para entrega, retirar
+ *                 nos correios — o produto está na rua, a caminho
+ *   preparo     → cadastrado, confirmado, aguardando coleta: ainda não
+ *                 saiu (e qualquer etapa nova que não se encaixe)
  *   aguardando  → entregue / cobrado: chegou, falta pagar
- *   negociacao  → negociação, requer atenção: travado, sem previsão
- *   frustracao  → frustrado, roubo, cancelado, devolvido, aguardando
- *                 devolução… (o card "Frustrados" do BlueSales)
+ *   negociacao  → negociação, requer atenção, jurídico: travado, sem previsão
+ *   frustracao  → frustrado, roubo, cancelado, devolvido, voltando,
+ *                 aguardando devolução… (o card "Frustrados" do BlueSales)
  */
 export function situacaoDoPedido(status: string | null | undefined): Situacao {
   const bucket = statusBucket(status);
@@ -57,7 +63,8 @@ export function situacaoDoPedido(status: string | null | undefined): Situacao {
   const s = norm(status);
   if (NEGOCIACAO.test(s)) return 'negociacao';
   if (AGUARDANDO.test(s)) return 'aguardando';
-  return 'rota';
+  if (NA_RUA.test(s)) return 'rota';
+  return 'preparo';
 }
 
 /**
@@ -167,6 +174,42 @@ export interface Indicadores {
   projecao: Projecao;
 }
 
+/** Valor do agendamento (o que o pedido vale). */
+const valorAgendado = (p: Pedido): Cents => reaisToCents(Number(p.valor_agendado ?? p.valor) || 0);
+
+/**
+ * Onde está hoje cada pedido AGENDADO no período (data do pedido). Fonte
+ * única dos quadros da Visualização e do "Gap Agendado vs Aprovado" do P&L.
+ */
+export function situacaoDosAgendados(pedidos: Pedido[], periodo: Periodo): Record<Situacao, Fatia> {
+  const situacao: Record<Situacao, Fatia> = {
+    pago: { qtd: 0, valor: 0 },
+    rota: { qtd: 0, valor: 0 },
+    preparo: { qtd: 0, valor: 0 },
+    aguardando: { qtd: 0, valor: 0 },
+    negociacao: { qtd: 0, valor: 0 },
+    frustracao: { qtd: 0, valor: 0 },
+  };
+  for (const p of pedidosAtivos(pedidos)) {
+    if (!isDentro(p.data, periodo.inicio, periodo.fim)) continue;
+    const s = situacaoDoPedido(p.status);
+    situacao[s].qtd += 1;
+    situacao[s].valor += valorAgendado(p);
+  }
+  return situacao;
+}
+
+/** Dos pagamentos do período, quantos são de pedidos agendados nele (o
+ *  resto é venda de antes que pagou agora). */
+export function pagosDaSafra(pedidos: Pedido[], periodo: Periodo): number {
+  return pedidosAtivos(pedidos).filter(
+    (p) =>
+      statusBucket(p.status) === 'aprovado' &&
+      isDentro(p.data, periodo.inicio, periodo.fim) &&
+      isDentro(dataAprovacaoPedido(p), periodo.inicio, periodo.fim),
+  ).length;
+}
+
 export function calcularIndicadores(
   dailies: AfterpayDaily[],
   custos: CustoVariavel[],
@@ -179,13 +222,7 @@ export function calcularIndicadores(
   const ativos = pedidosAtivos(pedidos);
 
   // ── Situação dos agendados do período ──
-  const situacao: Record<Situacao, Fatia> = {
-    pago: { qtd: 0, valor: 0 },
-    rota: { qtd: 0, valor: 0 },
-    aguardando: { qtd: 0, valor: 0 },
-    negociacao: { qtd: 0, valor: 0 },
-    frustracao: { qtd: 0, valor: 0 },
-  };
+  const situacao = situacaoDosAgendados(pedidos, periodo);
   const porMotivo = new Map<MotivoFrustracao, FrustracaoPorMotivo>(
     MOTIVOS.map((m) => [m.id, { motivo: m.id, rotulo: m.rotulo, nota: m.nota, qtd: 0, valor: 0, perda: 0 }]),
   );
@@ -195,9 +232,7 @@ export function calcularIndicadores(
   for (const p of ativos) {
     if (!isDentro(p.data, periodo.inicio, periodo.fim)) continue;
     const s = situacaoDoPedido(p.status);
-    const valor = reaisToCents(Number(p.valor_agendado ?? p.valor) || 0);
-    situacao[s].qtd += 1;
-    situacao[s].valor += valor;
+    const valor = valorAgendado(p);
 
     if (s === 'frustracao') {
       const f = porMotivo.get(motivoFrustracao(p))!;
@@ -216,14 +251,7 @@ export function calcularIndicadores(
   // "Outros" só aparece quando tem pedido; os seis principais, sempre.
   const frustracao_por_motivo = [...porMotivo.values()].filter((f) => f.motivo !== 'outros' || f.qtd > 0);
 
-  // Dos pagamentos do período, quantos são de pedidos agendados nele
-  // (o resto é venda de antes que pagou agora).
-  const pagos_da_safra = ativos.filter(
-    (p) =>
-      statusBucket(p.status) === 'aprovado' &&
-      isDentro(p.data, periodo.inicio, periodo.fim) &&
-      isDentro(dataAprovacaoPedido(p), periodo.inicio, periodo.fim),
-  ).length;
+  const pagos_da_safra = pagosDaSafra(pedidos, periodo);
 
   // ── Taxa de recebimento: dos pedidos já resolvidos até o fim do período,
   // quantos pagaram. O que ainda não se resolveu não diz nada.

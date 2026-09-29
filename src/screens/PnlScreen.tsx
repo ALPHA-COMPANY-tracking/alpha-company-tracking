@@ -5,6 +5,7 @@ import { formatBRL, formatBRLCompact, formatMultiplier, formatPercent, reaisToCe
 import { formatDiaMes } from '@/lib/dates';
 import { type DescontoFrustrados, calcularPnl } from '@/lib/pnl';
 import { agregarPedidos } from '@/lib/pedidos';
+import { pagosDaSafra, situacaoDosAgendados } from '@/lib/indicadores';
 import { planosSemCusto } from '@/lib/custosConfig';
 import { useData } from '@/store/DataProvider';
 import { KpiCard, Panel } from '@/components/ui';
@@ -40,6 +41,10 @@ export function PnlScreen({
   const pnl = useMemo(() => calcularPnl(dailies, custos, periodo, opts, pedidos), [dailies, custos, periodo, opts, pedidos]);
 
   const vazio = pnl.receita_aprovada === 0 && pnl.custos_totais_reais === 0;
+
+  // Onde está cada pedido agendado no período — a mesma conta da Visualização.
+  const situacao = useMemo(() => situacaoDosAgendados(pedidos, periodo), [pedidos, periodo]);
+  const pagosDeAntes = useMemo(() => pnl.qtd_pagamentos - pagosDaSafra(pedidos, periodo), [pnl.qtd_pagamentos, pedidos, periodo]);
 
   // Desempenho por vendedor no período (fonte: pedidos do BlueSales).
   const agg = useMemo(() => agregarPedidos(pedidos, periodo), [pedidos, periodo]);
@@ -205,7 +210,7 @@ export function PnlScreen({
             onAddCusto={onAddCusto}
           />
 
-          <GapBlock pnl={pnl} />
+          <GapBlock pnl={pnl} situacao={situacao} pagosDeAntes={pagosDeAntes} />
         </>
       )}
 

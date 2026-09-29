@@ -2,7 +2,13 @@
 import { describe, expect, it } from 'vitest';
 import type { AfterpayDaily, Pedido } from '@/types';
 import { calcularPnl } from '@/lib/pnl';
-import { calcularIndicadores, motivoFrustracao, situacaoDoPedido } from '@/lib/indicadores';
+import {
+  calcularIndicadores,
+  motivoFrustracao,
+  pagosDaSafra,
+  situacaoDoPedido,
+  situacaoDosAgendados,
+} from '@/lib/indicadores';
 
 const P = { inicio: '2026-09-01', fim: '2026-09-30' };
 
@@ -27,13 +33,42 @@ const ped = (status: string, data: string, extra: Partial<Pedido> = {}): Pedido 
 describe('situação do pedido', () => {
   it('em rota, aguardando pagamento, negociação e frustração', () => {
     expect(situacaoDoPedido('pagos')).toBe('pago');
-    for (const s of ['cadastrados', 'aguard_coleta', 'enviados', 'saiu_para_entrega', 'retirar_nos_correios'])
+    // Em rota = na rua. O que ainda não saiu fica em "a enviar".
+    for (const s of ['enviados', 'saiu_para_entrega', 'retirar_nos_correios', 'em_transito'])
       expect(situacaoDoPedido(s)).toBe('rota');
+    for (const s of ['cadastrados', 'confirmados', 'aguard_coleta']) expect(situacaoDoPedido(s)).toBe('preparo');
     for (const s of ['entregues', 'cobrados']) expect(situacaoDoPedido(s)).toBe('aguardando');
     for (const s of ['negociação', 'requer_atencao']) expect(situacaoDoPedido(s)).toBe('negociacao');
     for (const s of ['frustrados', 'devolvido', 'aguardando_devolucao', 'roubo', 'Roubado', 'cancelados', 'extraviado', 'sinistro'])
       expect(situacaoDoPedido(s)).toBe('frustracao');
-    expect(situacaoDoPedido('confirmados')).toBe('rota'); // etapa nova de 21/09: antes do envio
+  });
+
+  it('Jurídico é cobrança travada (negociação), não em rota', () => {
+    expect(situacaoDoPedido('juridico')).toBe('negociacao');
+    expect(situacaoDoPedido('Jurídico')).toBe('negociacao');
+  });
+
+  it('P&L e Visualização: o que falta pagar sai da etapa dos agendados do período', () => {
+    const pedidos = [
+      ped('enviados', '2026-09-10'),
+      ped('entregues', '2026-09-11'),
+      ped('juridico', '2026-09-12'),
+      ped('roubo', '2026-09-06'),
+      ped('pagos', '2026-09-05', { data_aprovacao: '2026-09-08' }),
+      ped('pagos', '2026-08-20', { data_aprovacao: '2026-09-03' }), // agendado em agosto, pago em setembro
+    ];
+    const s = situacaoDosAgendados(pedidos, P);
+    expect(s.rota).toEqual({ qtd: 1, valor: 73_500 });
+    expect(s.aguardando.qtd).toBe(1);
+    expect(s.negociacao.qtd).toBe(1);
+    expect(s.frustracao.qtd).toBe(1);
+    expect(s.pago.qtd).toBe(1);
+    // O pagamento de agosto entra no aprovado de setembro, mas não no agendado:
+    // "agendado − aprovado − frustrado" daria 2 pedidos; faltam pagar 3.
+    const pnl = calcularPnl([], [], P, {}, pedidos);
+    expect(pnl.qtd_pagamentos - pagosDaSafra(pedidos, P)).toBe(1);
+    expect(pnl.qtd_agendados - pnl.qtd_pagamentos - s.frustracao.qtd).toBe(2);
+    expect(s.rota.qtd + s.aguardando.qtd + s.negociacao.qtd).toBe(3);
   });
 
   it('motivo segue a etapa do BlueSales, inclusive "Voltando"', () => {
@@ -82,8 +117,9 @@ describe('situação do pedido', () => {
 });
 
 describe('indicadores', () => {
-  // Setembro: 10 agendados — 4 pagos, 2 em rota, 1 cobrado, 1 negociação,
-  // 2 em frustração. Mais 3 pagamentos em setembro de pedidos de agosto.
+  // Setembro: 10 agendados — 4 pagos, 1 em rota (enviado), 1 a enviar
+  // (aguard. coleta), 1 cobrado, 1 negociação, 2 em frustração. Mais 3
+  // pagamentos em setembro de pedidos de agosto.
   // Agosto também tem 1 frustrado já resolvido.
   const pedidos: Pedido[] = [
     ...Array.from({ length: 4 }, () => ped('pagos', '2026-09-05', { data_aprovacao: '2026-09-10' })),
@@ -117,7 +153,8 @@ describe('indicadores', () => {
   });
 
   it('situação dos agendados e frustração geral', () => {
-    expect(ind.situacao.rota.qtd).toBe(2);
+    expect(ind.situacao.rota.qtd).toBe(1);
+    expect(ind.situacao.preparo).toEqual({ qtd: 1, valor: 53_500 });
     expect(ind.situacao.aguardando.qtd).toBe(1);
     expect(ind.situacao.negociacao.qtd).toBe(1);
     expect(ind.situacao.frustracao.qtd).toBe(2);
@@ -143,12 +180,12 @@ describe('indicadores', () => {
     expect(ind.projecao.taxa_recebimento).toBeCloseTo(0.7, 5);
   });
 
-  it('a receber conta SÓ os pedidos em rota (sem negociação, cobrado ou frustrado)', () => {
+  it('a receber conta SÓ os pedidos na rua (sem a enviar, negociação, cobrado ou frustrado)', () => {
     const pr = ind.projecao;
-    expect(pr.rota.qtd).toBe(2);
-    expect(pr.rota.valor).toBe(73_500 + 53_500);
-    expect(pr.a_receber).toBe(Math.round(127_000 * 0.7));
-    expect(pr.envio_rota).toBe(8_300 + 3_300 + 4_100 + 3_300);
+    expect(pr.rota.qtd).toBe(1);
+    expect(pr.rota.valor).toBe(73_500);
+    expect(pr.a_receber).toBe(Math.round(73_500 * 0.7));
+    expect(pr.envio_rota).toBe(8_300 + 3_300);
     // Frustrado: produto + frete. Devolvido: o produto voltou, só o frete.
     expect(pr.perda_frustracao).toBe(8_300 + 3_300 + 3_300);
     expect(pr.lucro_real).toBe(calcularPnl(dailies, [], P, {}, pedidos).lucro_real);
