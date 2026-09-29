@@ -158,12 +158,35 @@ const ENVIO_PERMITIDO = new Set([
  * chaves (nunca o conteúdo) em `_descartado`: assim dá para perceber que
  * o BlueSales começou a mandar campo novo, sem guardar o valor dele.
  */
+/** "address.city", "name"… — só os NOMES dos campos, nunca o conteúdo. */
+function caminhosDeChaves(o: unknown, prefixo = '', nivel = 0): string[] {
+  if (!o || typeof o !== 'object' || Array.isArray(o) || nivel > 3) return [];
+  const out: string[] = [];
+  for (const [k, v] of Object.entries(o as Record<string, unknown>)) {
+    const caminho = prefixo ? `${prefixo}.${k}` : k;
+    const filhos = caminhosDeChaves(v, caminho, nivel + 1);
+    if (filhos.length) out.push(...filhos);
+    else out.push(caminho);
+  }
+  return out.slice(0, 60);
+}
+
 export function semDadosPessoais(body: Record<string, unknown>): Record<string, unknown> {
   const limpo: Record<string, unknown> = {};
+  // Dos blocos do cliente ficam só os NOMES dos campos: é assim que se
+  // descobre se o BlueSales manda o endereço (estado/cidade do Mapa de
+  // Frustração) sem guardar dado pessoal nenhum.
+  const removidos: Record<string, string[]> = {};
   for (const [chave, valor] of Object.entries(body)) {
-    if (BLOCOS_PESSOAIS.has(chave.toLowerCase())) continue;
+    if (BLOCOS_PESSOAIS.has(chave.toLowerCase())) {
+      removidos[chave] = caminhosDeChaves(valor);
+      continue;
+    }
     limpo[chave] = valor;
   }
+  if (Object.keys(removidos).length) limpo._removidos = removidos;
+  // Se veio estado, fica a UF (sem cidade) — confirma que o mapa se alimenta sozinho.
+  limpo._regiao = regiaoDoPayload(body).uf ?? 'ausente';
 
   const envio = limpo.shipping ?? limpo.envio;
   if (envio && typeof envio === 'object' && !Array.isArray(envio)) {

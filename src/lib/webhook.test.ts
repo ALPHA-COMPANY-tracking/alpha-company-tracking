@@ -89,6 +89,17 @@ describe('semDadosPessoais (LGPD)', () => {
     expect((log.order as { id: string }).id).toBe('BLV-VE7RUD88Y3'); // resto preservado
   });
 
+  it('do cliente ficam só os NOMES dos campos, e se veio estado', () => {
+    const log = semDadosPessoais({
+      ...ORDER_CREATE,
+      customer: { name: 'YOLANDA DE GOIS', address: { street: 'Rua X, 10', city: 'Ipatinga', state: 'MG' } },
+    } as Record<string, unknown>);
+    expect(log._removidos).toEqual({ customer: ['name', 'address.street', 'address.city', 'address.state'] });
+    expect(log._regiao).toBe('MG');
+    expect(JSON.stringify(log)).not.toMatch(/YOLANDA|Rua X|Ipatinga/);
+    expect(semDadosPessoais(ORDER_CREATE as Record<string, unknown>)._regiao).toBe('ausente');
+  });
+
   it('o rastreio do envio é preservado — é o que serve para diagnóstico', () => {
     const log = semDadosPessoais({
       ...ORDER_CREATE,
