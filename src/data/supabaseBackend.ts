@@ -4,12 +4,40 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { AfterpayDaily, CategoriaCusto, CustoVariavel } from '@/types';
+import type { AfterpayDaily, CategoriaCusto, CustoVariavel, Pedido } from '@/types';
 import type { Dataset } from '@/data/db';
 import { SEED_CATEGORIAS } from '@/data/seed';
-import type { Backend } from '@/data/backend';
+import type { Backend, RegiaoPedido } from '@/data/backend';
 
 const N = (v: unknown) => Number(v ?? 0);
+
+/** Linha de bluesales_pedidos → Pedido. Usada também pelo Painel do Vendedor. */
+export function pedidoDaLinha(r: Record<string, unknown>): Pedido {
+  const S = (v: unknown) => (v == null ? null : String(v));
+  return {
+    id: String(r.id),
+    internal_id: r.internal_id != null ? N(r.internal_id) : null,
+    status: S(r.status),
+    data: String(r.data),
+    data_aprovacao: S(r.data_aprovacao),
+    valor: N(r.valor),
+    valor_bruto: r.valor_bruto != null ? N(r.valor_bruto) : null,
+    valor_agendado: r.valor_agendado != null ? N(r.valor_agendado) : null,
+    perda_real: r.perda_real != null ? N(r.perda_real) : null,
+    taxa_plataforma: r.taxa_plataforma != null ? N(r.taxa_plataforma) : null,
+    cliente: S(r.cliente),
+    removido_em: S(r.removido_em),
+    produto_nome: S(r.produto_nome),
+    produto_plano: S(r.produto_plano),
+    codigo_plano: S(r.codigo_plano),
+    metodo_pagamento: S(r.metodo_pagamento),
+    vendedor: S(r.vendedor),
+    rastreamento: S(r.rastreamento),
+    passou_correios: r.passou_correios === true,
+    uf: S(r.uf),
+    cidade: S(r.cidade),
+  };
+}
 
 function mapDaily(r: Record<string, unknown>): AfterpayDaily {
   return {
@@ -101,27 +129,7 @@ export class SupabaseBackend implements Backend {
         ? (dailies.data[dailies.data.length - 1].sincronizado_em ?? null)
         : null;
 
-    const pedidosMap = (pedidos.data ?? []).map((r) => ({
-      id: String(r.id),
-      internal_id: r.internal_id ?? null,
-      status: r.status ?? null,
-      data: String(r.data),
-      data_aprovacao: r.data_aprovacao != null ? String(r.data_aprovacao) : null,
-      valor: N(r.valor),
-      valor_bruto: r.valor_bruto != null ? N(r.valor_bruto) : null,
-      valor_agendado: r.valor_agendado != null ? N(r.valor_agendado) : null,
-      perda_real: r.perda_real != null ? N(r.perda_real) : null,
-      taxa_plataforma: r.taxa_plataforma != null ? N(r.taxa_plataforma) : null,
-      cliente: r.cliente ?? null,
-      removido_em: r.removido_em != null ? String(r.removido_em) : null,
-      produto_nome: r.produto_nome ?? null,
-      produto_plano: r.produto_plano ?? null,
-      codigo_plano: r.codigo_plano ?? null,
-      metodo_pagamento: r.metodo_pagamento ?? null,
-      vendedor: r.vendedor ?? null,
-      rastreamento: r.rastreamento ?? null,
-      passou_correios: r.passou_correios === true,
-    }));
+    const pedidosMap = (pedidos.data ?? []).map(pedidoDaLinha);
 
     return {
       categorias,
@@ -201,6 +209,18 @@ export class SupabaseBackend implements Backend {
       .eq('id', id)
       .eq('user_id', this.userId);
     if (error) throw error;
+  }
+  async definirRegioes(itens: RegiaoPedido[]) {
+    // De 500 em 500: um CSV de meses inteiros não estoura o tamanho da chamada.
+    let achados = 0;
+    for (let i = 0; i < itens.length; i += 500) {
+      const { data, error } = await this.db.rpc('definir_regioes', { conta: this.userId, itens: itens.slice(i, i + 500) });
+      if (error) {
+        throw new Error(/definir_regioes|function/i.test(error.message) ? 'Rode a migração 0021 no Supabase primeiro.' : error.message);
+      }
+      achados += Number(data) || 0;
+    }
+    return achados;
   }
   async lancarDaily(d: AfterpayDaily) {
     const { error } = await this.db

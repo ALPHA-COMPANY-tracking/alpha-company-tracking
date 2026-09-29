@@ -9,7 +9,7 @@ import type { ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { AfterpayDaily, AtendenteStat, CategoriaCusto, CustoVariavel, Pedido, PlataformaStat } from '@/types';
 import { type Dataset, novoId } from '@/data/db';
-import { type Backend, LocalBackend } from '@/data/backend';
+import { type Backend, type RegiaoPedido, LocalBackend, aplicarRegioes } from '@/data/backend';
 
 interface DataContextValue {
   categorias: CategoriaCusto[];
@@ -37,6 +37,8 @@ interface DataContextValue {
   removerPedido: (id: string, removido: boolean) => void;
   /** Preenche o nome do cliente de uma venda antiga, à mão. */
   definirClientePedido: (id: string, nome: string | null) => void;
+  /** Estado e cidade dos pedidos (CSV do BlueSales). Devolve quantos achou. */
+  importarRegioes: (itens: RegiaoPedido[]) => Promise<number>;
   lancarDaily: (daily: AfterpayDaily) => void;
   lancarDailies: (dailies: AfterpayDaily[]) => void;
   marcarSync: () => void;
@@ -206,6 +208,13 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
     [aplicar],
   );
 
+  // Não é otimista: a tela precisa saber quantos pedidos o banco achou.
+  const importarRegioes = useCallback<DataContextValue['importarRegioes']>(async (itens) => {
+    const achados = await backendRef.current.definirRegioes(itens);
+    setData((d) => (d ? { ...d, pedidos: aplicarRegioes(d.pedidos, itens).pedidos } : d));
+    return achados;
+  }, []);
+
   const lancarDaily = useCallback<DataContextValue['lancarDaily']>(
     (daily) => {
       aplicar(
@@ -271,12 +280,13 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
       definirTaxaPedido,
       removerPedido,
       definirClientePedido,
+      importarRegioes,
       lancarDaily,
       lancarDailies,
       marcarSync,
       recarregar,
     };
-  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, definirPerdaPedido, definirTaxaPedido, removerPedido, definirClientePedido, lancarDaily, lancarDailies, marcarSync, recarregar]);
+  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, definirPerdaPedido, definirTaxaPedido, removerPedido, definirClientePedido, importarRegioes, lancarDaily, lancarDailies, marcarSync, recarregar]);
 
   if (!value) {
     return (

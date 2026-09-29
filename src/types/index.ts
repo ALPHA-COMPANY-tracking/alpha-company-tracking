@@ -128,4 +128,7 @@ export interface Pedido {
   /** Ficou em "Retirar nos Correios" alguma vez (marcado no banco). Com
    *  status de devolução, é pedido que a cliente não retirou e voltou. */
   passou_correios?: boolean;
+  /** Estado (UF) e cidade da entrega — só isso do endereço (migração 0021). */
+  uf?: string | null;
+  cidade?: string | null;
 }

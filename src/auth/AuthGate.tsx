@@ -6,6 +6,7 @@ import { SupabaseBackend } from '@/data/supabaseBackend';
 import { DataProvider } from '@/store/DataProvider';
 import { AppShell } from '@/AppShell';
 import { LoginScreen } from '@/auth/LoginScreen';
+import { PainelVendedor } from '@/vendedor/PainelVendedor';
 
 /** Gate de autenticação para o modo nuvem (Supabase configurado). */
 export function AuthGate() {
@@ -21,19 +22,27 @@ export function AuthGate() {
   // De qual conta são os dados: a do dono, se este login for de um sócio
   // (migração 0017); a própria, para o dono. Sem a migração, a função não
   // existe e fica a própria conta — como sempre foi.
+  // Login de VENDEDOR (migração 0021) não abre a dashboard: vai para o
+  // Painel do Vendedor, que só enxerga os pedidos dele.
   const userId = session?.user.id ?? null;
-  const [conta, setConta] = useState<{ de: string; id: string } | null>(null);
+  const [conta, setConta] = useState<{ de: string; id: string; vendedor: { dono: string; nome: string } | null } | null>(null);
   useEffect(() => {
     if (!supabase || !userId) return;
     let vivo = true;
-    supabase.rpc('conta_do_usuario').then(({ data, error }) => {
-      if (vivo) setConta({ de: userId, id: !error && typeof data === 'string' ? data : userId });
+    Promise.all([
+      supabase.rpc('conta_do_usuario'),
+      supabase.from('dashboard_vendedores').select('dono_id,vendedor').eq('membro_id', userId).maybeSingle(),
+    ]).then(([c, v]) => {
+      if (!vivo) return;
+      const vendedor = !v.error && v.data ? { dono: String(v.data.dono_id), nome: String(v.data.vendedor) } : null;
+      setConta({ de: userId, id: !c.error && typeof c.data === 'string' ? c.data : userId, vendedor });
     });
     return () => {
       vivo = false;
     };
   }, [userId]);
-  const contaId = conta && conta.de === userId ? conta.id : null;
+  const contaAtual = conta && conta.de === userId ? conta : null;
+  const contaId = contaAtual && !contaAtual.vendedor ? contaAtual.id : null;
 
   // Memoiza pelo ID, não pelo objeto `session`: o Supabase emite uma nova
   // sessão a cada renovação de token, e recriar o backend aí remontaria o
@@ -43,11 +52,21 @@ export function AuthGate() {
     [contaId],
   );
 
-  if (session === undefined || (session && !contaId)) {
+  if (session === undefined || (session && !contaAtual)) {
     return (
       <div className="min-h-screen grid place-items-center text-dim">
         <Loader2 className="animate-spin" size={20} />
       </div>
+    );
+  }
+
+  if (session && contaAtual?.vendedor) {
+    return (
+      <PainelVendedor
+        donoId={contaAtual.vendedor.dono}
+        vendedor={contaAtual.vendedor.nome}
+        onLogout={() => supabase?.auth.signOut()}
+      />
     );
   }
 

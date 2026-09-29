@@ -65,6 +65,66 @@ function txt(v: unknown): string | undefined {
   return s ? s : undefined;
 }
 
+// ── Região da entrega: SÓ estado (UF) e cidade ──
+
+const UFS = new Set([
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA',
+  'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
+]);
+const UF_POR_NOME: Record<string, string> = {
+  ACRE: 'AC', ALAGOAS: 'AL', AMAPA: 'AP', AMAZONAS: 'AM', BAHIA: 'BA', CEARA: 'CE',
+  'DISTRITO FEDERAL': 'DF', 'ESPIRITO SANTO': 'ES', GOIAS: 'GO', MARANHAO: 'MA',
+  'MATO GROSSO': 'MT', 'MATO GROSSO DO SUL': 'MS', 'MINAS GERAIS': 'MG', PARA: 'PA',
+  PARAIBA: 'PB', PARANA: 'PR', PERNAMBUCO: 'PE', PIAUI: 'PI', 'RIO DE JANEIRO': 'RJ',
+  'RIO GRANDE DO NORTE': 'RN', 'RIO GRANDE DO SUL': 'RS', RONDONIA: 'RO', RORAIMA: 'RR',
+  'SANTA CATARINA': 'SC', 'SAO PAULO': 'SP', SERGIPE: 'SE', TOCANTINS: 'TO',
+};
+
+/** "sp", "São Paulo" → "SP". Qualquer outra coisa → undefined. */
+export function normalizarUf(v: unknown): string | undefined {
+  const s = String(v ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim()
+    .toUpperCase();
+  if (UFS.has(s)) return s;
+  return UF_POR_NOME[s];
+}
+
+/** "SÃO JOSÉ DOS CAMPOS" → "São José Dos Campos". */
+function nomeDeCidade(v: unknown): string | undefined {
+  const s = String(v ?? '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  if (!s || /\d/.test(s)) return undefined;
+  return s.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (_m, sep: string, l: string) => sep + l.toUpperCase());
+}
+
+const CHAVES_UF = ['state', 'uf', 'estado', 'state_code', 'province'];
+const CHAVES_CIDADE = ['city', 'cidade', 'municipio', 'município', 'city_name'];
+
+/**
+ * Estado e cidade da entrega, onde quer que o BlueSales ponha o endereço
+ * (cliente, envio…): o primeiro bloco que tiver um estado VÁLIDO. Nada
+ * mais do endereço é lido — e o log continua sem o bloco inteiro.
+ */
+export function regiaoDoPayload(body: unknown): { uf?: string; cidade?: string } {
+  const fila: { o: unknown; nivel: number }[] = [{ o: body, nivel: 0 }];
+  while (fila.length) {
+    const { o, nivel } = fila.shift()!;
+    if (!o || typeof o !== 'object' || Array.isArray(o) || nivel > 4) continue;
+    const obj = o as Record<string, unknown>;
+    const chaves = new Map(Object.keys(obj).map((k) => [k.toLowerCase(), k]));
+    const achar = (lista: string[]) => lista.map((k) => chaves.get(k)).find((k) => k && obj[k] != null && obj[k] !== '');
+    const kUf = achar(CHAVES_UF);
+    const uf = kUf ? normalizarUf(obj[kUf]) : undefined;
+    if (uf) {
+      const kCidade = achar(CHAVES_CIDADE);
+      return { uf, cidade: kCidade ? nomeDeCidade(obj[kCidade]) : undefined };
+    }
+    for (const v of Object.values(obj)) if (v && typeof v === 'object') fila.push({ o: v, nivel: nivel + 1 });
+  }
+  return {};
+}
+
 // Blocos que são do cliente, não do pedido: saem inteiros do log.
 const BLOCOS_PESSOAIS = new Set([
   'customer', 'cliente',
@@ -203,6 +263,11 @@ export function mapearPedido(
   const rastreio = txt(pick(envio, 'tracking_code', 'código_de_rastreamento', 'codigo_de_rastreamento'));
   if (rastreio) pedido.rastreamento = rastreio;
 
+  // Do endereço, só estado e cidade (Mapa de Frustração, migração 0021).
+  const regiao = regiaoDoPayload(body);
+  if (regiao.uf) pedido.uf = regiao.uf;
+  if (regiao.cidade) pedido.cidade = regiao.cidade;
+
   return pedido;
 }
 
@@ -263,9 +328,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ ok: true, ignorado: 'sem order.id' });
   }
 
-  const { error } = await supabase()
+  let { error } = await supabase()
     .from('bluesales_pedidos')
     .upsert(pedido, { onConflict: 'user_id,id' });
+  if (error && /\b(uf|cidade)\b/.test(error.message)) {
+    // Migração 0021 ainda não rodada: grava o pedido sem a região.
+    const { uf: _uf, cidade: _cidade, ...semRegiao } = pedido;
+    ({ error } = await supabase().from('bluesales_pedidos').upsert(semRegiao, { onConflict: 'user_id,id' }));
+  }
 
   // A notificação NÃO depende da gravação ter dado certo: são coisas
   // independentes, e você precisa saber da venda mesmo que o banco falhe.

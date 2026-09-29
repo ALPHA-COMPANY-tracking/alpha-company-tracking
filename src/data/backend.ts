@@ -3,8 +3,28 @@
 // interface; trocar Local ↔ Supabase não toca nas telas.
 // ─────────────────────────────────────────────────────────────
 
-import type { AfterpayDaily, CategoriaCusto, CustoVariavel } from '@/types';
+import type { AfterpayDaily, CategoriaCusto, CustoVariavel, Pedido } from '@/types';
 import { type Dataset, carregar, salvar } from '@/data/db';
+
+/** Região de um pedido, pelo número dele no BlueSales (#123). */
+export interface RegiaoPedido {
+  internal_id: number;
+  uf: string;
+  cidade: string | null;
+}
+
+/** Aplica as regiões nos pedidos; devolve os pedidos e quantos mudaram. */
+export function aplicarRegioes(pedidos: Pedido[], itens: RegiaoPedido[]): { pedidos: Pedido[]; achados: number } {
+  const porNumero = new Map(itens.map((i) => [i.internal_id, i]));
+  let achados = 0;
+  const novos = pedidos.map((p) => {
+    const r = p.internal_id != null ? porNumero.get(Number(p.internal_id)) : undefined;
+    if (!r) return p;
+    achados += 1;
+    return { ...p, uf: r.uf, cidade: r.cidade };
+  });
+  return { pedidos: novos, achados };
+}
 
 export interface Backend {
   load(): Promise<Dataset>;
@@ -23,6 +43,8 @@ export interface Backend {
   removerPedido(id: string, removido: boolean): Promise<void>;
   /** Nome do cliente da venda (null = apagar o que estava lá). */
   definirClientePedido(id: string, nome: string | null): Promise<void>;
+  /** Estado e cidade de vários pedidos (pelo número). Devolve quantos achou. */
+  definirRegioes(itens: RegiaoPedido[]): Promise<number>;
   lancarDaily(d: AfterpayDaily): Promise<void>;
   lancarDailies(ds: AfterpayDaily[]): Promise<void>;
   marcarSync(iso: string): Promise<void>;
@@ -87,6 +109,15 @@ export class LocalBackend implements Backend {
       ...ds,
       pedidos: ds.pedidos.map((p) => (p.id === id ? { ...p, cliente: nome } : p)),
     }));
+  }
+  async definirRegioes(itens: RegiaoPedido[]) {
+    let achados = 0;
+    this.mut((ds) => {
+      const r = aplicarRegioes(ds.pedidos, itens);
+      achados = r.achados;
+      return { ...ds, pedidos: r.pedidos };
+    });
+    return achados;
   }
   async lancarDaily(d: AfterpayDaily) {
     this.mut((ds) => {
