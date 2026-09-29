@@ -21,9 +21,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const donoId = process.env.DASHBOARD_USER_ID;
     if (!donoId) return aviso('DASHBOARD_USER_ID não configurado.');
-    const chave = process.env.CLIENTE_HASH_KEY;
-    if (!chave) return aviso('Falta configurar a chave CLIENTE_HASH_KEY na Vercel.');
-
     const [{ createClient }, lib] = await Promise.all([import('@supabase/supabase-js'), import('./lib-cliente.js')]);
     const db = createClient(process.env.SUPABASE_URL ?? '', process.env.SUPABASE_SERVICE_ROLE_KEY ?? '', {
       auth: { persistSession: false },
@@ -44,6 +41,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (v) papel = 'vendedor';
     }
     if (!papel) return res.status(401).json({ error: 'Não autorizado' });
+
+    const chave = process.env.CLIENTE_HASH_KEY;
+    if (!chave) return aviso('Falta configurar a chave CLIENTE_HASH_KEY na Vercel.');
 
     const acao = typeof req.query.acao === 'string' ? req.query.acao : '';
     const corpo = (typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body ?? {}) as Record<string, unknown>;
