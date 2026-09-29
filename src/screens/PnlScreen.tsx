@@ -15,18 +15,25 @@ import { BarsVertical } from '@/components/viz/BarsVertical';
 import { Destaques } from '@/components/pnl/Destaques';
 import { COR } from '@/lib/cores';
 import { saudacao } from '@/lib/saudacao';
+import type { RegistroAlertas } from '@/store/useRegistroAlertas';
+import { AvisoAlertas } from '@/components/alertas/AvisoAlertas';
 
 export function PnlScreen({
   nome = 'Jonas',
   periodo,
   onAddCusto,
   onLancarManual,
+  alertas,
+  onVerAlertas,
 }: {
   /** Quem está logado — para a saudação no celular. */
   nome?: string;
   periodo: Periodo;
   onAddCusto: () => void;
   onLancarManual?: () => void;
+  /** Registro de alertas de clientes (aviso no topo). */
+  alertas?: RegistroAlertas;
+  onVerAlertas?: () => void;
 }) {
   const { dailies, custos, categorias, pedidos } = useData();
   // Padrão 'nenhum' para ESPELHAR o BlueSales: lá os frustrados aparecem
@@ -74,6 +81,15 @@ export function PnlScreen({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Pedido que chegou do BlueSales com alerta de cliente (duplicado, roubo…) */}
+      {alertas?.registro && (
+        <AvisoAlertas
+          registro={alertas.registro}
+          pedidos={pedidos}
+          onVisto={alertas.marcarVisto}
+          onVerTodos={() => onVerAlertas?.()}
+        />
+      )}
       {semCusto.length > 0 && (
         <div className="flex items-start gap-3 rounded-[12px] border border-yel/40 bg-yel/[0.07] px-4 py-[13px]">
           <TriangleAlert size={17} className="text-yel shrink-0 mt-[1px]" />

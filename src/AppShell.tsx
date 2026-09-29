@@ -23,6 +23,7 @@ import { InstagramScreen } from '@/screens/InstagramScreen';
 import { haQuanto, resumoDoPeriodo, saudacao } from '@/lib/saudacao';
 import { metaDisponivel, sincronizarMeta } from '@/lib/metaAds';
 import { useData } from '@/store/DataProvider';
+import { useRegistroAlertas } from '@/store/useRegistroAlertas';
 
 /** De quanto em quanto tempo a dashboard aberta busca o gasto do Meta. */
 const SYNC_META_MS = 10 * 60_000;
@@ -126,7 +127,10 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
   // Gasto do Meta sempre fresco com a dashboard aberta: ao abrir, a cada
   // 10 minutos e ao voltar para a aba. O agendamento do GitHub, que devia
   // rodar de 30 em 30 minutos, na prática roda de 3 em 3 horas.
-  const { recarregar } = useData();
+  const { recarregar, pedidos } = useData();
+  // Alertas de clientes: gravados sozinhos pelo servidor; aqui carregados a
+  // cada minuto e completados com o que a dashboard acha.
+  const registroAlertas = useRegistroAlertas(pedidos);
   useEffect(() => {
     if (!metaDisponivel) return;
     // Guardado na sessão: o Atualizar já sincroniza antes do F5, e a
@@ -321,7 +325,14 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
           </div>
         </div>
 
-        {tab === 'pnl' && <PnlScreen nome={primeiroNome} periodo={periodo} onAddCusto={() => setModal(true)} onLancarManual={() => setTab('ads')} />}
+        {tab === 'pnl' && <PnlScreen
+            nome={primeiroNome}
+            periodo={periodo}
+            onAddCusto={() => setModal(true)}
+            onLancarManual={() => setTab('ads')}
+            alertas={registroAlertas}
+            onVerAlertas={() => setTab('alertas')}
+          />}
         {tab === 'vendas' && <VendasScreen periodo={periodo} />}
         {tab === 'ranking' && <RankingScreen periodo={periodo} />}
         {tab === 'instagram' && <InstagramScreen periodo={periodo} />}
@@ -331,7 +342,7 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
         {tab === 'taxas' && <TaxasScreen periodo={periodo} />}
         {tab === 'frustrados' && <FrustradosScreen periodo={periodo} />}
         {tab === 'mapa' && <MapaScreen periodo={periodo} />}
-        {tab === 'alertas' && <AlertasScreen />}
+        {tab === 'alertas' && <AlertasScreen registro={registroAlertas} />}
         {tab === 'viz' && <VizScreen periodo={periodo} />}
         {tab === 'export' && <ExportScreen periodo={periodo} />}
       </main>

@@ -376,29 +376,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ({ error } = await supabase().from('bluesales_pedidos').upsert(basico, { onConflict: 'user_id,id' }));
   }
 
-  // Pedido novo: a cliente já passou por aqui? Os outros pedidos com o
-  // mesmo código dizem se é roubo, frustração, duplicado ou recompra.
+  // Conferência AUTOMÁTICA: a cliente deste pedido (ainda em aberto) já
+  // passou por aqui? Os outros pedidos com o mesmo código dizem se é roubo,
+  // frustração, duplicado ou mesmo WhatsApp. O alerta é GRAVADO em
+  // alertas_clientes (aparece na Demonstração de Resultados); no pedido
+  // novo, vai também no aviso do celular.
   let alerta: { nivel: string; texto: string } | null = null;
-  if (libCliente && body.event === 'ORDER_CREATE' && (pedido.cpf_hash || pedido.tel_hash)) {
-    const filtros = [pedido.cpf_hash && `cpf_hash.eq.${pedido.cpf_hash}`, pedido.tel_hash && `tel_hash.eq.${pedido.tel_hash}`]
-      .filter(Boolean)
-      .join(',');
-    const { data: outros } = await supabase()
-      .from('bluesales_pedidos')
-      .select('internal_id,status,data,cpf_hash')
-      .eq('user_id', userId)
-      .neq('id', pedido.id as string)
-      .is('removido_em', null)
-      .or(filtros)
-      .order('data', { ascending: false })
-      .limit(20);
-    // Mesmo WhatsApp com CPF diferente: pode ser outra pessoa no mesmo celular.
-    const ligados = (outros ?? []).map((o) => ({
-      ...o,
-      outroCpf: Boolean(pedido.cpf_hash && o.cpf_hash && o.cpf_hash !== pedido.cpf_hash),
-    }));
-    const nivel = libCliente.nivelDoAlerta(ligados);
-    if (nivel) alerta = { nivel, texto: libCliente.textoDoAlerta(nivel, ligados) };
+  if (libCliente && libCliente.statusEmAberto(pedido.status)) {
+    try {
+      let cpf = pedido.cpf_hash as string | undefined;
+      let tel = pedido.tel_hash as string | undefined;
+      if (!cpf && !tel) {
+        // Evento sem o bloco do cliente: vale o código já gravado.
+        const { data: salvo } = await supabase()
+          .from('bluesales_pedidos')
+          .select('cpf_hash,tel_hash')
+          .eq('user_id', userId)
+          .eq('id', pedido.id as string)
+          .maybeSingle();
+        cpf = salvo?.cpf_hash ?? undefined;
+        tel = salvo?.tel_hash ?? undefined;
+      }
+      if (cpf || tel) {
+        const filtros = [cpf && `cpf_hash.eq.${cpf}`, tel && `tel_hash.eq.${tel}`].filter(Boolean).join(',');
+        const { data: outros } = await supabase()
+          .from('bluesales_pedidos')
+          .select('internal_id,status,data,cpf_hash')
+          .eq('user_id', userId)
+          .neq('id', pedido.id as string)
+          .is('removido_em', null)
+          .or(filtros)
+          .order('data', { ascending: false })
+          .limit(20);
+        // Mesmo WhatsApp com CPF diferente: pode ser outra pessoa no mesmo celular.
+        const ligados = (outros ?? []).map((o) => ({ ...o, outroCpf: Boolean(cpf && o.cpf_hash && o.cpf_hash !== cpf) }));
+        const nivel = libCliente.nivelDoAlerta(ligados);
+        if (nivel && nivel !== 'recompra') {
+          await supabase().rpc('registrar_alerta_cliente', {
+            conta: userId,
+            pedido: pedido.id,
+            numero: pedido.internal_id ?? null,
+            nivel_novo: nivel,
+            por_onde: ligados.some((o) => cpf && o.cpf_hash === cpf) ? 'cpf' : 'telefone',
+            outros_pedidos: ligados.map((o) => ({ numero: o.internal_id, status: o.status, data: o.data, outro_cpf: o.outroCpf })),
+            texto_alerta: libCliente.textoDoAlerta(nivel, ligados),
+          });
+        }
+        if (nivel && body.event === 'ORDER_CREATE') alerta = { nivel, texto: libCliente.textoDoAlerta(nivel, ligados) };
+      }
+    } catch {
+      alerta = null; // a conferência nunca derruba o pedido nem o aviso
+    }
   }
 
   // A notificação NÃO depende da gravação ter dado certo: são coisas

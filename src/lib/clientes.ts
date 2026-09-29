@@ -120,6 +120,19 @@ export function pedidoDoMotivo(a: AlertaCliente): OutroPedido | undefined {
   });
 }
 
+const POR_ONDE: Record<PorOnde, string> = { cpf: 'pelo CPF', telefone: 'pelo WhatsApp', nome: 'só pelo nome' };
+
+/** "#1296 (16/09) · pelo CPF" — de onde vem o alerta. */
+export function motivoDoAlerta(a: AlertaCliente): string {
+  const o = pedidoDoMotivo(a);
+  const [, m, d] = (o?.data ?? '').split('-');
+  const ref = o ? `#${o.internal_id ?? '?'}${d ? ` (${d}/${m})` : ''}` : '';
+  return `${ref}${ref ? ' · ' : ''}${POR_ONDE[a.por]}`;
+}
+
+/** Mais grave primeiro — o mesmo critério do registro no banco. */
+export const GRAVIDADE: Record<NivelAlerta, number> = { roubo: 0, frustracao: 1, duplicado: 2, whatsapp: 3, recompra: 4 };
+
 export const ROTULO_ALERTA: Record<NivelAlerta, string> = {
   roubo: 'Já teve roubo',
   frustracao: 'Já frustrou',

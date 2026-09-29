@@ -94,6 +94,12 @@ function norm(s: unknown): string {
     .toLowerCase();
 }
 
+/** Pedido ainda em aberto (nem pago, nem frustrado): dá tempo de segurar. */
+export function statusEmAberto(status: unknown): boolean {
+  const s = norm(status);
+  return !!s && !PAGO.has(s) && !ROUBO.test(s) && !FRUSTRACAO.test(s);
+}
+
 /**
  * O que os OUTROS pedidos dizem sobre um pedido novo, do mais grave para
  * o mais leve: já roubou > já frustrou > tem pedido em aberto (duplicado)

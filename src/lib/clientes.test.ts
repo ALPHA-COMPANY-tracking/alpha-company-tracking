@@ -4,12 +4,15 @@ import { describe, expect, it } from 'vitest';
 import type { Pedido } from '@/types';
 import { alertasDosPedidos, nivelDoAlerta, pedidoDoMotivo } from '@/lib/clientes';
 import { lerClientesDoCsv } from '@/lib/csvBluesales';
+import { type AlertaRegistrado, alertasFaltantes } from '@/lib/alertasRegistro';
+import { alertasNovos } from '@/components/alertas/AvisoAlertas';
 import {
   codigosDe,
   codigosDoPayload,
   nivelDoAlerta as nivelServidor,
   normalizarCpf,
   normalizarTelefone,
+  statusEmAberto,
   textoDoAlerta,
 } from '../../api/lib-cliente';
 
@@ -126,6 +129,58 @@ describe('alertas dos pedidos (dashboard)', () => {
 
   it('frustração vale mais que pedido em aberto', () => {
     expect(nivelDoAlerta([{ status: 'enviados' }, { status: 'voltando' }])).toBe('frustracao');
+  });
+});
+
+describe('registro automático de alertas', () => {
+  const reg = (pedido_id: string, nivel: AlertaRegistrado['nivel'], visto_em: string | null = null): AlertaRegistrado => ({
+    id: Math.floor(Math.random() * 1e6),
+    pedido_id,
+    pedido_numero: null,
+    nivel,
+    por: 'cpf',
+    outros: [],
+    texto: null,
+    criado_em: '2026-09-29T10:00:00Z',
+    atualizado_em: '2026-09-29T10:00:00Z',
+    visto_em,
+  });
+
+  it('servidor: só confere pedido em aberto', () => {
+    expect(statusEmAberto('cadastrados')).toBe(true);
+    expect(statusEmAberto('saiu_para_entrega')).toBe(true);
+    for (const s of ['pagos', 'roubo', 'devolvido', 'cancelados', null]) expect(statusEmAberto(s)).toBe(false);
+  });
+
+  it('a dashboard grava o que falta e o que piorou — nunca rebaixa, nunca grava recompra', () => {
+    const roubado = ped('roubo', { cpf_hash: 'r1' });
+    const novo = ped('cadastrados', { cpf_hash: 'r1' });
+    const pago = ped('pagos', { cpf_hash: 'r2' });
+    const recompra = ped('cadastrados', { cpf_hash: 'r2' });
+    const calculados = alertasDosPedidos([roubado, novo, pago, recompra]);
+    expect(alertasFaltantes(calculados, []).map(([id]) => id)).toEqual([novo.id]);
+    // Registrado como duplicado, agora é roubo: piorou, grava de novo.
+    expect(alertasFaltantes(calculados, [reg(novo.id, 'duplicado')])).toHaveLength(1);
+    // Já está como roubo: nada a fazer.
+    expect(alertasFaltantes(calculados, [reg(novo.id, 'roubo')])).toHaveLength(0);
+  });
+
+  it('o aviso da tela principal: só os não vistos, de pedido que ainda dá para segurar, roubo primeiro', () => {
+    const aberto1 = ped('cadastrados');
+    const aberto2 = ped('enviados');
+    const pagoDepois = ped('pagos');
+    const excluido = ped('cadastrados', { removido_em: '2026-09-29T11:00:00Z' });
+    const lista = alertasNovos(
+      [
+        reg(aberto1.id, 'duplicado'),
+        reg(aberto2.id, 'roubo'),
+        reg(pagoDepois.id, 'roubo'),
+        reg(excluido.id, 'roubo'),
+        reg('p-visto', 'roubo', '2026-09-29T12:00:00Z'),
+      ],
+      [aberto1, aberto2, pagoDepois, excluido],
+    );
+    expect(lista.map(({ a }) => a.pedido_id)).toEqual([aberto2.id, aberto1.id]);
   });
 });
 
