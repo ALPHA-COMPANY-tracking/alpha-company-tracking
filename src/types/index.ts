@@ -131,4 +131,7 @@ export interface Pedido {
   /** Estado (UF) e cidade da entrega — só isso do endereço (migração 0021). */
   uf?: string | null;
   cidade?: string | null;
+  /** CÓDIGO do CPF e do WhatsApp (nunca o dado): reconhece a mesma cliente (migração 0022). */
+  cpf_hash?: string | null;
+  tel_hash?: string | null;
 }

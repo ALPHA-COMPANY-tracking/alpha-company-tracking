@@ -36,6 +36,8 @@ export function pedidoDaLinha(r: Record<string, unknown>): Pedido {
     passou_correios: r.passou_correios === true,
     uf: S(r.uf),
     cidade: S(r.cidade),
+    cpf_hash: S(r.cpf_hash),
+    tel_hash: S(r.tel_hash),
   };
 }
 

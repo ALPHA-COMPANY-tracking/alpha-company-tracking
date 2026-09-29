@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BarChart3, Briefcase, Camera, ChevronDown, Download, LogOut, MapPinned, Megaphone, PieChart, Plug, Receipt, RefreshCw, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
+import { BarChart3, Briefcase, Camera, ChevronDown, Download, LogOut, MapPinned, Megaphone, PieChart, Plug, Receipt, RefreshCw, ShieldAlert, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { usePeriodo } from '@/store/usePeriodo';
@@ -11,6 +11,7 @@ import { PnlScreen } from '@/screens/PnlScreen';
 import { CustosScreen } from '@/screens/CustosScreen';
 import { FrustradosScreen } from '@/screens/FrustradosScreen';
 import { MapaScreen } from '@/screens/MapaScreen';
+import { AlertasScreen } from '@/screens/AlertasScreen';
 import { VizScreen } from '@/screens/VizScreen';
 import { ExportScreen } from '@/screens/ExportScreen';
 import { AdsScreen } from '@/screens/AdsScreen';
@@ -26,7 +27,7 @@ import { useData } from '@/store/DataProvider';
 /** De quanto em quanto tempo a dashboard aberta busca o gasto do Meta. */
 const SYNC_META_MS = 10 * 60_000;
 
-type Tab = 'pnl' | 'vendas' | 'ranking' | 'instagram' | 'ads' | 'facebook' | 'custos' | 'taxas' | 'frustrados' | 'mapa' | 'viz' | 'export';
+type Tab = 'pnl' | 'vendas' | 'ranking' | 'instagram' | 'ads' | 'facebook' | 'custos' | 'taxas' | 'frustrados' | 'mapa' | 'alertas' | 'viz' | 'export';
 
 /** `curto` é o rótulo da barra inferior no celular, onde só cabe uma palavra. */
 const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
@@ -40,6 +41,7 @@ const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
   { id: 'taxas', label: 'Taxas de Plataforma', curto: 'Taxas', Icon: Receipt },
   { id: 'frustrados', label: 'Frustrados', curto: 'Perdas', Icon: TriangleAlert },
   { id: 'mapa', label: 'Mapa de Frustração', curto: 'Mapa', Icon: MapPinned },
+  { id: 'alertas', label: 'Alerta de Clientes', curto: 'Alerta', Icon: ShieldAlert },
   { id: 'viz', label: 'Visualização', curto: 'Gráf.', Icon: PieChart },
   { id: 'export', label: 'Exportador', curto: 'CSV', Icon: Download },
 ];
@@ -59,7 +61,7 @@ const MENU: ItemMenu[] = [
     grupo: 'admin',
     label: 'Gerenciamento Administrativo',
     Icon: Briefcase,
-    abas: ['frustrados', 'mapa', 'taxas', 'custos', 'ranking'],
+    abas: ['frustrados', 'mapa', 'alertas', 'taxas', 'custos', 'ranking'],
   },
   { aba: 'export' },
 ];
@@ -329,6 +331,7 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
         {tab === 'taxas' && <TaxasScreen periodo={periodo} />}
         {tab === 'frustrados' && <FrustradosScreen periodo={periodo} />}
         {tab === 'mapa' && <MapaScreen periodo={periodo} />}
+        {tab === 'alertas' && <AlertasScreen />}
         {tab === 'viz' && <VizScreen periodo={periodo} />}
         {tab === 'export' && <ExportScreen periodo={periodo} />}
       </main>

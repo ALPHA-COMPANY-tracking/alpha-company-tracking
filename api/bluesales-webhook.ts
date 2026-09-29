@@ -354,20 +354,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ ok: true, ignorado: 'sem order.id' });
   }
 
+  // CPF e WhatsApp viram código (nunca o dado em si): é o que reconhece a
+  // mesma cliente em outro pedido — duplicado, roubo, frustração.
+  const chaveCliente = process.env.CLIENTE_HASH_KEY;
+  let libCliente: typeof import('./lib-cliente.js') | null = null;
+  if (chaveCliente) {
+    try {
+      libCliente = await import('./lib-cliente.js');
+      Object.assign(pedido, libCliente.codigosDoPayload(chaveCliente, body as Record<string, unknown>));
+    } catch {
+      libCliente = null; // sem o código o pedido grava igual — só fica sem alerta
+    }
+  }
+
   let { error } = await supabase()
     .from('bluesales_pedidos')
     .upsert(pedido, { onConflict: 'user_id,id' });
-  if (error && /\b(uf|cidade)\b/.test(error.message)) {
-    // Migração 0021 ainda não rodada: grava o pedido sem a região.
-    const { uf: _uf, cidade: _cidade, ...semRegiao } = pedido;
-    ({ error } = await supabase().from('bluesales_pedidos').upsert(semRegiao, { onConflict: 'user_id,id' }));
+  if (error && /\b(uf|cidade|cpf_hash|tel_hash)\b/.test(error.message)) {
+    // Migração 0021/0022 ainda não rodada: grava o pedido sem esses campos.
+    const { uf: _uf, cidade: _cidade, cpf_hash: _cpf, tel_hash: _tel, ...basico } = pedido;
+    ({ error } = await supabase().from('bluesales_pedidos').upsert(basico, { onConflict: 'user_id,id' }));
+  }
+
+  // Pedido novo: a cliente já passou por aqui? Os outros pedidos com o
+  // mesmo código dizem se é roubo, frustração, duplicado ou recompra.
+  let alerta: { nivel: string; texto: string } | null = null;
+  if (libCliente && body.event === 'ORDER_CREATE' && (pedido.cpf_hash || pedido.tel_hash)) {
+    const filtros = [pedido.cpf_hash && `cpf_hash.eq.${pedido.cpf_hash}`, pedido.tel_hash && `tel_hash.eq.${pedido.tel_hash}`]
+      .filter(Boolean)
+      .join(',');
+    const { data: outros } = await supabase()
+      .from('bluesales_pedidos')
+      .select('internal_id,status,data')
+      .eq('user_id', userId)
+      .neq('id', pedido.id as string)
+      .is('removido_em', null)
+      .or(filtros)
+      .order('data', { ascending: false })
+      .limit(20);
+    const nivel = libCliente.nivelDoAlerta(outros ?? []);
+    if (nivel) alerta = { nivel, texto: libCliente.textoDoAlerta(nivel, outros ?? []) };
   }
 
   // A notificação NÃO depende da gravação ter dado certo: são coisas
   // independentes, e você precisa saber da venda mesmo que o banco falhe.
   // Antes um erro de banco retornava aqui e o celular nunca tocava.
-  const push = await notificar(body as Record<string, unknown>, pedido, userId);
-  await anotar({ processado: !error, push });
+  const push = await notificar(body as Record<string, unknown>, pedido, userId, alerta);
+  await anotar({ processado: !error, push: alerta ? `${push} · alerta ${alerta.nivel}` : push });
 
   if (error) {
     return res.status(500).json({ error: error.message, push });
@@ -389,6 +422,7 @@ async function notificar(
   body: Record<string, unknown>,
   pedido: Record<string, unknown>,
   userId: string,
+  alerta: { nivel: string; texto: string } | null = null,
 ): Promise<string> {
   try {
     const publica = process.env.VAPID_PUBLIC_KEY;
@@ -401,8 +435,13 @@ async function notificar(
     const valor = Number(pedido.valor ?? pedido.valor_agendado ?? 0);
     const nomeCliente = (pedido.cliente as string) ?? null;
 
-    const aviso = await montarAviso(evento, status, vendedor, valor, nomeCliente);
-    if (!aviso) return `sem aviso para ${evento || 'evento sem nome'} (${status})`;
+    const base = await montarAviso(evento, status, vendedor, valor, nomeCliente);
+    if (!base) return `sem aviso para ${evento || 'evento sem nome'} (${status})`;
+    // Cliente com roubo, frustração ou pedido em aberto: o alerta vem primeiro.
+    const grave = alerta && alerta.nivel !== 'recompra';
+    const aviso = alerta
+      ? { ...base, titulo: grave ? `⚠️ ${base.titulo}` : base.titulo, corpo: `${alerta.texto}\n${base.corpo}` }
+      : base;
 
     const db = supabase();
     const { data, error } = await db

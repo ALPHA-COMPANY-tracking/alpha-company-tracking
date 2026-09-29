@@ -13,6 +13,7 @@ import { pedidosAtivos } from '@/lib/pedidos';
 import { perdaRealDePedido } from '@/lib/custosConfig';
 import { motivoFrustracao, situacaoDoPedido } from '@/lib/indicadores';
 import type { RegiaoPedido } from '@/data/backend';
+import { lerCsvBluesales, numeroDoPedido } from '@/lib/csvBluesales';
 
 /** Os 27 estados (o desenho do mapa vem de svg-maps/brazil). */
 export const ESTADOS: Record<string, { nome: string }> = {
@@ -66,59 +67,22 @@ export function nomeDeCidade(v: unknown): string | null {
     .replace(/ (Da|De|Do|Das|Dos|E)(?= )/g, (m) => m.toLowerCase()); // "Rio de Janeiro"
 }
 
-/** CSV com aspas (o endereço tem vírgula e quebra de linha dentro). */
-function linhasCsv(texto: string, sep: string): string[][] {
-  const out: string[][] = [];
-  let linha: string[] = [];
-  let campo = '';
-  let aspas = false;
-  for (let i = 0; i < texto.length; i++) {
-    const c = texto[i];
-    if (aspas) {
-      if (c === '"' && texto[i + 1] === '"') {
-        campo += '"';
-        i++;
-      } else if (c === '"') aspas = false;
-      else campo += c;
-    } else if (c === '"') aspas = true;
-    else if (c === sep) {
-      linha.push(campo);
-      campo = '';
-    } else if (c === '\n' || c === '\r') {
-      if (c === '\r' && texto[i + 1] === '\n') i++;
-      linha.push(campo);
-      out.push(linha);
-      linha = [];
-      campo = '';
-    } else campo += c;
-  }
-  if (campo || linha.length) {
-    linha.push(campo);
-    out.push(linha);
-  }
-  return out.filter((l) => l.length > 1);
-}
-
 /**
  * Lê o export do BlueSales ("pedidos_todas_as_etapas_….csv") e devolve SÓ
  * número do pedido, estado e cidade. CPF, telefone, e-mail, rua e CEP são
  * ignorados — nunca saem do navegador.
  */
 export function lerRegioesDoCsv(texto: string): { itens: RegiaoPedido[]; linhas: number; semRegiao: number } {
-  const limpo = texto.replace(/^﻿/, '');
-  const primeira = limpo.slice(0, limpo.search(/\r?\n/) >>> 0);
-  const sep = (primeira.match(/;/g)?.length ?? 0) > (primeira.match(/,/g)?.length ?? 0) ? ';' : ',';
-  const [cab, ...dados] = linhasCsv(limpo, sep);
-  const col = (nome: string) => (cab ?? []).findIndex((c) => semAcento(c).trim().toLowerCase() === nome);
-  const iId = col('id');
-  const iCidade = col('cidade');
-  const iUf = col('estado');
+  const { linhas: dados, coluna } = lerCsvBluesales(texto);
+  const iId = coluna('id');
+  const iCidade = coluna('cidade');
+  const iUf = coluna('estado');
   if (iId < 0 || iUf < 0) throw new Error('O arquivo não tem as colunas ID e Estado — use o export "todas as etapas" do BlueSales.');
 
   const itens: RegiaoPedido[] = [];
   let semRegiao = 0;
   for (const l of dados) {
-    const id = Number(String(l[iId] ?? '').replace(/\D/g, ''));
+    const id = numeroDoPedido(l[iId]);
     const uf = normalizarUf(l[iUf]);
     if (!id) continue;
     if (!uf) {

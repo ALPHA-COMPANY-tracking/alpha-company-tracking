@@ -4,6 +4,8 @@ import type { Pedido, Periodo } from '@/types';
 import { formatBRL, reaisToCents } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
 import { agendadoPorDia, casaComBusca, possiveisDuplicados, statusBucket } from '@/lib/pedidos';
+import { alertasDosPedidos } from '@/lib/clientes';
+import { SeloAlerta } from '@/components/alertas/SeloAlerta';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
 
@@ -85,6 +87,7 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
 
   // Conferência: onde está a venda que o BlueSales não conta mais.
   const duplicados = useMemo(() => possiveisDuplicados(pedidos, periodo), [pedidos, periodo]);
+  const alertas = useMemo(() => alertasDosPedidos(pedidos), [pedidos]);
   const porDia = useMemo(() => agendadoPorDia(pedidos, periodo), [pedidos, periodo]);
 
   /** Lixeira com confirmação, a mesma da tabela. */
@@ -161,6 +164,12 @@ export function VendasScreen({ periodo }: { periodo: Periodo }) {
             {p.internal_id != null && <span className="text-dim font-bold">#{p.internal_id}</span>}
             <span className="hidden sm:inline text-dim2">{p.internal_id != null ? " · " : ""}{p.id}</span>
           </div>
+          {/* Cliente com roubo, frustração ou outro pedido em aberto. */}
+          {!removido && alertas.get(p.id) && alertas.get(p.id)!.nivel !== 'recompra' && (
+            <div className="mt-1">
+              <SeloAlerta alerta={alertas.get(p.id)!} />
+            </div>
+          )}
         </td>
         <td className="hidden sm:table-cell px-3 lg:px-5 py-3.5 lg:py-4 text-dim">{p.vendedor?.trim() || '—'}</td>
         <td className="hidden md:table-cell px-3 lg:px-5 py-3.5 lg:py-4 text-dim">{planoCurto(p.produto_plano)}</td>

@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BadgeCheck, CalendarCheck, Check, HandCoins, Loader2, LogOut, Pencil, Percent, RefreshCw, Search, Target, TriangleAlert } from 'lucide-react';
+import { BadgeCheck, CalendarCheck, Check, HandCoins, Loader2, LogOut, Pencil, Percent, RefreshCw, Search, ShieldAlert, Target, TriangleAlert } from 'lucide-react';
 import type { Pedido } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { pedidoDaLinha } from '@/data/supabaseBackend';
@@ -21,6 +21,10 @@ import { formatDiaMes, hojeIso } from '@/lib/dates';
 import { chaveVendedor } from '@/lib/pnl';
 import { type Situacao, situacaoDoPedido } from '@/lib/indicadores';
 import { resumoDoVendedor } from '@/lib/vendedor';
+import { type AlertaCliente, pedidoEmAberto } from '@/lib/clientes';
+import { alertasDoVendedor } from '@/lib/clientesApi';
+import { SeloAlerta } from '@/components/alertas/SeloAlerta';
+import { VerificarCliente } from '@/components/alertas/VerificarCliente';
 
 const CAMPOS =
   'id,internal_id,status,data,data_aprovacao,valor,valor_agendado,produto_plano,metodo_pagamento,vendedor,cliente,removido_em,passou_correios';
@@ -66,16 +70,21 @@ export function PainelVendedor({
   const [pedidos, setPedidos] = useState<Pedido[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
+  const [alertas, setAlertas] = useState<Map<string, AlertaCliente>>(new Map());
 
   const carregar = useCallback(async () => {
     if (!supabase) return;
     setCarregando(true);
     // O banco só devolve os pedidos em que este login é o vendedor.
-    const { data, error } = await supabase.from('bluesales_pedidos').select(CAMPOS).eq('user_id', donoId);
+    const [{ data, error }, meusAlertas] = await Promise.all([
+      supabase.from('bluesales_pedidos').select(CAMPOS).eq('user_id', donoId),
+      alertasDoVendedor(),
+    ]);
     setCarregando(false);
     if (error) return setErro(error.message);
     setErro(null);
     setPedidos((data ?? []).map((r) => pedidoDaLinha(r as Record<string, unknown>)));
+    setAlertas(meusAlertas);
   }, [donoId]);
 
   useEffect(() => {
@@ -134,6 +143,13 @@ export function PainelVendedor({
   const nome = vendedor.charAt(0).toUpperCase() + vendedor.slice(1).toLowerCase();
   const pctMeta = meta > 0 && r ? Math.min(1, r.agendado_hoje.valor / meta) : 0;
 
+  /** Alerta de um pedido dele que ainda dá tempo de segurar (em aberto). */
+  const alertaAberto = (p: Pedido) => {
+    const a = alertas.get(p.id);
+    return a && a.nivel !== 'recompra' && pedidoEmAberto(p) ? a : undefined;
+  };
+  const emAlerta = (pedidos ?? []).filter((p) => !p.removido_em && alertaAberto(p));
+
   return (
     <div className="min-h-screen w-full">
       <header className="sticky top-0 z-20 bg-bg/95 backdrop-blur border-b border-line/70">
@@ -182,6 +198,20 @@ export function PainelVendedor({
           </div>
         ) : (
           <>
+            {/* Pedidos dele, ainda em aberto, de cliente com roubo / frustração / pedido duplo */}
+            {emAlerta.length > 0 && (
+              <div className="flex items-start gap-2.5 rounded-[12px] border border-red/40 bg-red/[0.07] px-4 py-3 text-[12.5px] text-dim leading-relaxed">
+                <ShieldAlert size={16} className="text-red shrink-0 mt-[1px]" />
+                <span>
+                  <b className="text-tx">
+                    {emAlerta.length} pedido{emAlerta.length === 1 ? '' : 's'} seu{emAlerta.length === 1 ? '' : 's'} em aberto com alerta
+                  </b>{' '}
+                  (cliente com roubo, frustração ou pedido duplicado): {emAlerta.map((p) => `#${p.internal_id ?? '?'}`).join(', ')}. Confirme
+                  com a cliente antes do envio.
+                </span>
+              </div>
+            )}
+
             {/* Meta do dia */}
             <div className="rounded-card border border-gold/25 bg-gradient-to-br from-gold/[0.08] via-card to-card px-4 lg:px-6 py-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -233,6 +263,12 @@ export function PainelVendedor({
                 </div>
               )}
             </div>
+
+            <Panel title="Verificar cliente antes de agendar" hint="pelo CPF ou WhatsApp">
+              <div className="p-3.5 lg:p-5">
+                <VerificarCliente />
+              </div>
+            </Panel>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-[14px]">
               <KpiCard
@@ -322,6 +358,11 @@ export function PainelVendedor({
                       <div key={p.id} className="flex items-center gap-3 px-3.5 lg:px-5 py-2.5 border-t border-line/70">
                         <div className="min-w-0 flex-1">
                           <div className="text-[13px] font-semibold text-tx truncate">{p.cliente || 'Cliente sem nome'}</div>
+                          {alertaAberto(p) && (
+                            <div className="mt-0.5">
+                              <SeloAlerta alerta={alertaAberto(p)!} />
+                            </div>
+                          )}
                           <div className="text-[11px] text-dim2 mono">
                             #{p.internal_id ?? '—'} · {formatDiaMes(p.data)}
                           </div>
