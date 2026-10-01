@@ -36,11 +36,10 @@ export function PnlScreen({
   onVerAlertas?: () => void;
 }) {
   const { dailies, custos, categorias, pedidos } = useData();
-  // Padrão 'nenhum' para ESPELHAR o BlueSales: lá os frustrados aparecem
-  // na lista de perdas mas não entram no Lucro Líquido — conferido no P&L
-  // deles de 01–08/09/2026, onde os R$ 1.170,00 ficam de fora dos Custos
-  // Totais. Quem quiser a perda de caixa troca no botão do rodapé.
-  const [modoFrustrados, setModoFrustrados] = useState<DescontoFrustrados>('nenhum');
+  // Padrão 'real' para ESPELHAR o BlueSales: desde 30/09/2026 o Lucro
+  // Líquido de lá desconta o "Custo real de frustração" (frete e produto,
+  // pelas regras de custo); a receita frustrada é só informativa.
+  const [modoFrustrados, setModoFrustrados] = useState<DescontoFrustrados>('real');
 
   // Memorizado: os gráficos do topo recalculam o P&L dia a dia, e um
   // objeto novo a cada render refaria tudo à toa.

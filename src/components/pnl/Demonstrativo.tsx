@@ -264,8 +264,8 @@ export function Demonstrativo({
   const opcoesFrustrados: { id: DescontoFrustrados; label: string; hint: string; lucro: Cents }[] = [
     // O BlueSales também não desconta os frustrados — mas o lucro dele não
     // tem os custos variáveis, então o número não é o mesmo.
-    { id: 'nenhum', label: 'Nada', hint: 'frustrados fora, como no BlueSales', lucro: lucroSemFrustrados },
-    { id: 'real', label: 'Valor real perdido', hint: 'produto + frete', lucro: lucroSemFrustrados - pnl.perda_real_frustrados },
+    { id: 'real', label: 'Custo real de frustração', hint: 'frete e produto · como no BlueSales', lucro: lucroSemFrustrados - pnl.perda_real_frustrados },
+    { id: 'nenhum', label: 'Nada', hint: 'frustrados fora do lucro', lucro: lucroSemFrustrados },
   ];
 
   const taxaNasComissoes = pnl.comissoes_por_vendedor.reduce((s, v) => s + v.taxa_descontada, 0);
@@ -539,7 +539,7 @@ export function Demonstrativo({
             <div className={`px-4 py-3 flex items-start justify-between gap-3 ${descontando ? 'bg-red/[0.06]' : ''}`}>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className={`text-[13px] ${descontando ? 'font-semibold text-tx' : 'text-tx'}`}>Valor real perdido</span>
+                  <span className={`text-[13px] ${descontando ? 'font-semibold text-tx' : 'text-tx'}`}>Custo real de frustração</span>
                   {descontando && (
                     <span className="text-[9px] uppercase tracking-wide font-bold text-red border border-red/40 bg-red/10 rounded-full px-[7px] py-[1px]">
                       descontando

@@ -84,7 +84,7 @@ describe('o plano de 4 potes entra certo no P&L', () => {
   it('a perda de um 4 potes frustrado é produto + frete', () => {
     const frustrado: Pedido = {
       id: 'f',
-      status: 'frustrados',
+      status: 'roubo',
       data: '2026-09-04',
       valor: 535,
       valor_agendado: 535,

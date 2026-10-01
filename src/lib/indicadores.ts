@@ -24,6 +24,7 @@ import {
   custoProdutoDoPlano,
   FRETE_POR_PEDIDO,
   perdaRealDePedido,
+  perdaSemCusto,
 } from '@/lib/custosConfig';
 
 export type Situacao = 'pago' | 'rota' | 'preparo' | 'aguardando' | 'negociacao' | 'frustracao';
@@ -79,22 +80,26 @@ export type MotivoFrustracao =
   | 'cancelado'
   | 'roubo'
   | 'frustrado'
+  | 'perda_cobranca'
   | 'outros';
 
-/** Os motivos na ordem da tela. Os seis primeiros aparecem sempre, mesmo zerados. */
+/** Os motivos na ordem da tela. Os seis primeiros aparecem sempre, mesmo zerados;
+ *  perda de cobrança e outros, só quando têm pedido. */
 export const MOTIVOS: { id: MotivoFrustracao; rotulo: string; nota: string }[] = [
-  { id: 'devolvido', rotulo: 'Devolvidos', nota: 'o produto já voltou · perde o frete' },
+  { id: 'devolvido', rotulo: 'Devolvidos', nota: 'o produto já voltou · perde o frete de ida (reverso: ida e volta)' },
   { id: 'voltando', rotulo: 'Voltando', nota: 'o pacote está retornando · perde o frete' },
   { id: 'aguardando_devolucao', rotulo: 'Aguardando devolução', nota: 'a cliente vai devolver · perde o frete' },
   { id: 'cancelado', rotulo: 'Cancelados', nota: 'c/ custo perde o frete · s/ custo, nada' },
-  { id: 'roubo', rotulo: 'Roubados', nota: 'roubo ou furto na entrega' },
-  { id: 'frustrado', rotulo: 'Frustrados', nota: 'recusou ou não pagou' },
-  { id: 'outros', rotulo: 'Outros', nota: 'extravio, sinistro, recusa' },
+  { id: 'roubo', rotulo: 'Roubo / perdido', nota: 'roubo, furto, perdido ou apreendido · perde frete + produto' },
+  { id: 'frustrado', rotulo: 'Frustrados', nota: 'frustrado antigo (legado) · perde o frete' },
+  { id: 'perda_cobranca', rotulo: 'Perda de cobrança', nota: 'entregue e não pago · perde frete + produto' },
+  { id: 'outros', rotulo: 'Outros', nota: 'sinistro e outros' },
 ];
 
 export function motivoFrustracao(p: Pick<Pedido, 'status'>): MotivoFrustracao {
   const s = norm(p.status);
-  if (/roub|furt/.test(s)) return 'roubo';
+  if (/perda|cobranc/.test(s)) return 'perda_cobranca';
+  if (/roub|furt|perdid|apreend|extravi/.test(s)) return 'roubo';
   if (/cancel/.test(s)) return 'cancelado';
   if (/aguard.*devol/.test(s)) return 'aguardando_devolucao';
   if (/voltand|retorn/.test(s)) return 'voltando';
@@ -194,6 +199,8 @@ export function situacaoDosAgendados(pedidos: Pedido[], periodo: Periodo): Recor
   for (const p of pedidosAtivos(pedidos)) {
     if (!isDentro(p.data, periodo.inicio, periodo.fim)) continue;
     const s = situacaoDoPedido(p.status);
+    // Cancelado sem custo / não postado e recusado não são frustração (BlueSales).
+    if (s === 'frustracao' && perdaSemCusto(p)) continue;
     situacao[s].qtd += 1;
     situacao[s].valor += valorAgendado(p);
   }
@@ -235,7 +242,7 @@ export function calcularIndicadores(
     const s = situacaoDoPedido(p.status);
     const valor = valorAgendado(p);
 
-    if (s === 'frustracao') {
+    if (s === 'frustracao' && !perdaSemCusto(p)) {
       const f = porMotivo.get(motivoFrustracao(p))!;
       f.qtd += 1;
       f.valor += valor;
@@ -250,7 +257,7 @@ export function calcularIndicadores(
     }
   }
   // "Outros" só aparece quando tem pedido; os seis principais, sempre.
-  const frustracao_por_motivo = [...porMotivo.values()].filter((f) => f.motivo !== 'outros' || f.qtd > 0);
+  const frustracao_por_motivo = [...porMotivo.values()].filter((f) => (f.motivo !== 'outros' && f.motivo !== 'perda_cobranca') || f.qtd > 0);
 
   const pagos_da_safra = pagosDaSafra(pedidos, periodo);
 

@@ -6,7 +6,7 @@
 
 import type { Pedido, Periodo } from '@/types';
 import { isDentro } from '@/lib/dates';
-import { perdaRealDePedido } from '@/lib/custosConfig';
+import { perdaRealDePedido, perdaSemCusto } from '@/lib/custosConfig';
 
 /** Normaliza status: minúsculo, sem acento, sem espaços nas bordas. */
 function norm(s: string | null | undefined): string {
@@ -29,7 +29,8 @@ const APROVADO = new Set(['pagos', 'pago']);
 // (Negociação, Atenção, Cobrados, Enviados etc. seguem como pipeline.)
 // "Voltando" entrou em 21/09/2026: o BlueSales passou a usar essa etapa
 // para o pacote que está retornando (8 pedidos, a maioria dos Correios).
-const FRUSTRADO = /frustr|devol|voltand|retorn|roub|furt|extravi|sinistr|recus|cancel/;
+// Perdido, apreendido e perda de cobrança: regras do BlueSales de 30/09/2026.
+const FRUSTRADO = /frustr|devol|voltand|retorn|roub|furt|extravi|sinistr|recus|cancel|perd|apreend/;
 
 export function statusBucket(status: string | null | undefined): 'aprovado' | 'frustrado' | 'pipeline' {
   const s = norm(status);
@@ -117,7 +118,9 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
       const met = p.metodo_pagamento?.trim() || 'Outro';
       metodos.set(met, (metodos.get(met) ?? 0) + 1);
 
-      if (bucket === 'frustrado') {
+      // Recusado, cancelado sem custo / não postado e frustrado não postado
+      // não entram (não geraram custo) — como no BlueSales.
+      if (bucket === 'frustrado' && !perdaSemCusto(p)) {
         valor_frustrado += valor;
         qtd_frustrados += 1;
         perda_real_frustrados += perdaRealDePedido(p);

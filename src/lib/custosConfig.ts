@@ -102,26 +102,57 @@ export function planosSemCusto(pedidos: Pedido[], periodo: Periodo): string[] {
   return [...achados].sort();
 }
 
-/** O produto não se perde: devolvido, voltando, aguardando devolução, cancelado. */
-const PRODUTO_VOLTA = /devol|voltand|retorn|cancel/;
+// ── Regras de custo da frustração — as do BlueSales (tela nova, 30/09/2026) ──
+//   Perdido / Roubo / Apreendido ........ frete + produto (a mercadoria não volta)
+//   Perda de cobrança ................... frete + produto (entregue e não pago)
+//   Devolvido automático / cliente ...... frete de ida (a volta não gera custo)
+//   Devolvido reverso ................... frete de ida + de volta
+//   Voltando / Aguardando devolução ..... frete
+//   Cancelado com custo (já postado) .... frete
+//   Frustrados (legado, já postado) ..... frete
+//   NÃO entram: cancelado sem custo ou não postado, recusado, frustrado
+//   legado não postado — não geraram custo.
+
+const normStatus = (s: string | null | undefined) =>
+  (s ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+
+/** Só o frete: o produto volta, ou é frustrado antigo (legado). */
+const SO_FRETE = /devol|voltand|retorn|cancel|frustr/;
+/** Devolvido reverso: a empresa paga a ida e a volta. */
+const FRETE_DOBRADO = /revers/;
 
 /**
- * Perda REAL de um pedido frustrado, em reais.
- *
- * O valor do pedido é a receita que não entrou — não o dinheiro que saiu.
- * O que se perde de fato (regras do Jonas, 21/09/2026):
- *   · o produto VOLTA (devolvido, voltando, aguardando devolução) ou o
- *     pedido foi CANCELADO "c/ custo" (a cliente não pagou o frete) → só o
- *     frete;
- *   · o produto NÃO volta (roubo, frustrado…) → produto + frete;
- *   · "Cancelado s/ Custo" no BlueSales (não saiu, ou a cliente pagou ida e
- *     volta) → zero: marcado na tela Frustrados, vira perda_real = 0.
- * Um ajuste manual (`perda_real`) tem prioridade sobre tudo.
+ * Pedido perdido que NÃO entra no P&L (não gerou custo): recusado,
+ * cancelado sem custo ou não postado. "Postado" = tem código de rastreio
+ * ou passou pela retirada nos Correios.
+ */
+export function perdaSemCusto(p: Pick<Pedido, 'status' | 'rastreamento' | 'passou_correios' | 'perda_real'>): boolean {
+  // O que foi marcado à mão na tela Frustrados vale: "s/ custo" (0) fica
+  // fora, "c/ custo" (o frete) entra.
+  if (p.perda_real != null) return Number(p.perda_real) === 0;
+  const s = normStatus(p.status);
+  if (/recus/.test(s)) return true;
+  // Cancelado só tem custo se já foi postado. (O frustrado antigo conta
+  // sempre com o frete: pedido velho pode não ter o rastreio gravado aqui.)
+  if (/cancel/.test(s)) return !(p.rastreamento || p.passou_correios);
+  return false;
+}
+
+/**
+ * Perda REAL de um pedido frustrado, em reais — o "Custo real de
+ * frustração" do BlueSales. O valor do pedido é a receita que não entrou;
+ * isto é o dinheiro que saiu (regras acima). Um ajuste manual
+ * (`perda_real`) tem prioridade sobre tudo.
  */
 export function perdaRealDePedido(p: Pedido): number {
   if (p.perda_real != null) return Number(p.perda_real) || 0;
-  const status = (p.status ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  if (PRODUTO_VOLTA.test(status)) return FRETE_POR_PEDIDO;
+  if (perdaSemCusto(p)) return 0;
+  const status = normStatus(p.status);
+  if (FRETE_DOBRADO.test(status)) return 2 * FRETE_POR_PEDIDO;
+  if (SO_FRETE.test(status)) return FRETE_POR_PEDIDO;
   return custoProdutoDoPlano(p.produto_plano) + FRETE_POR_PEDIDO;
 }
 

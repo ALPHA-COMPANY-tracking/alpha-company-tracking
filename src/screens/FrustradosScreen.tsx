@@ -5,7 +5,7 @@ import { formatBRL, reaisToCents } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
 import { pedidosAtivos, statusBucket } from '@/lib/pedidos';
 import { MOTIVOS, motivoFrustracao } from '@/lib/indicadores';
-import { custoProdutoDoPlano, FRETE_POR_PEDIDO, perdaRealDePedido } from '@/lib/custosConfig';
+import { custoProdutoDoPlano, FRETE_POR_PEDIDO, perdaRealDePedido, perdaSemCusto } from '@/lib/custosConfig';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
 import { MoneyInput } from '@/components/MoneyInput';
@@ -25,10 +25,13 @@ function planoCurto(plano?: string | null): string {
   return `${m[1]} pote${m[1] === '1' ? '' : 's'}`;
 }
 
-/** Devolvido, voltando, aguardando devolução, cancelado: o produto não se perde. */
-function produtoVolta(p: Pedido): boolean {
-  const m = motivoFrustracao(p);
-  return m === 'devolvido' || m === 'voltando' || m === 'aguardando_devolucao' || m === 'cancelado';
+/** Por que a perda é essa — as regras do BlueSales. */
+function regraDaPerda(p: Pedido, perda: number): string {
+  if (perda === 2 * FRETE_POR_PEDIDO) return 'frete de ida + de volta (devolvido reverso)';
+  if (perda === FRETE_POR_PEDIDO) {
+    return motivoFrustracao(p) === 'frustrado' ? 'só o frete (frustrado antigo)' : 'só o frete — o produto não se perde';
+  }
+  return `produto ${formatBRL(reaisToCents(custoProdutoDoPlano(p.produto_plano)))} + frete ${formatBRL(reaisToCents(FRETE_POR_PEDIDO))}`;
 }
 
 export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
@@ -40,7 +43,15 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
     () =>
       // Vendas tiradas da plataforma (lixeira) não contam aqui também.
       pedidosAtivos(pedidos)
-        .filter((p) => statusBucket(p.status) === 'frustrado' && isDentro(p.data, periodo.inicio, periodo.fim))
+        .filter((p) => statusBucket(p.status) === 'frustrado' && !perdaSemCusto(p) && isDentro(p.data, periodo.inicio, periodo.fim))
+        .sort((a, b) => b.data.localeCompare(a.data)),
+    [pedidos, periodo],
+  );
+  // Perdidos que não entram no P&L (não geraram custo) — como no BlueSales.
+  const semCustoLista = useMemo(
+    () =>
+      pedidosAtivos(pedidos)
+        .filter((p) => statusBucket(p.status) === 'frustrado' && perdaSemCusto(p) && isDentro(p.data, periodo.inicio, periodo.fim))
         .sort((a, b) => b.data.localeCompare(a.data)),
     [pedidos, periodo],
   );
@@ -50,7 +61,7 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
 
   // Quantos por motivo — os seis sempre à vista, mesmo zerados.
   const porMotivo = MOTIVOS.map((m) => ({ ...m, qtd: frustrados.filter((p) => motivoFrustracao(p) === m.id).length })).filter(
-    (m) => m.id !== 'outros' || m.qtd > 0,
+    (m) => (m.id !== 'outros' && m.id !== 'perda_cobranca') || m.qtd > 0,
   );
   const rotuloMotivo = Object.fromEntries(MOTIVOS.map((m) => [m.id, m.rotulo]));
   const dosCorreios = frustrados.filter((p) => p.passou_correios).length;
@@ -82,14 +93,14 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
           <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px]">no período</div>
         </div>
         <div className="bg-card border border-line rounded-kpi px-2.5 lg:px-4 py-3 lg:py-[15px]">
-          <div className="text-[10px] lg:text-[11px] text-dim font-medium mb-[3px] leading-tight">Valor dos pedidos</div>
+          <div className="text-[10px] lg:text-[11px] text-dim font-medium mb-[3px] leading-tight">Receita frustrada</div>
           <div className="mono text-[16px] lg:text-[21px] font-extrabold text-dim truncate">{formatBRL(reaisToCents(totalPedidos))}</div>
           <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px]">não entrou</div>
         </div>
         <div className="bg-card border border-red/30 rounded-kpi px-2.5 lg:px-4 py-3 lg:py-[15px]">
-          <div className="text-[10px] lg:text-[11px] text-dim font-medium mb-[3px] leading-tight">Perda real</div>
+          <div className="text-[10px] lg:text-[11px] text-dim font-medium mb-[3px] leading-tight">Custo real de frustração</div>
           <div className="mono text-[16px] lg:text-[21px] font-extrabold text-red truncate">{formatBRL(reaisToCents(totalPerda))}</div>
-          <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px]">saiu do caixa</div>
+          <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px]">saiu do caixa · desconta do lucro</div>
         </div>
       </div>
 
@@ -135,7 +146,6 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
               ) : (
                 frustrados.map((p) => {
                   const perda = perdaRealDePedido(p);
-                  const cogs = custoProdutoDoPlano(p.produto_plano);
                   const ajustado = p.perda_real != null;
                   const semCusto = ajustado && Number(p.perda_real) === 0;
                   const emEdicao = editando === p.id;
@@ -172,9 +182,7 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
                                 ? 'sem custo — não saiu ou a cliente pagou o frete'
                                 : ajustado
                                   ? 'ajustado por você'
-                                  : produtoVolta(p)
-                                    ? `só o frete — o produto não se perde`
-                                    : `produto ${formatBRL(reaisToCents(cogs))} + frete ${formatBRL(reaisToCents(FRETE_POR_PEDIDO))}`}
+                                  : regraDaPerda(p, perda)}
                             </div>
                             {/* As mesmas etiquetas do BlueSales: "Cancelado c/ Custo"
                                 (a cliente não pagou o frete) e "s/ Custo" (não saiu,
@@ -246,14 +254,46 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
         </div>
       </Panel>
 
+      {semCustoLista.length > 0 && (
+        <Panel title="Não entram no P&L" hint="não geraram custo — como no BlueSales">
+          <div>
+            {semCustoLista.map((p) => (
+              <div key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 lg:px-5 py-2.5 border-t border-line/70 first:border-t-0">
+                <span className="text-tx font-medium w-[46px]">{diaMes(p.data)}</span>
+                <div className="min-w-0 flex-1 basis-[200px]">
+                  <div className="text-tx text-[12.5px] truncate">{p.cliente ?? '—'}</div>
+                  <div className="text-[10px] mono text-dim2">#{p.internal_id ?? '—'} · {rotuloMotivo[motivoFrustracao(p)]}</div>
+                </div>
+                <span className="text-[11px] text-dim2">
+                  {p.perda_real != null
+                    ? 'marcado s/ custo'
+                    : /recus/i.test(p.status ?? '')
+                      ? 'recusado'
+                      : 'não foi postado'}
+                </span>
+                <span className="mono text-[12px] text-dim w-[84px] text-right">{formatBRL(reaisToCents(Number(p.valor) || 0))}</span>
+                <button
+                  onClick={() => definirPerdaPedido(p.id, FRETE_POR_PEDIDO)}
+                  title="Teve custo: entra no P&L perdendo o frete"
+                  className="text-[11px] font-semibold rounded-full border border-line2 px-2.5 py-[3px] text-dim hover:text-tx"
+                >
+                  c/ custo (frete)
+                </button>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
+
       <div className="flex items-start gap-3 rounded-[12px] border border-line2 bg-card2 px-4 py-[13px]">
         <TriangleAlert size={16} className="text-yel shrink-0 mt-[2px]" />
         <p className="m-0 text-[12.5px] text-dim leading-relaxed">
-          A perda é o dinheiro que de fato saiu: <b className="text-dim">só o frete</b> quando o produto não se perde
-          (devolvido, voltando, aguardando devolução, cancelado c/ custo) e <b className="text-dim">produto + frete</b>{' '}
-          quando se perde (roubo, frustrado). Marque <b className="text-dim">s/ custo</b> como no BlueSales quando o
-          pedido não saiu ou a cliente pagou o frete de ida e volta — a perda fica zero. O total daqui é o que aparece
-          como <b className="text-dim"> “Valor real perdido”</b> na Demonstração de Resultados.
+          As regras de custo são as do BlueSales: <b className="text-dim">frete + produto</b> quando a mercadoria não volta
+          (roubo, perdido, apreendido, perda de cobrança); <b className="text-dim">só o frete</b> no devolvido, voltando,
+          aguardando devolução, cancelado com custo e frustrado antigo; <b className="text-dim">frete de ida e de volta</b>{' '}
+          no devolvido reverso. Cancelado sem custo ou não postado, recusado e frustrado não postado{' '}
+          <b className="text-dim">não entram</b>. O total daqui é o <b className="text-dim">“Custo real de frustração”</b>{' '}
+          que a Demonstração de Resultados desconta do lucro.
         </p>
       </div>
     </div>

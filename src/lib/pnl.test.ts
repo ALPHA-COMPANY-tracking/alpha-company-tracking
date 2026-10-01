@@ -37,19 +37,20 @@ function custoUnico(valor: number): CustoVariavel {
 }
 
 describe('calcularPnl — critérios de aceite', () => {
-  // Padrão: os frustrados NÃO descontam do lucro — é assim que o BlueSales
-  // apresenta (mostra a perda no bloco Perdas, mas não a subtrai).
+  // Critérios de aceite do Afterpay, sem descontar os frustrados. (Desde
+  // 30/09/2026 o padrão desconta o custo real, como o BlueSales — ver teste 3.)
+  const SEM = { descontarFrustrados: 'nenhum' } as const;
   it('1. sem custos variáveis: afterpay 14.772,17 · lucro 6.041,08 · margem 29,0%', () => {
-    const r = calcularPnl([dia], [], periodo);
+    const r = calcularPnl([dia], [], periodo, SEM);
     expect(r.custos_afterpay).toBe(1_477_217); // R$ 14.772,17
-    expect(r.desconto_frustrados).toBe(0); // padrão 'nenhum'
+    expect(r.desconto_frustrados).toBe(0);
     expect(r.lucro_real).toBe(604_108); // R$ 6.041,08
     expect(r.lucro_afterpay).toBe(604_108);
     expect(formatPercent(r.margem_real)).toBe('29,0%');
   });
 
   it('2. com custos variáveis de 1.500,00: totais 16.272,17 · lucro 4.541,08 · margem 21,8%', () => {
-    const r = calcularPnl([dia], [custoUnico(1500)], periodo);
+    const r = calcularPnl([dia], [custoUnico(1500)], periodo, SEM);
     expect(r.custos_variaveis_total).toBe(150_000);
     expect(r.custos_totais_reais).toBe(1_627_217); // R$ 16.272,17
     expect(r.lucro_real).toBe(454_108); // R$ 4.541,08
@@ -117,7 +118,7 @@ describe('indicadores derivados', () => {
   });
 
   it('diferença vs Afterpay = custos variáveis (sinal negativo)', () => {
-    const r = calcularPnl([dia], [custoUnico(1500)], periodo);
+    const r = calcularPnl([dia], [custoUnico(1500)], periodo, { descontarFrustrados: 'nenhum' });
     expect(r.diferenca_afterpay).toBe(-150_000); // − R$ 1.500,00
   });
 });

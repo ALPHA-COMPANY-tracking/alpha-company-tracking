@@ -102,9 +102,10 @@ export interface ComissaoVendedor {
 export interface PnlOptions {
   /**
    * O que descontar do lucro pelos pedidos frustrados:
-   *   'real' (padrão na tela) → produto + frete: o que de fato saiu do caixa
-   *   'nenhum'                → nada; reproduz o lucro do BlueSales
-   * O default da função é 'nenhum' para não alterar quem chama sem opções.
+   *   'real' (padrão)  → o custo real de frustração (frete e produto, regras
+   *                      do BlueSales) — desde 30/09/2026 o BlueSales também
+   *                      desconta do lucro
+   *   'nenhum'         → nada (como o BlueSales fazia até setembro)
    */
   descontarFrustrados?: DescontoFrustrados;
 }
@@ -354,9 +355,9 @@ export function calcularPnl(
     .map(([categoria_id, v]) => ({ categoria_id, total: v.total, qtd: v.qtd }))
     .sort((a, b) => b.total - a.total);
 
-  // Padrão 'nenhum': espelha o BlueSales, que mostra a perda mas não a
-  // desconta do lucro. Os outros modos descontam a perda real ou o valor cheio.
-  const modo_frustrados = opts.descontarFrustrados ?? 'nenhum';
+  // Padrão 'real': espelha o BlueSales, que desde 30/09/2026 desconta do
+  // lucro o "Custo real de frustração" (a receita frustrada é só informativa).
+  const modo_frustrados = opts.descontarFrustrados ?? 'real';
   const custosBase = custos_afterpay + custos_variaveis_total;
   const desconto_frustrados = modo_frustrados === 'real' ? perda_real_frustrados : 0;
   const custos_totais_reais = custosBase + desconto_frustrados;

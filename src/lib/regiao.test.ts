@@ -99,7 +99,7 @@ describe('perdas por região', () => {
     ped('voltando', 'SP', 'São Paulo'),
     ped('enviados', 'SP', 'São Paulo'),
     ped('pagos', 'MG', 'Belo Horizonte'),
-    ped('cancelados', 'MG', 'Belo Horizonte'),
+    ped('cancelados', 'MG', 'Belo Horizonte', { rastreamento: 'AP1BR' }), // postado: entra com o frete
     ped('roubo', null),
     ped('roubo', 'RJ', 'Niterói', { data: '2026-08-30' }), // fora do período
     ped('roubo', 'RJ', 'Niterói', { removido_em: '2026-09-11T00:00:00Z' }), // excluído

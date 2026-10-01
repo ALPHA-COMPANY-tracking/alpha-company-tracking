@@ -84,7 +84,8 @@ describe('situação do pedido', () => {
     expect(motivoFrustracao({ status: 'cancelados' })).toBe('cancelado');
     expect(motivoFrustracao({ status: 'roubo' })).toBe('roubo');
     expect(motivoFrustracao({ status: 'frustrados' })).toBe('frustrado');
-    expect(motivoFrustracao({ status: 'extraviado' })).toBe('outros');
+    expect(motivoFrustracao({ status: 'extraviado' })).toBe('roubo'); // "perdido" no BlueSales
+    expect(motivoFrustracao({ status: 'perda_cobranca' })).toBe('perda_cobranca');
     expect(situacaoDoPedido('voltando')).toBe('frustracao');
   });
 
@@ -106,8 +107,9 @@ describe('situação do pedido', () => {
     expect(calcularPnl([], [], ago, {}, todos).qtd_frustrados).toBe(16);
   });
 
-  it('card de Frustrados igual ao BlueSales (setembro/2026: 5 pedidos, R$ 3.675)', () => {
-    // Roubo (#576, #577, #593) + Aguard. Devolução (#850) + Cancelados (#1488).
+  it('card de Frustrados como o BlueSales: cancelado não postado não entra (regras de 30/09/2026)', () => {
+    // Roubo (#576, #577, #593) + Aguard. Devolução (#850); o cancelado
+    // (#1488) não foi postado — não gerou custo, fica fora.
     const setembro: Pedido[] = [
       ped('roubo', '2026-09-02'),
       ped('roubo', '2026-09-02'),
@@ -117,8 +119,11 @@ describe('situação do pedido', () => {
       ped('negociação', '2026-09-10'), // não é perda: ainda pode pagar
     ];
     const pnl = calcularPnl([], [], P, {}, setembro);
-    expect(pnl.qtd_frustrados).toBe(5);
-    expect(pnl.valor_frustrado).toBe(367_500);
+    expect(pnl.qtd_frustrados).toBe(4);
+    expect(pnl.valor_frustrado).toBe(294_000);
+    // Postado (com rastreio), o cancelado entra perdendo o frete.
+    const postado = setembro.map((p) => (p.status === 'cancelados' ? { ...p, rastreamento: 'AP1BR' } : p));
+    expect(calcularPnl([], [], P, {}, postado).qtd_frustrados).toBe(5);
   });
 });
 
@@ -192,8 +197,8 @@ describe('indicadores', () => {
     expect(pr.rota.valor).toBe(73_500);
     expect(pr.a_receber).toBe(Math.round(73_500 * 0.7));
     expect(pr.envio_rota).toBe(8_300 + 3_300);
-    // Frustrado: produto + frete. Devolvido: o produto voltou, só o frete.
-    expect(pr.perda_frustracao).toBe(8_300 + 3_300 + 3_300);
+    // Frustrado antigo (legado) e devolvido: só o frete — regras do BlueSales.
+    expect(pr.perda_frustracao).toBe(3_300 + 3_300);
     expect(pr.lucro_real).toBe(calcularPnl(dailies, [], P, {}, pedidos).lucro_real);
     expect(pr.lucro_projetado).toBe(pr.lucro_real - pr.perda_frustracao + pr.a_receber - pr.comissoes - pr.envio_rota);
   });
