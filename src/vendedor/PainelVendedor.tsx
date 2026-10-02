@@ -22,7 +22,9 @@ import { chaveVendedor } from '@/lib/pnl';
 import { type Situacao, situacaoDoPedido } from '@/lib/indicadores';
 import { resumoDoVendedor } from '@/lib/vendedor';
 import { type AlertaCliente, pedidoEmAberto } from '@/lib/clientes';
-import { alertasDoVendedor } from '@/lib/clientesApi';
+import { alertasDoVendedor, alertasRegistradosDoVendedor } from '@/lib/clientesApi';
+import type { AlertaRegistrado } from '@/lib/alertasRegistro';
+import { AvisoAlertas, alertasNovos } from '@/components/alertas/AvisoAlertas';
 import { SeloAlerta } from '@/components/alertas/SeloAlerta';
 import { VerificarCliente } from '@/components/alertas/VerificarCliente';
 
@@ -87,11 +89,64 @@ export function PainelVendedor({
     setAlertas(meusAlertas);
   }, [donoId]);
 
+  // ── Aviso de alerta de cliente: o mesmo do dono, só dos pedidos dele ──
+  // undefined = carregando; null = a função do banco ainda não existe
+  // (migração 0026): fica o resumo antigo. O "visto" é deste aparelho —
+  // não mexe no do dono.
+  const [registrados, setRegistrados] = useState<AlertaRegistrado[] | null | undefined>(undefined);
+  const chaveVistos = `afterpay-vendedor:alertas-vistos:${chaveVendedor(vendedor)}`;
+  const [vistos, setVistos] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(chaveVistos) ?? '[]') as string[]);
+    } catch {
+      return new Set();
+    }
+  });
+  /** Se o alerta piorar depois (atualizado_em muda), ele volta como novo. */
+  const chaveDo = (a: AlertaRegistrado) => `${a.id}:${a.atualizado_em}`;
+  function marcarVisto(ids: number[]) {
+    setVistos((atual) => {
+      const novo = new Set(atual);
+      for (const a of registrados ?? []) if (ids.includes(a.id)) novo.add(chaveDo(a));
+      try {
+        localStorage.setItem(chaveVistos, JSON.stringify([...novo].slice(-500)));
+      } catch {
+        /* só neste aparelho */
+      }
+      return novo;
+    });
+  }
+  const registroVisivel = useMemo(
+    () => (registrados ?? []).map((a) => ({ ...a, visto_em: vistos.has(chaveDo(a)) ? 'visto' : null })),
+    [registrados, vistos],
+  );
+
+  // Com o painel aberto, confere a cada minuto: o pedido duplicado ou de
+  // cliente com roubo aparece logo depois de agendado no BlueSales.
   useEffect(() => {
-    carregar();
-    const t = setInterval(carregar, 5 * 60_000);
-    return () => clearInterval(t);
+    const atualizar = () => {
+      carregar();
+      alertasRegistradosDoVendedor().then(setRegistrados);
+    };
+    atualizar();
+    const t = setInterval(atualizar, 60_000);
+    const aoVoltar = () => document.visibilityState === 'visible' && atualizar();
+    document.addEventListener('visibilitychange', aoVoltar);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', aoVoltar);
+    };
   }, [carregar]);
+
+  // Na aba do navegador: "(2) ⚠️" enquanto houver alerta novo.
+  const qtdNovos = alertasNovos(registroVisivel, pedidos ?? []).length;
+  useEffect(() => {
+    const original = document.title.replace(/^\(\d+\) ⚠️ /, '');
+    document.title = qtdNovos > 0 ? `(${qtdNovos}) ⚠️ ${original}` : original;
+    return () => {
+      document.title = original;
+    };
+  }, [qtdNovos]);
 
   const hoje = hojeIso();
   const r = useMemo(() => (pedidos ? resumoDoVendedor(pedidos, vendedor, periodo, hoje) : null), [pedidos, vendedor, periodo, hoje]);
@@ -198,8 +253,12 @@ export function PainelVendedor({
           </div>
         ) : (
           <>
-            {/* Pedidos dele, ainda em aberto, de cliente com roubo / frustração / pedido duplo */}
-            {emAlerta.length > 0 && (
+            {/* O mesmo aviso do dono: pedido dele que chegou do BlueSales com
+                alerta de cliente (duplicado, roubo, não pagou…). */}
+            {Array.isArray(registrados) && <AvisoAlertas registro={registroVisivel} pedidos={pedidos ?? []} onVisto={marcarVisto} />}
+
+            {/* Sem a migração 0026: o resumo pelos pedidos em aberto. */}
+            {registrados === null && emAlerta.length > 0 && (
               <div className="flex items-start gap-2.5 rounded-[12px] border border-red/40 bg-red/[0.07] px-4 py-3 text-[12.5px] text-dim leading-relaxed">
                 <ShieldAlert size={16} className="text-red shrink-0 mt-[1px]" />
                 <span>

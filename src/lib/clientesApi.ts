@@ -3,6 +3,7 @@
 import { supabase } from '@/lib/supabase';
 import type { ClienteDoCsv } from '@/lib/csvBluesales';
 import { type AlertaCliente, nivelDoAlerta } from '@/lib/clientes';
+import type { AlertaRegistrado } from '@/lib/alertasRegistro';
 
 export interface PedidoVerificado {
   numero: number | null;
@@ -53,6 +54,18 @@ export async function enviarHistoricoClientes(itens: ClienteDoCsv[]): Promise<Re
     com_codigo += r.com_codigo;
   }
   return { ok: true, gravados, com_codigo };
+}
+
+/**
+ * Painel do Vendedor: os alertas REGISTRADOS dos pedidos dele — o mesmo
+ * aviso que o dono vê na Demonstração de Resultados (migração 0026).
+ * null = a função ainda não existe no banco.
+ */
+export async function alertasRegistradosDoVendedor(): Promise<AlertaRegistrado[] | null> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('alertas_registrados_vendedor');
+  if (error || !Array.isArray(data)) return null;
+  return (data as Omit<AlertaRegistrado, 'outros' | 'visto_em'>[]).map((a) => ({ ...a, outros: [], visto_em: null }));
 }
 
 /**

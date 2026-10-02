@@ -29,9 +29,11 @@ export function AvisoAlertas({
   registro: AlertaRegistrado[];
   pedidos: Pedido[];
   onVisto: (ids: number[]) => void;
-  onVerTodos: () => void;
+  /** Sem ele (Painel do Vendedor), mostra todos e não tem o atalho. */
+  onVerTodos?: () => void;
 }) {
   const novos = alertasNovos(registro, pedidos);
+  const limite = onVerTodos ? MAX : novos.length;
   if (novos.length === 0) return null;
   const temRoubo = novos.some(({ a }) => a.nivel === 'roubo');
 
@@ -56,21 +58,23 @@ export function AvisoAlertas({
           >
             <Check size={13} /> Marcar todos como vistos
           </button>
-          <button
-            onClick={onVerTodos}
-            className="inline-flex items-center gap-1 px-3 py-[6px] rounded-[9px] text-[12px] font-semibold text-gold2 hover:text-gold"
-          >
-            Ver todos <ChevronRight size={14} />
-          </button>
+          {onVerTodos && (
+            <button
+              onClick={onVerTodos}
+              className="inline-flex items-center gap-1 px-3 py-[6px] rounded-[9px] text-[12px] font-semibold text-gold2 hover:text-gold"
+            >
+              Ver todos <ChevronRight size={14} />
+            </button>
+          )}
         </div>
       </div>
       <div>
-        {novos.slice(0, MAX).map(({ a, p }) => (
+        {novos.slice(0, limite).map(({ a, p }) => (
           <div key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 lg:px-5 py-2.5 border-t border-line/60 first:border-t-0">
             <EtiquetaAlerta nivel={a.nivel} />
             <div className="min-w-0 flex-1 basis-[240px]">
               <div className="text-[13px] font-semibold text-tx truncate">{p?.cliente || `Pedido #${a.pedido_numero ?? '—'}`}</div>
-              <div className="text-[11px] text-dim2 truncate">
+              <div className="text-[11px] text-dim2 leading-snug">
                 #{a.pedido_numero ?? '—'}
                 {p && ` · ${formatDiaMes(p.data)} · ${p.vendedor || 'sem vendedor'}`}
                 {a.texto && ` · ${a.texto}`}
@@ -84,7 +88,7 @@ export function AvisoAlertas({
             </button>
           </div>
         ))}
-        {novos.length > MAX && (
+        {novos.length > limite && (
           <button onClick={onVerTodos} className="w-full py-2.5 border-t border-line/60 text-[12px] font-semibold text-gold2 hover:text-gold">
             Mais {novos.length - MAX} na tela Alerta de Clientes
           </button>
