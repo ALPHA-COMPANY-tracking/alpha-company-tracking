@@ -3,14 +3,15 @@
 // que os pedidos que já existem (entregues, na rua, a enviar) devem
 // render. Sem vendas que ainda não aconteceram e sem os anúncios que
 // trariam essas vendas: responde "com o que eu tenho, estou no positivo
-// ou no vermelho?". Tudo sai do histórico REAL da operação:
+// ou no vermelho?".
 //
-//   · Quanto paga: dos pedidos que já se resolveram (pago ou frustração)
-//     nos últimos 120 dias, quantos pagaram — conforme a etapa em que o
-//     pedido está hoje. Pedido já entregue paga mais que pedido a enviar,
-//     porque já passou do risco de roubo, devolução e cancelamento.
+//   · Quanto paga: SEMPRE 80% — a previsão conta com 20% de frustração
+//     (FRUSTRACAO_PREVISTA), o máximo que a operação chega, já com tudo:
+//     cancelamento, roubo, devolução… Decisão do Jonas em 05/10/2026.
 //   · Quanto perde quando não paga: a perda média (regras do BlueSales)
-//     das frustrações dessa etapa.
+//     das frustrações da etapa, no histórico dos últimos 120 dias —
+//     entregue que não paga perde produto + frete; cancelado antes de
+//     sair, nada.
 //   · Quando paga (só para o gráfico e o "até o fim do mês"): quantos dias
 //     os pagamentos levaram, do agendamento ao pagamento. Um pedido de 10
 //     dias só conta com os pagamentos que levaram 10 dias ou mais.
@@ -40,13 +41,16 @@ export type Etapa = 'aguardando' | 'rota' | 'preparo';
 
 const JANELA_DIAS = 120;
 
+/** Frustração com que a previsão SEMPRE conta: 20% de toda a base. */
+export const FRUSTRACAO_PREVISTA = 0.2;
+
 export interface LinhaEtapa {
   etapa: Etapa;
   /** Pedidos nessa etapa hoje. */
   qtd: number;
   /** Valor agendado deles. */
   valor: Cents;
-  /** Dos pedidos que passaram por essa etapa, quantos pagaram. */
+  /** Quanto deve pagar: 1 − FRUSTRACAO_PREVISTA. */
   taxa: number;
   /** O que esses pedidos devem render (sem corte de data). */
   previsto: Cents;
@@ -147,7 +151,6 @@ export function preverMes(pedidos: Pedido[], dailies: AfterpayDaily[], custos: C
     rota: falhasEm(['aguardando', 'rota']),
     preparo: falhas,
   };
-  const taxa = (e: Etapa) => safeDiv(pagos.length, pagos.length + falhasDaEtapa[e].length);
   const media = (xs: number[]) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : 0);
   const perdaMedia = (e: Etapa) => media(falhasDaEtapa[e].map(perdaRealDePedido));
   const fator_recebido = Math.min(
@@ -170,9 +173,9 @@ export function preverMes(pedidos: Pedido[], dailies: AfterpayDaily[], custos: C
   // ── Os pedidos da base ──
   const porDia = new Array<number>(diasRestantes + 1).fill(0); // k = 0..diasRestantes
   const linhas: Record<Etapa, LinhaEtapa> = {
-    aguardando: { etapa: 'aguardando', qtd: 0, valor: 0, taxa: taxa('aguardando'), previsto: 0 },
-    rota: { etapa: 'rota', qtd: 0, valor: 0, taxa: taxa('rota'), previsto: 0 },
-    preparo: { etapa: 'preparo', qtd: 0, valor: 0, taxa: taxa('preparo'), previsto: 0 },
+    aguardando: { etapa: 'aguardando', qtd: 0, valor: 0, taxa: 1 - FRUSTRACAO_PREVISTA, previsto: 0 },
+    rota: { etapa: 'rota', qtd: 0, valor: 0, taxa: 1 - FRUSTRACAO_PREVISTA, previsto: 0 },
+    preparo: { etapa: 'preparo', qtd: 0, valor: 0, taxa: 1 - FRUSTRACAO_PREVISTA, previsto: 0 },
   };
   const fora = { negociacao: { qtd: 0, valor: 0 }, parados: { qtd: 0, valor: 0 }, perda_se_nao_pagarem: 0 };
   let deveEntrar = 0;
@@ -207,7 +210,11 @@ export function preverMes(pedidos: Pedido[], dailies: AfterpayDaily[], custos: C
         FRETE_POR_PEDIDO +
         recebido * (comissaoDoVendedor(p.vendedor) + COMISSAO_COBRANCA) +
         (ehBoleto(p) ? TAXA_BOLETO : 0));
-    frustracaoPrevista += (1 - t) * perdaMedia(etapa);
+    // Sem frustração dessa etapa no histórico: conta o pedido inteiro
+    // perdido (produto + frete) — a previsão erra para o lado seguro.
+    frustracaoPrevista +=
+      (1 - t) *
+      (falhasDaEtapa[etapa].length ? perdaMedia(etapa) : custoProdutoDoPlano(p.produto_plano) + FRETE_POR_PEDIDO);
 
     for (let k = 0; k <= diasRestantes; k++) {
       const v = recebido * t * chance(k);

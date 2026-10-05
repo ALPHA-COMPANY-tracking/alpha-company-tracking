@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AfterpayDaily, Pedido } from '@/types';
 import { addDias } from '@/lib/dates';
-import { preverMes } from '@/lib/previsao';
+import { FRUSTRACAO_PREVISTA, preverMes } from '@/lib/previsao';
 
 const HOJE = '2026-10-10';
 const PLANO = 'DERMAX PREMIUM - 6 POTE'; // produto 83 + frete 33 = 116
@@ -59,12 +59,22 @@ describe('Previsão do Mês', () => {
   const dailies = Array.from({ length: 7 }, (_, i) => dia(addDias('2026-10-03', i), 100));
   const pr = preverMes(pedidos, dailies, [], HOJE);
 
-  it('quanto paga, pela etapa: entregue paga mais que na rua', () => {
-    const taxa = Object.fromEntries(pr.linhas.map((l) => [l.etapa, l.taxa]));
-    expect(taxa.aguardando).toBeCloseTo(8 / 9, 6); // só a perda de cobrança aconteceu depois de entregue
-    expect(taxa.rota).toBeCloseTo(8 / 10, 6);
-    expect(taxa.preparo).toBeCloseTo(8 / 10, 6);
+  it('sempre 20% de frustração, em qualquer etapa (decisão do Jonas)', () => {
+    expect(FRUSTRACAO_PREVISTA).toBe(0.2);
+    for (const l of pr.linhas) expect(l.taxa).toBeCloseTo(0.8, 9);
     expect(pr.historico.atraso_mediano).toBe(5);
+  });
+
+  it('entregue que não paga perde a média das frustrações depois de entregue; sem histórico, o pedido inteiro', () => {
+    const entregue = ped('entregue', '2026-10-08');
+    const com = preverMes([...historico(), entregue], dailies, [], HOJE);
+    // Histórico: a perda de cobrança (produto 83 + frete 33).
+    expect(com.lucro.frustracao_prevista).toBe(Math.round(0.2 * 116 * 100));
+    expect(com.linhas.find((l) => l.etapa === 'aguardando')!.previsto).toBe(58_800);
+    // Sem nenhuma frustração depois de entregue no histórico: conta produto + frete.
+    const semFalhaEntregue = historico().filter((p) => p.status !== 'perda_de_cobranca');
+    const sem = preverMes([...semFalhaEntregue, entregue], dailies, [], HOJE);
+    expect(sem.lucro.frustracao_prevista).toBe(Math.round(0.2 * 116 * 100));
   });
 
   it('pedido em rota: valor × chance de pagar, e o pagamento cai no dia certo do gráfico', () => {

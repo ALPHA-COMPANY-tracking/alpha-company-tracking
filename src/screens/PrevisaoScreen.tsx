@@ -14,15 +14,15 @@ import { AreaPrevisao } from '@/components/viz/AreaPrevisao';
 import { COR } from '@/lib/cores';
 import { type Cents, formatBRL, formatPercent } from '@/lib/money';
 import { hojeIso } from '@/lib/dates';
-import { type Etapa, preverMes } from '@/lib/previsao';
+import { type Etapa, FRUSTRACAO_PREVISTA, preverMes } from '@/lib/previsao';
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
-const ETAPA: Record<Etapa, { titulo: string; nota: string }> = {
-  aguardando: { titulo: 'Entregues, esperando pagamento', nota: 'dos entregues pagam' },
-  rota: { titulo: 'Na rua (em rota)', nota: 'dos que saem para a rua pagam' },
-  preparo: { titulo: 'A enviar', nota: 'dos agendados pagam' },
+const ETAPA: Record<Etapa, string> = {
+  aguardando: 'Entregues, esperando pagamento',
+  rota: 'Na rua (em rota)',
+  preparo: 'A enviar',
 };
 
 export function PrevisaoScreen() {
@@ -57,7 +57,7 @@ export function PrevisaoScreen() {
               {positivo ? 'Mês no positivo' : 'Mês no vermelho'}
             </div>
             <div className="text-[12.5px] text-dim leading-snug">
-              Lucro previsto com a base de hoje · margem {formatPercent(l.margem)}
+              Lucro previsto com a base de hoje e {formatPercent(FRUSTRACAO_PREVISTA, 0)} de frustração · margem {formatPercent(l.margem)}
             </div>
           </div>
         </div>
@@ -94,14 +94,14 @@ export function PrevisaoScreen() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-5">
-        <Panel title="O que a base deve render" hint="por etapa">
+        <Panel title="O que a base deve render" hint={`com ${formatPercent(FRUSTRACAO_PREVISTA, 0)} de frustração`}>
           <div className="divide-y divide-line">
             {pr.linhas.map((ln) => (
               <div key={ln.etapa} className="px-[18px] py-3 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-[13px] text-tx">{ETAPA[ln.etapa].titulo}</div>
+                  <div className="text-[13px] text-tx">{ETAPA[ln.etapa]}</div>
                   <div className="text-[10.5px] text-dim2 leading-snug">
-                    {ln.qtd} {ln.qtd === 1 ? 'pedido' : 'pedidos'} · {formatBRL(ln.valor)} · {formatPercent(ln.taxa, 0)} {ETAPA[ln.etapa].nota}
+                    {ln.qtd} {ln.qtd === 1 ? 'pedido' : 'pedidos'} · {formatBRL(ln.valor)} · {formatPercent(ln.taxa, 0)} devem pagar
                   </div>
                 </div>
                 <div className="mono text-[13.5px] font-bold text-grn shrink-0">{formatBRL(ln.previsto)}</div>
@@ -136,7 +136,12 @@ export function PrevisaoScreen() {
             <Linha rotulo="Lucro real até agora" nota='o mesmo da Demonstração de Resultados em "Este mês"' cents={l.ate_agora} sinal="=" />
             <Linha rotulo="Receita que deve entrar" nota="dos pedidos da base" cents={l.receita_prevista} sinal="+" />
             <Linha rotulo="Custos dessa receita" nota="produto, frete, comissões e taxa de boleto" cents={-l.custos_da_receita} sinal="−" />
-            <Linha rotulo="Frustração prevista" nota="perda dos pedidos da base que não devem pagar" cents={-l.frustracao_prevista} sinal="−" />
+            <Linha
+              rotulo="Frustração prevista"
+              nota={`${formatPercent(FRUSTRACAO_PREVISTA, 0)} dos pedidos da base: cancelamento, roubo, devolução — tudo`}
+              cents={-l.frustracao_prevista}
+              sinal="−"
+            />
           </div>
           <div
             className={`px-[18px] py-5 border-t flex items-end justify-between gap-4 bg-gradient-to-br ${
@@ -147,7 +152,7 @@ export function PrevisaoScreen() {
               <div className={`text-[11px] font-bold tracking-[0.14em] uppercase ${positivo ? 'text-grn' : 'text-red'}`}>
                 {positivo ? 'Lucro previsto' : 'Prejuízo previsto'}
               </div>
-              <div className="text-[11px] text-dim2 mt-1">sem anúncios e vendas dos próximos dias</div>
+              <div className="text-[11px] text-dim2 mt-1">com {formatPercent(FRUSTRACAO_PREVISTA, 0)} de frustração · sem anúncios e vendas dos próximos dias</div>
             </div>
             <div className={`mono text-[26px] lg:text-[30px] font-extrabold tracking-tight shrink-0 ${positivo ? 'text-grn' : 'text-red'}`}>
               {formatBRL(l.previsto)}
@@ -166,9 +171,11 @@ export function PrevisaoScreen() {
       </Panel>
 
       <div className="rounded-[12px] border border-line2 bg-card2 px-4 py-[13px] text-[12px] text-dim leading-relaxed">
-        <b className="text-tx">Como a previsão é feita.</b> Só entram os pedidos que já existem. Dos {pr.historico.resolvidos} pedidos que já
-        se resolveram (pagos ou frustrados) nos últimos 120 dias, sai quanto paga em cada etapa — quem já foi entregue paga mais, porque
-        passou do risco de roubo, devolução e cancelamento — e quanto se perde quando não paga.
+        <b className="text-tx">Como a previsão é feita.</b> Só entram os pedidos que já existem, e sempre com{' '}
+        {formatPercent(FRUSTRACAO_PREVISTA, 0)} de frustração — o máximo que a operação chega, já com cancelamento, roubo, devolução e
+        todo o resto: {formatPercent(1 - FRUSTRACAO_PREVISTA, 0)} de cada etapa pagam. Quanto se perde em cada frustração vem dos{' '}
+        {pr.historico.resolvidos} pedidos que já se resolveram nos últimos 120 dias, pelas regras do BlueSales (entregue que não paga perde
+        produto + frete; cancelado antes de sair, nada).
         {pr.historico.atraso_mediano != null && ` Metade dos pagamentos chega em até ${pr.historico.atraso_mediano} dias depois do agendamento.`}{' '}
         Cada real agendado vira {formatBRL(Math.round(pr.historico.fator_recebido * 100))} recebido (descontos e pagamentos parciais). Os
         anúncios e as vendas dos próximos dias não entram. A conta é refeita sozinha a cada pedido novo — é uma estimativa, não uma
