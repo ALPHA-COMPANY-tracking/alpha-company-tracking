@@ -32,3 +32,6 @@ dev.log
 
 # Chaves do push geradas localmente
 CHAVES-PUSH.local.txt
+
+# Tokens gerados localmente (ex.: PLANILHA-TOKEN.local.txt)
+*.local.txt
