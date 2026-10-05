@@ -1,11 +1,11 @@
 // ─────────────────────────────────────────────────────────────
 // Conferência da Planilha (migração 0027): o que a planilha de pagamentos
 // mandou, as correções já feitas e o "Usar o da planilha" da tela.
-// As regras de comparação são as mesmas do servidor (api/lib-planilha.ts).
+// As regras de comparação são as mesmas do servidor (api/planilha.ts).
 // ─────────────────────────────────────────────────────────────
 
 import { supabase } from '@/lib/supabase';
-import type { Diferenca, LinhaPlanilha } from '../../api/lib-planilha';
+import type { Diferenca, LinhaPlanilha } from '../../api/planilha';
 
 export interface FotoPlanilha {
   linhas: LinhaPlanilha[];

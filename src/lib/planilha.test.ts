@@ -10,7 +10,7 @@ import {
   normalizarVendedor,
   type LinhaPlanilha,
   type PedidoBanco,
-} from '../../api/lib-planilha';
+} from '../../api/planilha';
 
 const lin = (pedido_id: string, valor: number, data: string, vendedor = 'PETER', aba = 'SETEMBRO'): LinhaPlanilha => ({
   aba,

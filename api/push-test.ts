@@ -26,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     // Só o dono ou um sócio logado dispara o teste.
-    const { donoOuSocio } = await import('./lib-auth.js');
+    const { donoOuSocio } = await import('./lib-push.js');
     if (!(await donoOuSocio(db, req.headers['authorization'], userId))) {
       return res.status(401).json({ error: 'Não autorizado' });
     }

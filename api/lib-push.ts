@@ -8,6 +8,8 @@
 // único que nunca entregou. Texto é barato de importar; entrega, não.
 // ─────────────────────────────────────────────────────────────
 
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 export interface Aviso {
   titulo: string;
   corpo: string;
@@ -56,6 +58,29 @@ export function avisoDoEvento(
     };
   }
   return null; // envio, cobrança etc. não viram notificação
+}
+
+// ─────────────────────────────────────────────────────────────
+// Quem pode usar os endpoints de aviso: o dono ou um sócio logado
+// (Bearer <sessão do Supabase>). Login de VENDEDOR não passa — ele só tem
+// o Painel do Vendedor. Mora aqui (e não num arquivo próprio) porque o
+// plano da Vercel aceita no máximo 12 funções, e cada arquivo de /api é uma.
+// ─────────────────────────────────────────────────────────────
+
+export async function donoOuSocio(db: SupabaseClient, authorization: unknown, donoId: string): Promise<boolean> {
+  const token = String(authorization ?? '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) return false;
+  const { data } = await db.auth.getUser(token);
+  const quem = data.user?.id;
+  if (!quem) return false;
+  if (quem === donoId) return true;
+  const { data: membro } = await db
+    .from('dashboard_membros')
+    .select('dono_id')
+    .eq('membro_id', quem)
+    .eq('dono_id', donoId)
+    .maybeSingle();
+  return Boolean(membro);
 }
 
 // Este arquivo existe em /api só porque a Vercel empacota apenas o que

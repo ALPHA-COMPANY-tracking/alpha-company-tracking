@@ -13,7 +13,7 @@ import { KpiCard, Panel } from '@/components/ui';
 import { COR } from '@/lib/cores';
 import { formatBRL, reaisToCents } from '@/lib/money';
 import { haQuanto } from '@/lib/saudacao';
-import { competencias, conferirMes, type Diferenca, type TipoDiferenca } from '../../api/lib-planilha';
+import { competencias, conferirMes, type Diferenca, type TipoDiferenca } from '../../api/planilha';
 import {
   type AjusteFeito,
   type FotoPlanilha,

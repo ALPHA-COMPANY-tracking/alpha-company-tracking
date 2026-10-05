@@ -8,7 +8,7 @@
 // A chave não pode mudar nunca — com outra chave, nenhum código antigo
 // casa mais.
 //
-// Importar com import() dinâmico (ver api/lib-auth.ts).
+// Importar com import() dinâmico (ver api/resumo-dia.ts).
 // ─────────────────────────────────────────────────────────────
 
 import { createHmac } from 'node:crypto';
