@@ -64,53 +64,49 @@ describe('Previsão do Mês', () => {
     expect(taxa.aguardando).toBeCloseTo(8 / 9, 6); // só a perda de cobrança aconteceu depois de entregue
     expect(taxa.rota).toBeCloseTo(8 / 10, 6);
     expect(taxa.preparo).toBeCloseTo(8 / 10, 6);
-    expect(pr.base.atraso_mediano).toBe(5);
+    expect(pr.historico.atraso_mediano).toBe(5);
   });
 
-  it('pedido em rota: valor × chance de pagar, no dia certo', () => {
+  it('pedido em rota: valor × chance de pagar, e o pagamento cai no dia certo do gráfico', () => {
     const rota = pr.linhas.find((l) => l.etapa === 'rota')!;
     expect(rota.qtd).toBe(1);
     expect(rota.previsto).toBe(58_800); // 735 × 80%
     const dia13 = pr.serie.find((p) => p.data === '2026-10-13')!;
     const dia12 = pr.serie.find((p) => p.data === '2026-10-12')!;
-    expect(dia13.previsto! - dia12.previsto!).toBeGreaterThanOrEqual(58_800);
+    expect(dia13.previsto! - dia12.previsto!).toBe(58_800);
+    expect(pr.deve_entrar).toBe(58_800);
+    expect(pr.ate_fim_do_mes).toBe(58_800);
+    expect(pr.base).toEqual({ qtd: 1, valor: 73_500 });
   });
 
-  it('negociação e pedido parado demais ficam fora', () => {
+  it('negociação e pedido parado demais ficam fora, com a perda se não pagarem', () => {
     expect(pr.fora.negociacao).toEqual({ qtd: 1, valor: 73_500 });
     expect(pr.fora.parados).toEqual({ qtd: 1, valor: 73_500 });
+    expect(pr.fora.perda_se_nao_pagarem).toBe(2 * 11_600);
     expect(pr.linhas.find((l) => l.etapa === 'aguardando')!.qtd).toBe(0);
   });
 
-  it('vendas novas pelo ritmo de 14 dias: só as que pagam até o fim do mês', () => {
-    // 1 pedido nos últimos 14 dias → 1/14 por dia. Faltam 21 dias; quem for
-    // agendado até 26/10 paga até 31/10 (16 dias) × 80%.
-    const novas = pr.linhas.find((l) => l.etapa === 'novas')!;
-    expect(novas.previsto).toBe(Math.round(((16 / 14) * 0.8 * 735) * 100));
-    expect(pr.ritmo.qtd_dia).toBeCloseTo(1 / 14, 6);
+  it('só a base de hoje: sem vendas futuras e sem anúncios futuros', () => {
+    expect(pr.linhas.map((l) => l.etapa)).toEqual(['aguardando', 'rota', 'preparo']);
+    const l = pr.lucro;
+    expect(l.previsto).toBe(l.ate_agora + l.receita_prevista - l.custos_da_receita - l.frustracao_prevista);
+    // Frustração prevista: o pedido em rota não paga em 20% dos casos e perde 116.
+    expect(l.frustracao_prevista).toBe(Math.round(0.2 * 116 * 100));
+    // Custos do que deve entrar: 80% × (produto 83 + frete 33 + 6% de comissão sobre 735).
+    expect(l.custos_da_receita).toBe(Math.round(0.8 * (116 + 735 * 0.06) * 100));
   });
 
-  it('o gráfico termina no faturamento previsto, e o lucro fecha a conta', () => {
+  it('o gráfico termina no faturamento do mês; o que paga depois do dia 31 conta no total', () => {
     expect(pr.diasRestantes).toBe(21);
-    expect(Math.abs(pr.serie[pr.serie.length - 1].previsto! - pr.faturamento_previsto)).toBeLessThanOrEqual(2);
-    expect(pr.faturamento_previsto).toBe(pr.ja_entrou + pr.deve_entrar);
-    const l = pr.lucro;
-    expect(l.ads_dia).toBe(10_000);
-    expect(l.ads_restante).toBe(21 * 10_000);
-    expect(l.previsto).toBe(l.ate_agora + l.receita_prevista - l.custos_da_receita - l.ads_restante - l.fixos_restantes - l.frustracao_prevista);
-    // Frustração prevista: o pedido em rota (20% × 116) + as vendas novas que frustram.
-    expect(l.frustracao_prevista).toBe(Math.round((0.2 * 116 + (16 / 14) * 0.2 * 116) * 100));
+    expect(pr.serie[pr.serie.length - 1].previsto).toBe(pr.faturamento_mes);
+    expect(pr.faturamento_mes).toBe(pr.ja_entrou + pr.ate_fim_do_mes);
+    // Pedido de 29/10 paga só em 03/11: entra no total, não no mês.
+    const tarde = preverMes([...pedidos, ped('enviados', '2026-10-29')], dailies, [], '2026-10-29');
+    expect(tarde.deve_entrar - tarde.ate_fim_do_mes).toBe(58_800);
   });
 
   it('pedido excluído da plataforma não entra em nada', () => {
     const sem = preverMes([...pedidos, ped('enviados', '2026-10-09', { removido_em: '2026-10-09T12:00:00Z' })], dailies, [], HOJE);
     expect(sem.linhas.find((l) => l.etapa === 'rota')!.qtd).toBe(1);
-  });
-
-  it('último dia do mês: nada de ads nem vendas novas pela frente', () => {
-    const fim = preverMes(pedidos, dailies, [], '2026-10-31');
-    expect(fim.diasRestantes).toBe(0);
-    expect(fim.lucro.ads_restante).toBe(0);
-    expect(fim.linhas.find((l) => l.etapa === 'novas')!.previsto).toBe(0);
   });
 });

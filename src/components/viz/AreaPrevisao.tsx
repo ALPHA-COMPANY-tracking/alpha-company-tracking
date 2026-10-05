@@ -47,7 +47,7 @@ export function AreaPrevisao({ serie, hoje, altura = 250 }: { serie: PontoDia[];
             minTickGap={22}
           />
           <YAxis
-            tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : `${Math.round(v)}`)}
+            tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}k` : `${Math.round(v)}`)}
             tick={{ fill: HEX.eixo, fontSize: 10 }}
             tickLine={false}
             axisLine={false}
