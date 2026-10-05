@@ -17,10 +17,13 @@ import { ItemMenu } from '@/components/RodapeConta';
 export function BotaoNotificacoes({
   compacto = false,
   formato = 'botao',
+  lado = 'baixo',
 }: {
   compacto?: boolean;
   /** 'menu' = linha do menu lateral; 'botao' = botão com moldura. */
   formato?: 'botao' | 'menu';
+  /** Botão redondo: onde abre o menuzinho ('direita' = menu lateral recolhido). */
+  lado?: 'baixo' | 'direita';
 }) {
   const [estado, setEstado] = useState<EstadoPush>('indisponivel');
   const [ocupado, setOcupado] = useState(false);
@@ -110,8 +113,9 @@ export function BotaoNotificacoes({
     );
   }
 
-  // ── Botão redondo do celular ──
+  // ── Botão redondo (celular e menu recolhido) ──
   if (compacto) {
+    const flutua = lado === 'direita' ? 'left-[48px] bottom-0' : 'right-0 top-[46px]';
     return (
       <div className="relative" ref={caixa}>
         <button
@@ -127,7 +131,7 @@ export function BotaoNotificacoes({
         </button>
 
         {menu && (
-          <div className="absolute right-0 top-[46px] z-50 w-[210px] rounded-[12px] border border-line2 bg-card shadow-xl overflow-hidden">
+          <div className={`absolute ${flutua} z-50 w-[210px] rounded-[12px] border border-line2 bg-card shadow-xl overflow-hidden`}>
             <button
               onClick={testar}
               disabled={ocupado}
@@ -148,7 +152,7 @@ export function BotaoNotificacoes({
         {/* Resultado do teste, flutuando abaixo do botão */}
         {(recado || erro) && (
           <div
-            className={`absolute right-0 top-[46px] z-50 w-[220px] rounded-[10px] border px-3 py-2 text-[11.5px] shadow-xl ${
+            className={`absolute ${flutua} z-50 w-[220px] rounded-[10px] border px-3 py-2 text-[11.5px] shadow-xl ${
               erro ? 'border-red/40 bg-card text-red' : 'border-grn/40 bg-card text-grn'
             }`}
           >

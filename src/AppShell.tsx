@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BadgeCheck, BarChart3, Briefcase, Camera, ChevronDown, Download, LayoutDashboard, LogOut, MapPinned, Megaphone, PieChart, Plug, Receipt, RefreshCw, ShieldAlert, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
+import { BadgeCheck, BarChart3, Briefcase, Camera, ChevronDown, ChevronsLeft, ChevronsRight, Download, LayoutDashboard, LogOut, MapPinned, Megaphone, PieChart, Plug, Receipt, RefreshCw, ShieldAlert, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { usePeriodo } from '@/store/usePeriodo';
@@ -77,6 +77,16 @@ const abaPorId = (id: Tab) => TABS.find((t) => t.id === id)!;
 
 const KEY_ABA = 'afterpay-pnl:aba';
 const KEY_GRUPOS = 'afterpay-pnl:menu-aberto';
+const KEY_RECOLHIDO = 'afterpay-pnl:menu-recolhido';
+
+/** Menu lateral recolhido na última visita (só neste aparelho). */
+function recolhidoInicial(): boolean {
+  try {
+    return localStorage.getItem(KEY_RECOLHIDO) === '1';
+  } catch {
+    return false;
+  }
+}
 
 /** Grupos abertos da última visita (só neste aparelho). */
 function gruposIniciais(): string[] {
@@ -114,6 +124,18 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
         /* ignora */
       }
       return novo;
+    });
+  }
+  // Recolhido = só os ícones, numa faixa fina: sobra tela para os números.
+  const [recolhido, setRecolhido] = useState(recolhidoInicial);
+  function alternarMenu() {
+    setRecolhido((atual) => {
+      try {
+        localStorage.setItem(KEY_RECOLHIDO, atual ? '0' : '1');
+      } catch {
+        /* ignora */
+      }
+      return !atual;
     });
   }
   const [modal, setModal] = useState(false);
@@ -216,48 +238,80 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
   return (
     <div className="min-h-screen w-full lg:flex">
       {/* ───────── Menu lateral esquerdo ───────── */}
-      <aside className="hidden lg:block lg:w-[250px] lg:shrink-0 lg:min-h-screen lg:border-r border-line/70 lg:bg-card/40 px-4 pt-5 lg:sticky lg:top-0 lg:self-start">
-        <div className="flex items-center gap-3 pb-4 mb-3 border-b border-line/70 lg:border-0 lg:mb-4">
-          <LogoMark size={42} />
-          <Wordmark />
-        </div>
+      <aside
+        className={`hidden lg:block lg:shrink-0 lg:min-h-screen lg:border-r border-line/70 lg:bg-card/40 pt-5 lg:sticky lg:top-0 lg:self-start ${
+          recolhido ? 'lg:w-[72px] px-2.5' : 'lg:w-[250px] px-4'
+        }`}
+      >
+        {recolhido ? (
+          // Recolhido: o logo e, embaixo, a seta que abre de novo.
+          <div className="flex flex-col items-center gap-2 mb-4">
+            <LogoMark size={40} />
+            <BotaoSeta Icon={ChevronsRight} rotulo="Abrir o menu" onClick={alternarMenu} />
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 mb-4">
+            <LogoMark size={42} />
+            <Wordmark />
+            <span className="ml-auto">
+              <BotaoSeta Icon={ChevronsLeft} rotulo="Recolher o menu" onClick={alternarMenu} />
+            </span>
+          </div>
+        )}
 
-        <nav className="flex flex-col gap-1.5">
-          {MENU.map((m) => {
-            if ('aba' in m) return <BotaoAba key={m.aba} aba={m.aba} ativo={tab === m.aba} onClick={() => setTab(m.aba)} />;
-            // O grupo da tela aberta fica aberto — senão ela sumiria do menu.
-            const temAtiva = m.abas.includes(tab);
-            const aberto = gruposAbertos.includes(m.grupo) || temAtiva;
-            return (
-              <div key={m.grupo}>
-                <button
-                  onClick={() => alternarGrupo(m.grupo, aberto)}
-                  aria-expanded={aberto}
-                  className={`w-full inline-flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-[13px] font-semibold text-left transition-colors border border-transparent hover:bg-white/[0.025] ${
-                    temAtiva ? 'text-tx' : 'text-dim hover:text-tx'
-                  }`}
-                >
-                  <m.Icon size={16} className={`shrink-0 ${temAtiva ? 'text-gold' : 'text-dim2'}`} />
-                  <span className="flex-1 whitespace-normal leading-snug">{m.label}</span>
-                  <ChevronDown
-                    size={15}
-                    className={`shrink-0 text-dim2 transition-transform duration-200 ${aberto ? 'rotate-180' : ''}`}
-                  />
-                </button>
-                {aberto && (
-                  <div className="ml-[21px] mt-1 pl-2.5 border-l border-line2 flex flex-col gap-1">
-                    {m.abas.map((a) => (
-                      <BotaoAba key={a} aba={a} ativo={tab === a} onClick={() => setTab(a)} pequeno />
-                    ))}
-                  </div>
-                )}
+        {recolhido ? (
+          // Só os ícones, um por tela; um risco separa os grupos. O nome
+          // aparece ao passar o mouse.
+          <nav className="flex flex-col items-center gap-1">
+            {MENU.map((m, i) => (
+              <div
+                key={'aba' in m ? m.aba : m.grupo}
+                className={`flex flex-col items-center gap-1 w-full ${i > 0 ? 'pt-1 mt-1 border-t border-line/70' : ''}`}
+              >
+                {('aba' in m ? [m.aba] : m.abas).map((a) => (
+                  <BotaoAbaIcone key={a} aba={a} ativo={tab === a} onClick={() => setTab(a)} />
+                ))}
               </div>
-            );
-          })}
-        </nav>
+            ))}
+          </nav>
+        ) : (
+          <nav className="flex flex-col gap-1.5">
+            {MENU.map((m) => {
+              if ('aba' in m) return <BotaoAba key={m.aba} aba={m.aba} ativo={tab === m.aba} onClick={() => setTab(m.aba)} />;
+              // O grupo da tela aberta fica aberto — senão ela sumiria do menu.
+              const temAtiva = m.abas.includes(tab);
+              const aberto = gruposAbertos.includes(m.grupo) || temAtiva;
+              return (
+                <div key={m.grupo}>
+                  <button
+                    onClick={() => alternarGrupo(m.grupo, aberto)}
+                    aria-expanded={aberto}
+                    className={`w-full inline-flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-[13px] font-semibold text-left transition-colors border border-transparent hover:bg-white/[0.025] ${
+                      temAtiva ? 'text-tx' : 'text-dim hover:text-tx'
+                    }`}
+                  >
+                    <m.Icon size={16} className={`shrink-0 ${temAtiva ? 'text-gold' : 'text-dim2'}`} />
+                    <span className="flex-1 whitespace-normal leading-snug">{m.label}</span>
+                    <ChevronDown
+                      size={15}
+                      className={`shrink-0 text-dim2 transition-transform duration-200 ${aberto ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                  {aberto && (
+                    <div className="ml-[21px] mt-1 pl-2.5 border-l border-line2 flex flex-col gap-1">
+                      {m.abas.map((a) => (
+                        <BotaoAba key={a} aba={a} ativo={tab === a} onClick={() => setTab(a)} pequeno />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+        )}
 
         {/* Conta, tema, notificações e sair */}
-        <RodapeConta nome={nome} email={email} nuvem={!!onLogout} onLogout={onLogout} />
+        <RodapeConta nome={nome} email={email} nuvem={!!onLogout} onLogout={onLogout} compacto={recolhido} />
       </aside>
 
       {/* ───────── Cabeçalho fixo do celular ───────── */}
@@ -399,6 +453,40 @@ function BotaoAba({ aba, ativo, onClick, pequeno = false }: { aba: Tab; ativo: b
       <Icon size={pequeno ? 15 : 16} className={`shrink-0 ${ativo ? 'text-gold' : 'text-dim2'}`} />
       {/* Nome longo quebra linha em vez de espremer o ícone. */}
       <span className="whitespace-normal leading-snug">{label}</span>
+    </button>
+  );
+}
+
+/** Seta de recolher/abrir o menu lateral. */
+function BotaoSeta({ Icon, rotulo, onClick }: { Icon: LucideIcon; rotulo: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      title={rotulo}
+      aria-label={rotulo}
+      className="grid place-items-center w-8 h-8 rounded-[9px] border border-line2 text-dim2 hover:text-gold hover:border-gold/50 transition-colors"
+    >
+      <Icon size={16} />
+    </button>
+  );
+}
+
+/** Uma tela no menu recolhido: só o ícone, com o nome ao passar o mouse. */
+function BotaoAbaIcone({ aba, ativo, onClick }: { aba: Tab; ativo: boolean; onClick: () => void }) {
+  const { label, Icon } = abaPorId(aba);
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      aria-current={ativo ? 'page' : undefined}
+      className={`group relative grid place-items-center w-11 h-10 rounded-[10px] border transition-colors ${
+        ativo ? 'bg-white/[0.05] border-line2 text-gold' : 'border-transparent text-dim2 hover:text-tx hover:bg-white/[0.025]'
+      }`}
+    >
+      <Icon size={17} />
+      <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2.5 z-50 whitespace-nowrap rounded-[8px] border border-line2 bg-card3 px-2.5 py-1.5 text-[12px] font-semibold text-tx shadow-xl opacity-0 group-hover:opacity-100 transition-opacity">
+        {label}
+      </span>
     </button>
   );
 }

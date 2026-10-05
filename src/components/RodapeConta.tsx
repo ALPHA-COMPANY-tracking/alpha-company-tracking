@@ -18,13 +18,42 @@ export function RodapeConta({
   email,
   nuvem,
   onLogout,
+  compacto = false,
 }: {
   nome: string;
   email?: string;
   nuvem: boolean;
   onLogout?: () => void;
+  /** Menu recolhido: só o avatar e os botões redondos, um embaixo do outro. */
+  compacto?: boolean;
 }) {
   const { claro, alternar } = useTema();
+
+  if (compacto) {
+    return (
+      <div className="mt-4 pt-4 border-t border-line/70 flex flex-col items-center gap-2 pb-4">
+        <span
+          title={`${nome}${email ? ` · ${email}` : ''}`}
+          className="relative grid place-items-center w-10 h-10 rounded-full bg-chip border border-line2 text-[12px] font-bold text-dim"
+        >
+          {iniciais(nome)}
+          <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-bg ${nuvem ? 'bg-grn' : 'bg-dim2'}`} />
+        </span>
+        <BotaoTemaCompacto />
+        <BotaoNotificacoes compacto lado="direita" />
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            title="Sair"
+            aria-label="Sair"
+            className="grid place-items-center w-10 h-10 rounded-full border border-line2 text-dim2 hover:text-red"
+          >
+            <LogOut size={15} />
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="mt-6 pt-4 border-t border-line/70">
