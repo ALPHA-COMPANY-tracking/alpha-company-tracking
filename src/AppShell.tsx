@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BadgeCheck, BarChart3, Briefcase, Camera, ChevronDown, ChevronsLeft, ChevronsRight, Download, LayoutDashboard, LogOut, MapPinned, Megaphone, PieChart, Plug, Receipt, RefreshCw, ShieldAlert, ShoppingBag, TrendingUp, Trophy, TriangleAlert, Wallet } from 'lucide-react';
+import { BadgeCheck, BarChart3, Briefcase, Camera, ChevronDown, ChevronsLeft, ChevronsRight, Download, HandCoins, LayoutDashboard, LogOut, MapPinned, Megaphone, PieChart, Plug, Receipt, RefreshCw, ShieldAlert, ShoppingBag, TrendingUp, Trophy, TriangleAlert, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { usePeriodo } from '@/store/usePeriodo';
@@ -12,6 +12,7 @@ import { CustosScreen } from '@/screens/CustosScreen';
 import { FrustradosScreen } from '@/screens/FrustradosScreen';
 import { MapaScreen } from '@/screens/MapaScreen';
 import { AlertasScreen } from '@/screens/AlertasScreen';
+import { CobrancaScreen } from '@/screens/CobrancaScreen';
 import { VizScreen } from '@/screens/VizScreen';
 import { ExportScreen } from '@/screens/ExportScreen';
 import { AdsScreen } from '@/screens/AdsScreen';
@@ -30,7 +31,7 @@ import { useRegistroAlertas } from '@/store/useRegistroAlertas';
 /** De quanto em quanto tempo a dashboard aberta busca o gasto do Meta. */
 const SYNC_META_MS = 10 * 60_000;
 
-type Tab = 'pnl' | 'vendas' | 'aprovadas' | 'previsao' | 'ranking' | 'instagram' | 'ads' | 'facebook' | 'custos' | 'taxas' | 'frustrados' | 'mapa' | 'alertas' | 'viz' | 'export';
+type Tab = 'pnl' | 'vendas' | 'aprovadas' | 'previsao' | 'ranking' | 'instagram' | 'ads' | 'facebook' | 'custos' | 'taxas' | 'cobranca' | 'frustrados' | 'mapa' | 'alertas' | 'viz' | 'export';
 
 /** `curto` é o rótulo da barra inferior no celular, onde só cabe uma palavra. */
 const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
@@ -44,6 +45,7 @@ const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
   { id: 'facebook', label: 'Integração Facebook', curto: 'Face', Icon: Plug },
   { id: 'custos', label: 'Custos Variáveis', curto: 'Custos', Icon: Wallet },
   { id: 'taxas', label: 'Taxas de Plataforma', curto: 'Taxas', Icon: Receipt },
+  { id: 'cobranca', label: 'Fila de Cobrança', curto: 'Cobrar', Icon: HandCoins },
   { id: 'frustrados', label: 'Frustrados', curto: 'Perdas', Icon: TriangleAlert },
   { id: 'mapa', label: 'Mapa de Frustração', curto: 'Mapa', Icon: MapPinned },
   { id: 'alertas', label: 'Alerta de Clientes', curto: 'Alerta', Icon: ShieldAlert },
@@ -68,7 +70,7 @@ const MENU: ItemMenu[] = [
     grupo: 'admin',
     label: 'Gerenciamento Administrativo',
     Icon: Briefcase,
-    abas: ['frustrados', 'mapa', 'alertas', 'taxas', 'custos'],
+    abas: ['cobranca', 'frustrados', 'mapa', 'alertas', 'taxas', 'custos'],
   },
   { aba: 'export' },
 ];
@@ -402,6 +404,7 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
         {tab === 'facebook' && <FacebookScreen />}
         {tab === 'custos' && <CustosScreen periodo={periodo} />}
         {tab === 'taxas' && <TaxasScreen periodo={periodo} />}
+        {tab === 'cobranca' && <CobrancaScreen />}
         {tab === 'frustrados' && <FrustradosScreen periodo={periodo} />}
         {tab === 'mapa' && <MapaScreen periodo={periodo} />}
         {tab === 'alertas' && <AlertasScreen registro={registroAlertas} />}
