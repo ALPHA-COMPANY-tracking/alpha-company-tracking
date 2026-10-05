@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Pedido, Periodo } from '@/types';
-import { agregarPedidos, statusBucket } from '@/lib/pedidos';
+import { agregarPedidos, rotuloMetodo, statusBucket, vendasAprovadasPorDia } from '@/lib/pedidos';
 
 const periodo: Periodo = { inicio: '2026-08-01', fim: '2026-08-31' };
 
@@ -103,5 +103,31 @@ describe('agregarPedidos', () => {
     const r = agregarPedidos([pedido], periodo);
     expect(r.qtd_pagamentos).toBe(1);
     expect(r.qtd_agendados).toBe(1);
+  });
+});
+
+describe('Vendas Aprovadas', () => {
+  it('pelo dia do PAGAMENTO, só pagos e não excluídos — e o total bate com a Receita Aprovada', () => {
+    const pedidos: Pedido[] = [
+      { ...p('1', 'pagos', 735, 'PETER', '2026-08-01'), data_aprovacao: '2026-08-10', internal_id: 10 },
+      { ...p('2', 'pagos', 700, 'MATHEUS', '2026-08-05'), data_aprovacao: '2026-08-10', internal_id: 12, metodo_pagamento: 'boleto' },
+      { ...p('3', 'pagos', 535, 'PETER', '2026-08-09'), data_aprovacao: '2026-08-11', internal_id: 15 },
+      p('4', 'enviados', 735, 'PETER', '2026-08-10'),
+      { ...p('5', 'pagos', 735, 'PETER', '2026-08-10'), removido_em: '2026-08-12T10:00:00Z' },
+      { ...p('6', 'pagos', 735, 'PETER', '2026-07-30'), data_aprovacao: '2026-09-01' },
+    ];
+    const dias = vendasAprovadasPorDia(pedidos, periodo);
+    expect(dias.map((d) => d.data)).toEqual(['2026-08-11', '2026-08-10']);
+    expect(dias[1].pedidos.map((x) => x.id)).toEqual(['2', '1']);
+    expect(dias[1].total).toBe(1435);
+    const soma = dias.reduce((s, d) => s + d.total, 0);
+    expect(soma).toBe(agregarPedidos(pedidos, periodo).receita_aprovada);
+  });
+
+  it('nome da forma de pagamento', () => {
+    expect(rotuloMetodo('pix')).toBe('PIX');
+    expect(rotuloMetodo('Boleto')).toBe('Boleto');
+    expect(rotuloMetodo('credit_card')).toBe('Cartão');
+    expect(rotuloMetodo(null)).toBe('Não informado');
   });
 });

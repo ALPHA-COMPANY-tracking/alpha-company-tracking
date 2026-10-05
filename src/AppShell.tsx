@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BarChart3, Briefcase, Camera, ChevronDown, Download, LayoutDashboard, LogOut, MapPinned, Megaphone, PieChart, Plug, Receipt, RefreshCw, ShieldAlert, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
+import { BadgeCheck, BarChart3, Briefcase, Camera, ChevronDown, Download, FileCheck2, LayoutDashboard, LogOut, MapPinned, Megaphone, PieChart, Plug, Receipt, RefreshCw, ShieldAlert, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { usePeriodo } from '@/store/usePeriodo';
@@ -12,12 +12,14 @@ import { CustosScreen } from '@/screens/CustosScreen';
 import { FrustradosScreen } from '@/screens/FrustradosScreen';
 import { MapaScreen } from '@/screens/MapaScreen';
 import { AlertasScreen } from '@/screens/AlertasScreen';
+import { ConferenciaScreen } from '@/screens/ConferenciaScreen';
 import { VizScreen } from '@/screens/VizScreen';
 import { ExportScreen } from '@/screens/ExportScreen';
 import { AdsScreen } from '@/screens/AdsScreen';
 import { FacebookScreen } from '@/screens/FacebookScreen';
 import { TaxasScreen } from '@/screens/TaxasScreen';
 import { VendasScreen } from '@/screens/VendasScreen';
+import { VendasAprovadasScreen } from '@/screens/VendasAprovadasScreen';
 import { RankingScreen } from '@/screens/RankingScreen';
 import { InstagramScreen } from '@/screens/InstagramScreen';
 import { haQuanto, resumoDoPeriodo, saudacao } from '@/lib/saudacao';
@@ -28,12 +30,13 @@ import { useRegistroAlertas } from '@/store/useRegistroAlertas';
 /** De quanto em quanto tempo a dashboard aberta busca o gasto do Meta. */
 const SYNC_META_MS = 10 * 60_000;
 
-type Tab = 'pnl' | 'vendas' | 'ranking' | 'instagram' | 'ads' | 'facebook' | 'custos' | 'taxas' | 'frustrados' | 'mapa' | 'alertas' | 'viz' | 'export';
+type Tab = 'pnl' | 'vendas' | 'aprovadas' | 'ranking' | 'instagram' | 'ads' | 'facebook' | 'custos' | 'taxas' | 'frustrados' | 'mapa' | 'alertas' | 'planilha' | 'viz' | 'export';
 
 /** `curto` é o rótulo da barra inferior no celular, onde só cabe uma palavra. */
 const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
   { id: 'pnl', label: 'Demonstração de Resultados', curto: 'P&L', Icon: BarChart3 },
   { id: 'vendas', label: 'Vendas Agendadas', curto: 'Vendas', Icon: ShoppingBag },
+  { id: 'aprovadas', label: 'Vendas Aprovadas', curto: 'Pagas', Icon: BadgeCheck },
   { id: 'ranking', label: 'Ranking de Vendas', curto: 'Ranking', Icon: Trophy },
   { id: 'instagram', label: 'Instagram', curto: 'Insta', Icon: Camera },
   { id: 'ads', label: 'Anúncios (Meta)', curto: 'Ads', Icon: Megaphone },
@@ -43,6 +46,7 @@ const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
   { id: 'frustrados', label: 'Frustrados', curto: 'Perdas', Icon: TriangleAlert },
   { id: 'mapa', label: 'Mapa de Frustração', curto: 'Mapa', Icon: MapPinned },
   { id: 'alertas', label: 'Alerta de Clientes', curto: 'Alerta', Icon: ShieldAlert },
+  { id: 'planilha', label: 'Conferência da Planilha', curto: 'Planilha', Icon: FileCheck2 },
   { id: 'viz', label: 'Visualização', curto: 'Gráf.', Icon: PieChart },
   { id: 'export', label: 'Exportador', curto: 'CSV', Icon: Download },
 ];
@@ -57,14 +61,14 @@ const MENU: ItemMenu[] = [
     grupo: 'vendas',
     label: 'Dashboard | Vendas',
     Icon: LayoutDashboard,
-    abas: ['pnl', 'vendas', 'viz', 'instagram', 'ranking'],
+    abas: ['pnl', 'vendas', 'aprovadas', 'viz', 'instagram', 'ranking'],
   },
   { grupo: 'meta', label: 'Meta Ads', Icon: Megaphone, abas: ['ads', 'facebook'] },
   {
     grupo: 'admin',
     label: 'Gerenciamento Administrativo',
     Icon: Briefcase,
-    abas: ['frustrados', 'mapa', 'alertas', 'taxas', 'custos'],
+    abas: ['frustrados', 'mapa', 'alertas', 'planilha', 'taxas', 'custos'],
   },
   { aba: 'export' },
 ];
@@ -336,6 +340,7 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
             onVerAlertas={() => setTab('alertas')}
           />}
         {tab === 'vendas' && <VendasScreen periodo={periodo} registro={registroAlertas} />}
+        {tab === 'aprovadas' && <VendasAprovadasScreen periodo={periodo} />}
         {tab === 'ranking' && <RankingScreen periodo={periodo} />}
         {tab === 'instagram' && <InstagramScreen periodo={periodo} />}
         {tab === 'ads' && <AdsScreen periodo={periodo} />}
@@ -345,6 +350,7 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
         {tab === 'frustrados' && <FrustradosScreen periodo={periodo} />}
         {tab === 'mapa' && <MapaScreen periodo={periodo} />}
         {tab === 'alertas' && <AlertasScreen registro={registroAlertas} />}
+        {tab === 'planilha' && <ConferenciaScreen />}
         {tab === 'viz' && <VizScreen periodo={periodo} />}
         {tab === 'export' && <ExportScreen periodo={periodo} />}
       </main>

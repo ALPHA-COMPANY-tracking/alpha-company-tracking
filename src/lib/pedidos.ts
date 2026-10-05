@@ -229,3 +229,40 @@ export function agendadoPorDia(todos: Pedido[], periodo: Periodo): AgendadoDoDia
   }
   return [...dias.values()].sort((a, b) => b.data.localeCompare(a.data));
 }
+
+export interface PagosDoDia {
+  /** Dia do pagamento. */
+  data: string;
+  total: number;
+  pedidos: Pedido[];
+}
+
+/**
+ * Vendas Aprovadas: o que foi pago no período, por dia de PAGAMENTO (mais
+ * recente primeiro). A mesma regra da Receita Aprovada — os totais batem
+ * com a Demonstração de Resultados.
+ */
+export function vendasAprovadasPorDia(todos: Pedido[], periodo: Periodo): PagosDoDia[] {
+  const dias = new Map<string, PagosDoDia>();
+  for (const p of pedidosAtivos(todos)) {
+    if (statusBucket(p.status) !== 'aprovado') continue;
+    const data = dataAprovacaoPedido(p);
+    if (!isDentro(data, periodo.inicio, periodo.fim)) continue;
+    const d = dias.get(data) ?? { data, total: 0, pedidos: [] };
+    d.total += Number(p.valor) || 0;
+    d.pedidos.push(p);
+    dias.set(data, d);
+  }
+  for (const d of dias.values()) d.pedidos.sort((a, b) => (b.internal_id ?? 0) - (a.internal_id ?? 0) || a.id.localeCompare(b.id));
+  return [...dias.values()].sort((a, b) => b.data.localeCompare(a.data));
+}
+
+/** "pix" → "PIX", "boleto" → "Boleto", "credit_card" → "Cartão". */
+export function rotuloMetodo(metodo: string | null | undefined): string {
+  const m = norm(metodo);
+  if (!m) return 'Não informado';
+  if (/pix/.test(m)) return 'PIX';
+  if (/boleto/.test(m)) return 'Boleto';
+  if (/cart|card|credit|credito|debit/.test(m)) return 'Cartão';
+  return m.charAt(0).toUpperCase() + m.slice(1).replace(/_/g, ' ');
+}
