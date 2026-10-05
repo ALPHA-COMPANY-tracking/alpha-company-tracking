@@ -6,18 +6,42 @@
 // tela.
 // ─────────────────────────────────────────────────────────────
 
-import { useMemo } from 'react';
-import { Boxes, CalendarClock, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Boxes, CalendarClock, Check, Pencil, Target, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react';
 import { useData } from '@/store/DataProvider';
 import { KpiCard, Panel } from '@/components/ui';
 import { AreaPrevisao } from '@/components/viz/AreaPrevisao';
 import { COR } from '@/lib/cores';
 import { type Cents, formatBRL, formatPercent } from '@/lib/money';
 import { hojeIso } from '@/lib/dates';
-import { type Etapa, FRUSTRACAO_PREVISTA, preverMes } from '@/lib/previsao';
+import { type Etapa, FRUSTRACAO_PREVISTA, type PlanoMeta, planoDaMeta, preverMes } from '@/lib/previsao';
+import { MoneyInput } from '@/components/MoneyInput';
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+
+// A meta do mês fica salva neste aparelho, como a meta diária da Demonstração.
+const chaveMeta = (hoje: string) => `afterpay-pnl:meta-lucro:${hoje.slice(0, 7)}`;
+function lerMeta(hoje: string): number {
+  try {
+    return Number(localStorage.getItem(chaveMeta(hoje))) || 0;
+  } catch {
+    return 0;
+  }
+}
+function salvarMeta(hoje: string, cents: number) {
+  try {
+    localStorage.setItem(chaveMeta(hoje), String(cents));
+  } catch {
+    /* ignora */
+  }
+}
+
+/** "4,5 por dia" · "cerca de 6 por semana" (menos de 1 por dia). */
+function ritmo(porDia: number): string {
+  if (porDia >= 1) return `${porDia.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} por dia`;
+  return `cerca de ${Math.ceil(porDia * 7)} por semana`;
+}
 
 const ETAPA: Record<Etapa, string> = {
   aguardando: 'Entregues, esperando pagamento',
@@ -29,6 +53,8 @@ export function PrevisaoScreen() {
   const { pedidos, dailies, custos } = useData();
   const hoje = hojeIso();
   const pr = useMemo(() => preverMes(pedidos, dailies, custos, hoje), [pedidos, dailies, custos, hoje]);
+  const [meta, setMeta] = useState(() => lerMeta(hoje));
+  const plano = useMemo(() => (meta > 0 ? planoDaMeta(meta, pr, pedidos, dailies, hoje) : null), [meta, pr, pedidos, dailies, hoje]);
   const ano = hoje.slice(0, 4);
   const mes = Number(hoje.slice(5, 7));
   const l = pr.lucro;
@@ -65,6 +91,17 @@ export function PrevisaoScreen() {
           {formatBRL(l.previsto)}
         </div>
       </div>
+
+      <MetaDoMes
+        meta={meta}
+        plano={plano}
+        nomeMes={MESES[mes - 1]}
+        fim={dm(pr.fim)}
+        onSalvar={(v) => {
+          salvarMeta(hoje, v);
+          setMeta(v);
+        }}
+      />
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5 lg:gap-3.5">
         <KpiCard Icon={Wallet} color={COR.ouro} valueColor={COR.texto} label="Já entrou no mês" value={formatBRL(pr.ja_entrou)} sub={`${pr.qtd_pagamentos} pagamentos`} />
@@ -197,6 +234,126 @@ function Linha({ rotulo, nota, cents, sinal }: { rotulo: string; nota: string; c
         </div>
       </div>
       <div className={`mono text-[13.5px] font-bold shrink-0 ${cor}`}>{formatBRL(cents)}</div>
+    </div>
+  );
+}
+
+/** Meta de lucro do mês: chega com a base de hoje? Se não, quantas vendas novas faltam. */
+function MetaDoMes({
+  meta,
+  plano,
+  nomeMes,
+  fim,
+  onSalvar,
+}: {
+  meta: Cents;
+  plano: PlanoMeta | null;
+  nomeMes: string;
+  fim: string;
+  onSalvar: (cents: Cents) => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [rascunho, setRascunho] = useState(meta);
+
+  if (editando) {
+    return (
+      <div className="rounded-card border border-line2 bg-card px-4 py-3 flex flex-wrap items-center gap-2.5">
+        <Target size={16} className="text-gold shrink-0" />
+        <span className="text-[13px] font-semibold text-tx shrink-0">Meta de lucro de {nomeMes}</span>
+        <div className="flex-1 min-w-[160px] max-w-[260px]">
+          <MoneyInput cents={rascunho} onChange={setRascunho} autoFocus />
+        </div>
+        <button
+          onClick={() => {
+            onSalvar(rascunho);
+            setEditando(false);
+          }}
+          title="Salvar"
+          className="grid place-items-center w-9 h-9 rounded-lg text-grn hover:bg-grn/10 shrink-0"
+        >
+          <Check size={16} />
+        </button>
+        <button onClick={() => setEditando(false)} title="Cancelar" className="grid place-items-center w-9 h-9 rounded-lg text-dim2 hover:text-tx shrink-0">
+          <X size={16} />
+        </button>
+      </div>
+    );
+  }
+
+  if (!plano) {
+    return (
+      <button
+        onClick={() => {
+          setRascunho(0);
+          setEditando(true);
+        }}
+        className="rounded-card border border-dashed border-line2 px-4 py-3 flex items-center justify-center gap-2 text-[13px] font-semibold text-dim hover:text-tx hover:border-gold/50 transition-colors"
+      >
+        <Target size={15} /> Definir meta de lucro de {nomeMes}
+      </button>
+    );
+  }
+
+  const pct = plano.meta > 0 ? Math.max(0, Math.min(1, plano.previsto / plano.meta)) : 0;
+  const v = plano.venda;
+  return (
+    <div className={`rounded-card border px-4 lg:px-5 py-4 ${plano.atingida ? 'border-grn/30 bg-grn/[0.04]' : 'border-gold/30 bg-gold/[0.04]'}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Target size={18} className={plano.atingida ? 'text-grn shrink-0' : 'text-gold shrink-0'} />
+          <div className="min-w-0">
+            <div className="text-[13.5px] font-bold text-tx leading-snug">
+              Meta de lucro de {nomeMes}: <span className="whitespace-nowrap">{formatBRL(plano.meta)}</span>
+            </div>
+            <div className="text-[11.5px] text-dim">previsão com a base de hoje: {formatBRL(plano.previsto)}</div>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            setRascunho(plano.meta);
+            setEditando(true);
+          }}
+          title="Mudar a meta"
+          className="inline-flex items-center gap-1.5 px-2.5 py-[6px] rounded-[9px] text-[12px] font-semibold text-dim hover:text-tx border border-line2 shrink-0"
+        >
+          <Pencil size={12} /> Mudar
+        </button>
+      </div>
+
+      <div className="mt-3 flex items-center gap-3">
+        <span className="flex-1 h-[8px] rounded-full bg-trilha overflow-hidden">
+          <span className={`block h-full rounded-full ${plano.atingida ? 'bg-grn' : 'bg-gold'}`} style={{ width: `${pct * 100}%` }} />
+        </span>
+        <span className={`mono text-[13px] font-extrabold shrink-0 ${plano.atingida ? 'text-grn' : 'text-gold2'}`}>{Math.round(pct * 100)}%</span>
+      </div>
+
+      <div className="mt-3 text-[13px] leading-relaxed">
+        {plano.atingida ? (
+          <span className="text-grn font-semibold">
+            Com a base de hoje você já chega na meta — {formatBRL(plano.sobra)} acima. Venda nova é lucro a mais.
+          </span>
+        ) : plano.vendas != null ? (
+          <span className="text-tx">
+            Faltam <b>{formatBRL(plano.falta)}</b>. São <b className="text-gold2">{plano.vendas} vendas agendadas a mais</b> (cerca de{' '}
+            {plano.pagas} pagas), <b>{ritmo(plano.por_dia!)}</b> até {fim}.
+          </span>
+        ) : v ? (
+          <span className="text-red font-semibold">
+            Faltam {formatBRL(plano.falta)}, mas hoje cada venda nova dá prejuízo: rende {formatBRL(v.lucro_antes_do_anuncio)} e o anúncio
+            custa {formatBRL(v.anuncio)} por venda. Vender mais não fecha a meta — é preciso baixar o custo por venda ou subir o ticket.
+          </span>
+        ) : (
+          <span className="text-dim">Faltam {formatBRL(plano.falta)}. Sem vendas nos últimos 30 dias para calcular quantas faltam.</span>
+        )}
+      </div>
+
+      {v && (
+        <div className="mt-2 text-[11px] text-dim2 leading-relaxed">
+          Cada venda nova (médias dos últimos 30 dias): ticket {formatBRL(v.ticket)} · {formatPercent(1 - FRUSTRACAO_PREVISTA, 0)} pagam ·{' '}
+          {formatBRL(v.lucro_antes_do_anuncio)} de lucro depois de produto, frete, comissões e frustração − {formatBRL(v.anuncio)} de anúncio por
+          venda = <b className={v.lucro > 0 ? 'text-grn' : 'text-red'}>{formatBRL(v.lucro)}</b>.
+        </div>
+      )}
     </div>
   );
 }

@@ -113,6 +113,8 @@ export interface PrevisaoMes {
     atraso_mediano: number | null;
     /** O que entra de fato por real agendado (desconto, pagamento parcial). */
     fator_recebido: number;
+    /** Perda média de uma frustração, em reais (null = nenhuma no histórico). */
+    perda_media_frustracao: number | null;
   };
 
   serie: PontoDia[];
@@ -279,7 +281,95 @@ export function preverMes(pedidos: Pedido[], dailies: AfterpayDaily[], custos: C
       previsto,
       margem: safeDiv(previsto, pnl.receita_aprovada + deve_entrar),
     },
-    historico: { resolvidos: resolvidos.length, atraso_mediano, fator_recebido },
+    historico: {
+      resolvidos: resolvidos.length,
+      atraso_mediano,
+      fator_recebido,
+      perda_media_frustracao: falhas.length ? perdaMedia('preparo') : null,
+    },
     serie,
   };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Meta de lucro do mês: com a base de hoje chega? Se não, quantas vendas
+// NOVAS faltam. Cada venda nova rende, em média (últimos 30 dias):
+//   80% × (ticket − produto − frete − comissões − boleto)
+//   − 20% × perda média de uma frustração
+//   − o anúncio que custa trazer uma venda (custo por agendamento).
+// ─────────────────────────────────────────────────────────────
+
+const MEDIA_DIAS = 30;
+
+export interface PlanoMeta {
+  meta: Cents;
+  previsto: Cents;
+  /** Quanto falta para a meta (0 se já chega). */
+  falta: Cents;
+  /** Quanto passa da meta (0 se não chega). */
+  sobra: Cents;
+  atingida: boolean;
+  /** Médias dos últimos 30 dias (null = sem venda nesse tempo). */
+  venda: {
+    ticket: Cents;
+    /** Lucro de uma venda nova antes do anúncio, já com os 20% de frustração. */
+    lucro_antes_do_anuncio: Cents;
+    /** Anúncio ÷ agendamentos dos últimos 30 dias. */
+    anuncio: Cents;
+    /** O que sobra de cada venda nova depois do anúncio. */
+    lucro: Cents;
+  } | null;
+  /** Agendamentos novos que faltam (null = não dá: sem vendas recentes ou venda nova sem lucro). */
+  vendas: number | null;
+  /** Desses, quantos devem pagar (80%). */
+  pagas: number | null;
+  /** Por dia, de hoje ao último dia do mês. */
+  por_dia: number | null;
+  /** Dias de hoje (incluído) até o fim do mês. */
+  dias: number;
+}
+
+export function planoDaMeta(
+  meta: Cents,
+  pr: PrevisaoMes,
+  pedidos: Pedido[],
+  dailies: AfterpayDaily[],
+  hoje: IsoDate,
+): PlanoMeta {
+  const falta = Math.max(0, meta - pr.lucro.previsto);
+  const sobra = Math.max(0, pr.lucro.previsto - meta);
+  const dias = pr.diasRestantes + 1;
+  const desde = addDias(hoje, -MEDIA_DIAS);
+  const recentes = pedidosAtivos(pedidos).filter((p) => p.data >= desde && p.data < hoje);
+  const base = { meta, previsto: pr.lucro.previsto, falta, sobra, atingida: falta === 0, dias };
+  if (recentes.length === 0) return { ...base, venda: null, vendas: null, pagas: null, por_dia: null };
+
+  const paga = 1 - FRUSTRACAO_PREVISTA;
+  const media = (f: (p: Pedido) => number) => recentes.reduce((s, p) => s + f(p), 0) / recentes.length;
+  const ticket = media(valorAgendado) * pr.historico.fator_recebido;
+  const custoPaga = media(
+    (p) =>
+      custoProdutoDoPlano(p.produto_plano) +
+      FRETE_POR_PEDIDO +
+      valorAgendado(p) * pr.historico.fator_recebido * (comissaoDoVendedor(p.vendedor) + COMISSAO_COBRANCA) +
+      (ehBoleto(p) ? TAXA_BOLETO : 0),
+  );
+  // Sem frustração no histórico: a frustração custa o pedido inteiro.
+  const perda = pr.historico.perda_media_frustracao ?? media((p) => custoProdutoDoPlano(p.produto_plano) + FRETE_POR_PEDIDO);
+  const antes = paga * (ticket - custoPaga) - FRUSTRACAO_PREVISTA * perda;
+  const ads = dailies
+    .filter((d) => d.data >= desde && d.data < hoje)
+    .reduce((s, d) => s + (Number(d.investimento_ads) || 0) + (Number(d.taxas_investimento) || 0), 0);
+  const anuncio = ads / recentes.length;
+  const lucro = antes - anuncio;
+  const venda = {
+    ticket: reaisToCents(ticket),
+    lucro_antes_do_anuncio: reaisToCents(antes),
+    anuncio: reaisToCents(anuncio),
+    lucro: reaisToCents(lucro),
+  };
+  if (falta === 0) return { ...base, venda, vendas: 0, pagas: 0, por_dia: 0 };
+  if (venda.lucro <= 0) return { ...base, venda, vendas: null, pagas: null, por_dia: null };
+  const vendas = Math.ceil(falta / venda.lucro);
+  return { ...base, venda, vendas, pagas: Math.round(vendas * paga), por_dia: vendas / dias };
 }

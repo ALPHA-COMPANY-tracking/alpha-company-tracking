@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AfterpayDaily, Pedido } from '@/types';
 import { addDias } from '@/lib/dates';
-import { FRUSTRACAO_PREVISTA, preverMes } from '@/lib/previsao';
+import { FRUSTRACAO_PREVISTA, planoDaMeta, preverMes } from '@/lib/previsao';
 
 const HOJE = '2026-10-10';
 const PLANO = 'DERMAX PREMIUM - 6 POTE'; // produto 83 + frete 33 = 116
@@ -118,5 +118,47 @@ describe('Previsão do Mês', () => {
   it('pedido excluído da plataforma não entra em nada', () => {
     const sem = preverMes([...pedidos, ped('enviados', '2026-10-09', { removido_em: '2026-10-09T12:00:00Z' })], dailies, [], HOJE);
     expect(sem.linhas.find((l) => l.etapa === 'rota')!.qtd).toBe(1);
+  });
+});
+
+describe('Meta de lucro do mês', () => {
+  // Mesma base: 5 pedidos agendados nos últimos 30 dias, todos de R$ 735,
+  // PETER (5% + 1% de cobrança), pix. Perda média de frustração: 116.
+  const pedidos = [...historico(), ped('enviados', '2026-10-08'), ped('entregue', '2026-09-20'), ped('negociacao', '2026-09-22')];
+  const dailies = Array.from({ length: 7 }, (_, i) => dia(addDias('2026-10-03', i), 100)); // R$ 700 em anúncio
+  const pr = preverMes(pedidos, dailies, [], HOJE);
+
+  it('quanto rende uma venda nova: 80% pagam, 20% frustram, menos o anúncio', () => {
+    const plano = planoDaMeta(pr.lucro.previsto + 100_000, pr, pedidos, dailies, HOJE);
+    // 0,8 × (735 − 83 − 33 − 6% de 735) − 0,2 × 116 = 436,72; anúncio 700 ÷ 5 = 140.
+    expect(plano.venda!.lucro_antes_do_anuncio).toBe(43_672);
+    expect(plano.venda!.anuncio).toBe(14_000);
+    expect(plano.venda!.lucro).toBe(29_672);
+    // Faltam R$ 1.000 → 4 vendas (3,37 arredonda para cima), 3 pagas, em 22 dias.
+    expect(plano.falta).toBe(100_000);
+    expect(plano.vendas).toBe(4);
+    expect(plano.pagas).toBe(3);
+    expect(plano.dias).toBe(22);
+    expect(plano.por_dia).toBeCloseTo(4 / 22, 6);
+  });
+
+  it('a base já chega na meta: nada a vender, e mostra quanto passa', () => {
+    const plano = planoDaMeta(pr.lucro.previsto - 5_000, pr, pedidos, dailies, HOJE);
+    expect(plano.atingida).toBe(true);
+    expect(plano.sobra).toBe(5_000);
+    expect(plano.vendas).toBe(0);
+  });
+
+  it('venda nova que dá prejuízo depois do anúncio: não inventa número de vendas', () => {
+    const caro = Array.from({ length: 7 }, (_, i) => dia(addDias('2026-10-03', i), 1000)); // R$ 1.400 por venda
+    const plano = planoDaMeta(pr.lucro.previsto + 100_000, preverMes(pedidos, caro, [], HOJE), pedidos, caro, HOJE);
+    expect(plano.venda!.lucro).toBeLessThan(0);
+    expect(plano.vendas).toBeNull();
+  });
+
+  it('sem venda nos últimos 30 dias: sem média para calcular', () => {
+    const plano = planoDaMeta(1_000_000, pr, historico().filter((p) => p.data < '2026-09-10'), dailies, HOJE);
+    expect(plano.venda).toBeNull();
+    expect(plano.vendas).toBeNull();
   });
 });
