@@ -200,7 +200,9 @@ describe('indicadores', () => {
     // Frustrado antigo (legado) e devolvido: só o frete — regras do BlueSales.
     expect(pr.perda_frustracao).toBe(3_300 + 3_300);
     expect(pr.lucro_real).toBe(calcularPnl(dailies, [], P, {}, pedidos).lucro_real);
-    expect(pr.lucro_projetado).toBe(pr.lucro_real - pr.perda_frustracao + pr.a_receber - pr.comissoes - pr.envio_rota);
+    // O lucro real já desconta a frustração (padrão desde 30/09): não desconta de novo.
+    expect(pr.lucro_real).toBe(calcularPnl(dailies, [], P, { descontarFrustrados: 'nenhum' }, pedidos).lucro_real - pr.perda_frustracao);
+    expect(pr.lucro_projetado).toBe(pr.lucro_real + pr.a_receber - pr.comissoes - pr.envio_rota);
   });
 
   it('sem histórico resolvido a taxa é zero, e nada é inventado', () => {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BadgeCheck, BarChart3, Briefcase, Camera, ChevronDown, ChevronsLeft, ChevronsRight, Download, LayoutDashboard, LogOut, MapPinned, Megaphone, PieChart, Plug, Receipt, RefreshCw, ShieldAlert, ShoppingBag, Trophy, TriangleAlert, Wallet } from 'lucide-react';
+import { BadgeCheck, BarChart3, Briefcase, Camera, ChevronDown, ChevronsLeft, ChevronsRight, Download, LayoutDashboard, LogOut, MapPinned, Megaphone, PieChart, Plug, Receipt, RefreshCw, ShieldAlert, ShoppingBag, TrendingUp, Trophy, TriangleAlert, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { usePeriodo } from '@/store/usePeriodo';
@@ -19,6 +19,7 @@ import { FacebookScreen } from '@/screens/FacebookScreen';
 import { TaxasScreen } from '@/screens/TaxasScreen';
 import { VendasScreen } from '@/screens/VendasScreen';
 import { VendasAprovadasScreen } from '@/screens/VendasAprovadasScreen';
+import { PrevisaoScreen } from '@/screens/PrevisaoScreen';
 import { RankingScreen } from '@/screens/RankingScreen';
 import { InstagramScreen } from '@/screens/InstagramScreen';
 import { haQuanto, resumoDoPeriodo, saudacao } from '@/lib/saudacao';
@@ -29,13 +30,14 @@ import { useRegistroAlertas } from '@/store/useRegistroAlertas';
 /** De quanto em quanto tempo a dashboard aberta busca o gasto do Meta. */
 const SYNC_META_MS = 10 * 60_000;
 
-type Tab = 'pnl' | 'vendas' | 'aprovadas' | 'ranking' | 'instagram' | 'ads' | 'facebook' | 'custos' | 'taxas' | 'frustrados' | 'mapa' | 'alertas' | 'viz' | 'export';
+type Tab = 'pnl' | 'vendas' | 'aprovadas' | 'previsao' | 'ranking' | 'instagram' | 'ads' | 'facebook' | 'custos' | 'taxas' | 'frustrados' | 'mapa' | 'alertas' | 'viz' | 'export';
 
 /** `curto` é o rótulo da barra inferior no celular, onde só cabe uma palavra. */
 const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
   { id: 'pnl', label: 'Demonstração de Resultados', curto: 'P&L', Icon: BarChart3 },
   { id: 'vendas', label: 'Vendas Agendadas', curto: 'Vendas', Icon: ShoppingBag },
   { id: 'aprovadas', label: 'Vendas Aprovadas', curto: 'Pagas', Icon: BadgeCheck },
+  { id: 'previsao', label: 'Previsão do Mês', curto: 'Previsão', Icon: TrendingUp },
   { id: 'ranking', label: 'Ranking de Vendas', curto: 'Ranking', Icon: Trophy },
   { id: 'instagram', label: 'Instagram', curto: 'Insta', Icon: Camera },
   { id: 'ads', label: 'Anúncios (Meta)', curto: 'Ads', Icon: Megaphone },
@@ -59,7 +61,7 @@ const MENU: ItemMenu[] = [
     grupo: 'vendas',
     label: 'Dashboard | Vendas',
     Icon: LayoutDashboard,
-    abas: ['pnl', 'vendas', 'aprovadas', 'viz', 'instagram', 'ranking'],
+    abas: ['pnl', 'vendas', 'aprovadas', 'previsao', 'viz', 'instagram', 'ranking'],
   },
   { grupo: 'meta', label: 'Meta Ads', Icon: Megaphone, abas: ['ads', 'facebook'] },
   {
@@ -393,6 +395,7 @@ export function AppShell({ onLogout, email, socio = false }: { onLogout?: () => 
           />}
         {tab === 'vendas' && <VendasScreen periodo={periodo} registro={registroAlertas} />}
         {tab === 'aprovadas' && <VendasAprovadasScreen periodo={periodo} />}
+        {tab === 'previsao' && <PrevisaoScreen />}
         {tab === 'ranking' && <RankingScreen periodo={periodo} />}
         {tab === 'instagram' && <InstagramScreen periodo={periodo} />}
         {tab === 'ads' && <AdsScreen periodo={periodo} />}

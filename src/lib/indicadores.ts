@@ -125,9 +125,11 @@ export interface FrustracaoPorMotivo {
 }
 
 export interface Projecao {
-  /** Lucro real do período — o mesmo número da Demonstração de Resultados. */
+  /** Lucro real do período — o mesmo número da Demonstração de Resultados
+   *  (já com o custo de frustração descontado). */
   lucro_real: Cents;
-  /** Produto + frete dos agendados do período que já frustraram. */
+  /** Produto + frete dos agendados do período que já frustraram (já está
+   *  dentro do lucro real; aparece só como informação). */
   perda_frustracao: Cents;
   /** Pedidos em rota: valor e quantidade. */
   rota: Fatia;
@@ -279,7 +281,9 @@ export function calcularIndicadores(
   const a_receber = Math.round(situacao.rota.valor * taxa_recebimento);
   const comissoes = Math.round(comissaoCheia * taxa_recebimento);
   const perda_frustracao = frustracao_por_motivo.reduce((s, f) => s + f.perda, 0);
-  const lucro_projetado = pnl.lucro_real - perda_frustracao + a_receber - comissoes - envio_rota;
+  // O lucro real já vem com o custo de frustração descontado (padrão do P&L
+  // desde 30/09/2026): descontar perda_frustracao aqui contava duas vezes.
+  const lucro_projetado = pnl.lucro_real + a_receber - comissoes - envio_rota;
 
   return {
     investimento_ads: ads,

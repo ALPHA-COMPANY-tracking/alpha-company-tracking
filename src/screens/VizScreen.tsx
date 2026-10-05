@@ -194,12 +194,11 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
         {/* Lucro projetado */}
         <Panel title="Lucro projetado" hint="só pedidos em rota">
           <div className="divide-y divide-line">
-            <Linha rotulo="Lucro real até agora" nota="o mesmo da Demonstração de Resultados" cents={pr.lucro_real} sinal="=" />
             <Linha
-              rotulo="Perda da frustração"
-              nota="frete de todos + produto dos que não voltam"
-              cents={-pr.perda_frustracao}
-              sinal="−"
+              rotulo="Lucro real até agora"
+              nota={`o mesmo da Demonstração de Resultados · já com ${formatBRL(pr.perda_frustracao)} de frustração descontados`}
+              cents={pr.lucro_real}
+              sinal="="
             />
             <Linha
               rotulo="A receber dos pedidos em rota"
