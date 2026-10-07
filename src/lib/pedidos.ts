@@ -40,6 +40,16 @@ export function statusBucket(status: string | null | undefined): 'aprovado' | 'f
 }
 
 /**
+ * Pedido cancelado não é mais venda: sai do saldo AGENDADO (Faturamento
+ * Agendado, vendas do período, agendado por dia, painel do vendedor,
+ * resumo do dia). O custo dele — o frete, se chegou a ser postado — continua
+ * na frustração, porque esse dinheiro saiu. Decisão do Jonas em 07/10/2026.
+ */
+export function ehCancelado(p: Pick<Pedido, 'status'>): boolean {
+  return /cancel/.test(norm(p.status));
+}
+
+/**
  * Tira as vendas removidas à mão (canceladas e excluídas no BlueSales).
  * TODO cálculo passa por aqui — se ficasse só na tela, o Faturamento
  * Agendado continuaria contando uma venda que não existe mais.
@@ -65,6 +75,8 @@ export interface RevenuePedidos {
   qtd_frustrados: number;
   /** Dinheiro que de fato saiu do caixa nos frustrados (produto + frete). */
   perda_real_frustrados: number;
+  /** Do valor_frustrado, a parte dos cancelados (que já não estão no agendado). */
+  valor_frustrado_cancelado: number;
   porAtendente: AtendenteAgg[];
   porMetodo: { nome: string; pedidos: number }[];
   total: number; // quantos pedidos no período (fonte real disponível?)
@@ -87,7 +99,7 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
 
   let receita_aprovada = 0, qtd_pagamentos = 0;
   let valor_agendado = 0, qtd_agendados = 0;
-  let valor_frustrado = 0, qtd_frustrados = 0, perda_real_frustrados = 0;
+  let valor_frustrado = 0, qtd_frustrados = 0, perda_real_frustrados = 0, valor_frustrado_cancelado = 0;
   let total = 0;
 
   const atendentes = new Map<string, AtendenteAgg>();
@@ -104,8 +116,8 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
     const agendado = Number(p.valor_agendado ?? p.valor) || 0;
     const nome = p.vendedor?.trim() || 'Sem atendente';
 
-    // Lado do AGENDADO / funil — por data de criação.
-    if (criacaoNoPeriodo(p)) {
+    // Lado do AGENDADO / funil — por data de criação. Cancelado não conta.
+    if (criacaoNoPeriodo(p) && !ehCancelado(p)) {
       valor_agendado += agendado;
       qtd_agendados += 1;
       total += 1;
@@ -117,14 +129,16 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
 
       const met = p.metodo_pagamento?.trim() || 'Outro';
       metodos.set(met, (metodos.get(met) ?? 0) + 1);
+    }
 
-      // Recusado, cancelado sem custo / não postado e frustrado não postado
-      // não entram (não geraram custo) — como no BlueSales.
-      if (bucket === 'frustrado' && !perdaSemCusto(p)) {
-        valor_frustrado += valor;
-        qtd_frustrados += 1;
-        perda_real_frustrados += perdaRealDePedido(p);
-      }
+    // Frustração — também por data de criação, cancelado incluído (o frete
+    // de quem foi postado saiu). Recusado, cancelado sem custo / não postado
+    // e frustrado não postado não entram (não geraram custo) — como no BlueSales.
+    if (criacaoNoPeriodo(p) && bucket === 'frustrado' && !perdaSemCusto(p)) {
+      valor_frustrado += valor;
+      qtd_frustrados += 1;
+      perda_real_frustrados += perdaRealDePedido(p);
+      if (ehCancelado(p)) valor_frustrado_cancelado += valor;
     }
 
     // Lado da RECEITA APROVADA — por data de pagamento.
@@ -147,6 +161,7 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
     valor_frustrado,
     qtd_frustrados,
     perda_real_frustrados,
+    valor_frustrado_cancelado,
     porAtendente: [...atendentes.values()].sort((a, b) => b.valor_agendado - a.valor_agendado),
     porMetodo: [...metodos.entries()].map(([nome, pedidos]) => ({ nome, pedidos })).sort((a, b) => b.pedidos - a.pedidos),
     total,
@@ -194,7 +209,7 @@ export function casaComBusca(p: Pedido, busca: string): boolean {
 export function possiveisDuplicados(todos: Pedido[], periodo: Periodo): Pedido[][] {
   const grupos = new Map<string, Pedido[]>();
   for (const p of pedidosAtivos(todos)) {
-    if (!isDentro(p.data, periodo.inicio, periodo.fim)) continue;
+    if (!isDentro(p.data, periodo.inicio, periodo.fim) || ehCancelado(p)) continue;
     const chave = nomeComparavel(p.cliente);
     if (chave.length < 4) continue; // sem nome não dá para casar
     const g = grupos.get(chave);
@@ -221,7 +236,7 @@ export interface AgendadoDoDia {
 export function agendadoPorDia(todos: Pedido[], periodo: Periodo): AgendadoDoDia[] {
   const dias = new Map<string, AgendadoDoDia>();
   for (const p of pedidosAtivos(todos)) {
-    if (!isDentro(p.data, periodo.inicio, periodo.fim)) continue;
+    if (!isDentro(p.data, periodo.inicio, periodo.fim) || ehCancelado(p)) continue;
     const d = dias.get(p.data) ?? { data: p.data, qtd: 0, valor: 0 };
     d.qtd += 1;
     d.valor += Number(p.valor_agendado ?? p.valor) || 0;

@@ -270,6 +270,8 @@ export function calcularPnl(
   // Sem pedidos do BlueSales não dá para calcular a perda real (depende do
   // plano de cada pedido): cai no valor cheio do frustrado.
   let perda_real_frustrados = valor_frustrado;
+  // Frustrado que já está fora do agendado (cancelado): não sai de novo dele.
+  let frustrado_fora_do_agendado = 0;
   let valor_agendado = somaC((r) => r.valor_agendado);
   let qtd_agendados = somaI((r) => r.qtd_agendados);
 
@@ -284,6 +286,7 @@ export function calcularPnl(
     valor_frustrado = reaisToCents(agg.valor_frustrado);
     qtd_frustrados = agg.qtd_frustrados;
     perda_real_frustrados = reaisToCents(agg.perda_real_frustrados);
+    frustrado_fora_do_agendado = reaisToCents(agg.valor_frustrado_cancelado);
     valor_agendado = reaisToCents(agg.valor_agendado);
     qtd_agendados = agg.qtd_agendados;
   }
@@ -393,7 +396,7 @@ export function calcularPnl(
   // O frustrado sai dos DOIS lados: ele não vai ser pago, então não é
   // receita a projetar, e o custo dele também não entra aqui — a perda
   // dos frustrados tem linha própria, com o modo que você escolhe.
-  const agendado_de_pe = valor_agendado - valor_frustrado;
+  const agendado_de_pe = valor_agendado - (valor_frustrado - frustrado_fora_do_agendado);
   let lucro_agendado = 0;
   let margem_agendado = 0;
   if (agendado_de_pe > 0) {

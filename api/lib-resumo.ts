@@ -91,7 +91,8 @@ export function montarResumo(
   const boletosPorVendedor = new Map<string, number>();
 
   for (const p of pedidos) {
-    if (p.data === dia) {
+    // Cancelado não é mais venda: fora do agendado (como na dashboard).
+    if (p.data === dia && !/cancel/i.test(p.status ?? '')) {
       valor_agendado += Number(p.valor_agendado ?? p.valor ?? 0);
       qtd_agendados++;
     }

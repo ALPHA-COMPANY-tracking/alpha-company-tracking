@@ -3,7 +3,7 @@ import { Copy, RotateCcw, Search, ShoppingBag, Trash2, TriangleAlert, X } from '
 import type { Pedido, Periodo } from '@/types';
 import { formatBRL, reaisToCents } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
-import { agendadoPorDia, casaComBusca, possiveisDuplicados, statusBucket } from '@/lib/pedidos';
+import { agendadoPorDia, casaComBusca, ehCancelado, possiveisDuplicados, statusBucket } from '@/lib/pedidos';
 import { alertasDosPedidos } from '@/lib/clientes';
 import type { RegistroAlertas } from '@/store/useRegistroAlertas';
 import { SeloAlerta } from '@/components/alertas/SeloAlerta';
@@ -83,7 +83,10 @@ export function VendasScreen({ periodo, registro }: { periodo: Periodo; registro
   const listaAtivos = buscando ? achados.filter((p) => !p.removido_em) : ativos;
   const listaRemovidos = buscando ? achados.filter((p) => p.removido_em) : removidos;
 
-  const totalAtivo = ativos.reduce((s, p) => s + (Number(p.valor_agendado ?? p.valor) || 0), 0);
+  // Cancelado continua na lista, mas não é mais venda: fora do saldo agendado.
+  const validos = ativos.filter((p) => !ehCancelado(p));
+  const cancelados = ativos.length - validos.length;
+  const totalAtivo = validos.reduce((s, p) => s + (Number(p.valor_agendado ?? p.valor) || 0), 0);
   const pagos = ativos.filter((p) => statusBucket(p.status) === 'aprovado').length;
 
   // Conferência: onde está a venda que o BlueSales não conta mais.
@@ -175,7 +178,7 @@ export function VendasScreen({ periodo, registro }: { periodo: Periodo; registro
         <td className="hidden sm:table-cell px-3 lg:px-5 py-3.5 lg:py-4 text-dim">{p.vendedor?.trim() || '—'}</td>
         <td className="hidden md:table-cell px-3 lg:px-5 py-3.5 lg:py-4 text-dim">{planoCurto(p.produto_plano)}</td>
         <td className="px-2 sm:px-3 lg:px-5 py-3.5 lg:py-4 text-right">
-          <span className={`mono font-bold ${removido ? 'text-dim2 line-through' : 'text-gold2'}`}>
+          <span className={`mono font-bold ${removido || ehCancelado(p) ? 'text-dim2 line-through' : 'text-gold2'}`}>
             {formatBRL(reaisToCents(valor))}
           </span>
         </td>
@@ -229,8 +232,10 @@ export function VendasScreen({ periodo, registro }: { periodo: Periodo; registro
       <div className="grid grid-cols-3 gap-2 lg:gap-[14px]">
         <div className="bg-card border border-line rounded-kpi px-2.5 lg:px-4 py-3 lg:py-[15px]">
           <div className="text-[10px] lg:text-[11px] text-dim font-medium mb-[3px] leading-tight">Agendadas</div>
-          <div className="mono text-[16px] lg:text-[21px] font-extrabold text-gold2">{ativos.length}</div>
-          <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px]">no período</div>
+          <div className="mono text-[16px] lg:text-[21px] font-extrabold text-gold2">{validos.length}</div>
+          <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px]">
+            {cancelados > 0 ? `${cancelados} cancelada${cancelados === 1 ? '' : 's'} fora do saldo` : 'no período'}
+          </div>
         </div>
         <div className="bg-card border border-line rounded-kpi px-2.5 lg:px-4 py-3 lg:py-[15px]">
           <div className="text-[10px] lg:text-[11px] text-dim font-medium mb-[3px] leading-tight">Valor agendado</div>

@@ -17,7 +17,7 @@ import type { AfterpayDaily, CustoVariavel, Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
 import { calcularPnl } from '@/lib/pnl';
-import { dataAprovacaoPedido, pedidosAtivos, statusBucket } from '@/lib/pedidos';
+import { dataAprovacaoPedido, ehCancelado, pedidosAtivos, statusBucket } from '@/lib/pedidos';
 import {
   COMISSAO_COBRANCA,
   comissaoDoVendedor,
@@ -199,9 +199,10 @@ export function situacaoDosAgendados(pedidos: Pedido[], periodo: Periodo): Recor
     frustracao: { qtd: 0, valor: 0 },
   };
   for (const p of pedidosAtivos(pedidos)) {
-    if (!isDentro(p.data, periodo.inicio, periodo.fim)) continue;
+    // Cancelado não está no agendado (as fatias somam o Faturamento Agendado).
+    if (!isDentro(p.data, periodo.inicio, periodo.fim) || ehCancelado(p)) continue;
     const s = situacaoDoPedido(p.status);
-    // Cancelado sem custo / não postado e recusado não são frustração (BlueSales).
+    // Recusado e frustrado não postado não são frustração (BlueSales).
     if (s === 'frustracao' && perdaSemCusto(p)) continue;
     situacao[s].qtd += 1;
     situacao[s].valor += valorAgendado(p);
