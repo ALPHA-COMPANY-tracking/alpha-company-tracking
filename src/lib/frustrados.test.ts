@@ -44,7 +44,7 @@ describe('regras de custo do BlueSales', () => {
   });
 
   it('cancelado: com custo (postado) perde o frete; não postado não entra', () => {
-    const postado = { ...perdido('a', 735, '6 POTE', undefined, 'cancelados'), rastreamento: 'AP123BR' };
+    const postado = { ...perdido('a', 735, '6 POTE', undefined, 'cancelados'), rastreamento: 'AP123BR', enviado_em: '2026-09-02T12:00:00Z' };
     expect(perdaSemCusto(postado)).toBe(false);
     expect(perdaRealDePedido(postado)).toBe(33);
     const naoPostado = perdido('b', 735, '6 POTE', undefined, 'cancelados');

@@ -35,6 +35,7 @@ export function pedidoDaLinha(r: Record<string, unknown>): Pedido {
     rastreamento: S(r.rastreamento),
     passou_correios: r.passou_correios === true,
     entregue_em: S(r.entregue_em),
+    enviado_em: S(r.enviado_em),
     uf: S(r.uf),
     cidade: S(r.cidade),
     cpf_hash: S(r.cpf_hash),

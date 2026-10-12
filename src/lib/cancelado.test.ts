@@ -25,7 +25,9 @@ const ped = (id: string, status: string, valor: number, extra: Partial<Pedido> =
 // O caso da tela: 07/10, um de R$ 735 de pé e a Magaly (R$ 535) cancelada.
 const valido = ped('a', 'enviados', 735);
 const cancelado = ped('b', 'cancelados', 535);
-const canceladoPostado = ped('c', 'cancelados', 535, { rastreamento: 'AA123BR' });
+const canceladoPostado = ped('c', 'cancelados', 535, { rastreamento: 'AA123BR', enviado_em: '2026-10-08T12:00:00Z' });
+// O caso de 12/10: cancelado com etiqueta, mas o pacote nunca saiu.
+const canceladoComEtiqueta = ped('e', 'cancelados', 735, { rastreamento: 'AE017084557BR' });
 
 describe('cancelado sai do saldo agendado', () => {
   it('reconhece cancelado/cancelados, com ou sem acento e maiúscula', () => {
@@ -48,6 +50,12 @@ describe('cancelado sai do saldo agendado', () => {
     expect(agg.perda_real_frustrados).toBe(33); // só o frete
     // Sem postar, nem custo: nada de frustração.
     expect(agregarPedidos([valido, cancelado], P).qtd_frustrados).toBe(0);
+  });
+
+  it('etiqueta de rastreio não é saída: cancelado que nunca saiu não custa o frete', () => {
+    const agg = agregarPedidos([valido, canceladoComEtiqueta], P);
+    expect(agg.qtd_frustrados).toBe(0);
+    expect(agg.perda_real_frustrados).toBe(0);
   });
 
   it('a margem do agendado não tira o cancelado duas vezes', () => {

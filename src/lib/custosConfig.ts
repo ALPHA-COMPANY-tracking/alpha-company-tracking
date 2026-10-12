@@ -124,20 +124,28 @@ const SO_FRETE = /devol|voltand|retorn|cancel|frustr/;
 /** Devolvido reverso: a empresa paga a ida e a volta. */
 const FRETE_DOBRADO = /revers/;
 
+/** O pacote chegou a sair para entrega (o frete foi gasto)? O código de
+ *  rastreio NÃO prova isso: o BlueSales gera a etiqueta ainda em "Aguard.
+ *  Coleta" (12/10/2026: #2801 e #2802 cancelados com etiqueta, sem sair). */
+export function saiuParaEntrega(p: Pick<Pedido, 'enviado_em' | 'entregue_em' | 'passou_correios'>): boolean {
+  return Boolean(p.enviado_em || p.entregue_em || p.passou_correios);
+}
+
 /**
  * Pedido perdido que NÃO entra no P&L (não gerou custo): recusado,
- * cancelado sem custo ou não postado. "Postado" = tem código de rastreio
- * ou passou pela retirada nos Correios.
+ * cancelado sem custo ou que não chegou a sair para entrega.
  */
-export function perdaSemCusto(p: Pick<Pedido, 'status' | 'rastreamento' | 'passou_correios' | 'perda_real'>): boolean {
+export function perdaSemCusto(
+  p: Pick<Pedido, 'status' | 'perda_real' | 'enviado_em' | 'entregue_em' | 'passou_correios'>,
+): boolean {
   // O que foi marcado à mão na tela Frustrados vale: "s/ custo" (0) fica
   // fora, "c/ custo" (o frete) entra.
   if (p.perda_real != null) return Number(p.perda_real) === 0;
   const s = normStatus(p.status);
   if (/recus/.test(s)) return true;
-  // Cancelado só tem custo se já foi postado. (O frustrado antigo conta
-  // sempre com o frete: pedido velho pode não ter o rastreio gravado aqui.)
-  if (/cancel/.test(s)) return !(p.rastreamento || p.passou_correios);
+  // Cancelado só tem custo se o pacote saiu. (O frustrado antigo conta
+  // sempre com o frete: pedido velho pode não ter o histórico aqui.)
+  if (/cancel/.test(s)) return !saiuParaEntrega(p);
   return false;
 }
 

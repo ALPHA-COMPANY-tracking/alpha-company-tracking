@@ -122,7 +122,7 @@ describe('situação do pedido', () => {
     expect(pnl.qtd_frustrados).toBe(4);
     expect(pnl.valor_frustrado).toBe(294_000);
     // Postado (com rastreio), o cancelado entra perdendo o frete.
-    const postado = setembro.map((p) => (p.status === 'cancelados' ? { ...p, rastreamento: 'AP1BR' } : p));
+    const postado = setembro.map((p) => (p.status === 'cancelados' ? { ...p, rastreamento: 'AP1BR', enviado_em: '2026-09-02T12:00:00Z' } : p));
     expect(calcularPnl([], [], P, {}, postado).qtd_frustrados).toBe(5);
   });
 });

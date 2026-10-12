@@ -131,6 +131,10 @@ export interface Pedido {
   /** Quando o pedido foi entregue (primeira vez em entregue/cobrado) —
    *  anotado pelo banco (migração 0027). Base da Fila de Cobrança. */
   entregue_em?: string | null;
+  /** Quando o pedido saiu para entrega (primeira vez enviado/saiu/em rota/
+   *  Correios/entregue) — anotado pelo banco (migração 0028). Cancelado só
+   *  custa o frete se saiu. O rastreio NÃO serve: a etiqueta nasce antes. */
+  enviado_em?: string | null;
   /** Estado (UF) e cidade da entrega — só isso do endereço (migração 0021). */
   uf?: string | null;
   cidade?: string | null;

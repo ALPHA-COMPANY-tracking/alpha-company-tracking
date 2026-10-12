@@ -33,6 +33,7 @@ import {
   ehBoleto,
   FRETE_POR_PEDIDO,
   perdaRealDePedido,
+  saiuParaEntrega,
   TAXA_BOLETO,
 } from '@/lib/custosConfig';
 
@@ -127,7 +128,7 @@ const idade = (p: Pedido, hoje: IsoDate) => diasInclusivos(p.data, hoje) - 1;
 function etapaDaFalha(p: Pedido): Etapa {
   const motivo = motivoFrustracao(p);
   if (motivo === 'perda_cobranca' || motivo === 'aguardando_devolucao') return 'aguardando';
-  if (motivo === 'cancelado' && !(p.rastreamento || p.passou_correios)) return 'preparo';
+  if (motivo === 'cancelado' && !saiuParaEntrega(p)) return 'preparo';
   return 'rota';
 }
 
