@@ -77,6 +77,18 @@ export function hojeIso(): IsoDate {
   }).format(new Date());
 }
 
+/** Dia (São Paulo) de um instante do banco: '2026-10-14T02:00:00Z' → '2026-10-13'.
+ *  'YYYY-MM-DD' passa direto. */
+export function diaSP(iso: string): IsoDate {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(iso));
+}
+
 /** Formata 'YYYY-MM-DD' para 'DD/MM'. */
 export function formatDiaMes(iso: IsoDate): string {
   const { m, d } = parseYmd(iso);

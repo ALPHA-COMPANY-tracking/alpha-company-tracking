@@ -3,7 +3,7 @@
 // Mesmas regras do P&L da tela (ver src/lib/pnl.ts).
 // ─────────────────────────────────────────────────────────────
 
-import { COMISSAO_COBRANCA, FRETE_POR_PEDIDO, TAXA_BOLETO, comissaoDoVendedor, custoProdutoDoPlano, ehBoleto, ehPago } from './lib-custos.js';
+import { COMISSAO_COBRANCA, TAXA_BOLETO, freteDoPedido, comissaoDoVendedor, custoProdutoDoPlano, ehBoleto, ehPago } from './lib-custos.js';
 
 export interface ResumoDia {
   data: string;
@@ -25,6 +25,7 @@ interface LinhaPedido {
   produto_plano: string | null;
   vendedor: string | null;
   metodo_pagamento?: string | null;
+  enviado_em?: string | null;
 }
 
 /** Data de hoje no fuso de São Paulo, no formato YYYY-MM-DD. */
@@ -101,7 +102,7 @@ export function montarResumo(
       receita += v;
       qtd_pagamentos++;
       custoProdutos += custoProdutoDoPlano(p.produto_plano);
-      frete += FRETE_POR_PEDIDO;
+      frete += freteDoPedido(p);
       const nome = (p.vendedor ?? '').trim() || 'Sem atendente';
       receitaPorVendedor.set(nome, (receitaPorVendedor.get(nome) ?? 0) + v);
       if (ehBoleto(p.metodo_pagamento)) boletosPorVendedor.set(nome, (boletosPorVendedor.get(nome) ?? 0) + 1);

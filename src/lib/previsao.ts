@@ -31,7 +31,8 @@ import {
   comissaoDoVendedor,
   custoProdutoDoPlano,
   ehBoleto,
-  FRETE_POR_PEDIDO,
+  FRETE_ATUAL,
+  freteDoPedido,
   perdaRealDePedido,
   saiuParaEntrega,
   TAXA_BOLETO,
@@ -196,7 +197,7 @@ export function preverMes(pedidos: Pedido[], dailies: AfterpayDaily[], custos: C
       const grupo = s === 'negociacao' ? fora.negociacao : fora.parados;
       grupo.qtd += 1;
       grupo.valor += reaisToCents(face);
-      fora.perda_se_nao_pagarem += reaisToCents(custoProdutoDoPlano(p.produto_plano) + FRETE_POR_PEDIDO);
+      fora.perda_se_nao_pagarem += reaisToCents(custoProdutoDoPlano(p.produto_plano) + freteDoPedido(p));
       continue;
     }
     const etapa = s as Etapa;
@@ -210,14 +211,14 @@ export function preverMes(pedidos: Pedido[], dailies: AfterpayDaily[], custos: C
     custosReceita +=
       t *
       (custoProdutoDoPlano(p.produto_plano) +
-        FRETE_POR_PEDIDO +
+        freteDoPedido(p) +
         recebido * (comissaoDoVendedor(p.vendedor) + COMISSAO_COBRANCA) +
         (ehBoleto(p) ? TAXA_BOLETO : 0));
     // Sem frustração dessa etapa no histórico: conta o pedido inteiro
     // perdido (produto + frete) — a previsão erra para o lado seguro.
     frustracaoPrevista +=
       (1 - t) *
-      (falhasDaEtapa[etapa].length ? perdaMedia(etapa) : custoProdutoDoPlano(p.produto_plano) + FRETE_POR_PEDIDO);
+      (falhasDaEtapa[etapa].length ? perdaMedia(etapa) : custoProdutoDoPlano(p.produto_plano) + freteDoPedido(p));
 
     for (let k = 0; k <= diasRestantes; k++) {
       const v = recebido * t * chance(k);
@@ -351,12 +352,12 @@ export function planoDaMeta(
   const custoPaga = media(
     (p) =>
       custoProdutoDoPlano(p.produto_plano) +
-      FRETE_POR_PEDIDO +
+      FRETE_ATUAL +
       valorAgendado(p) * pr.historico.fator_recebido * (comissaoDoVendedor(p.vendedor) + COMISSAO_COBRANCA) +
       (ehBoleto(p) ? TAXA_BOLETO : 0),
   );
   // Sem frustração no histórico: a frustração custa o pedido inteiro.
-  const perda = pr.historico.perda_media_frustracao ?? media((p) => custoProdutoDoPlano(p.produto_plano) + FRETE_POR_PEDIDO);
+  const perda = pr.historico.perda_media_frustracao ?? media((p) => custoProdutoDoPlano(p.produto_plano) + FRETE_ATUAL);
   const antes = paga * (ticket - custoPaga) - FRUSTRACAO_PREVISTA * perda;
   const ads = dailies
     .filter((d) => d.data >= desde && d.data < hoje)

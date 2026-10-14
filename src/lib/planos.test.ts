@@ -38,7 +38,7 @@ describe('custo por plano', () => {
     expect(servidor.CUSTO_PRODUTO.map((r) => [r.match.source, r.custo])).toEqual(
       app.CUSTO_PRODUTO.map((r) => [r.match.source, r.custo]),
     );
-    expect(servidor.FRETE_POR_PEDIDO).toBe(app.FRETE_POR_PEDIDO);
+    expect(servidor.FRETES).toEqual(app.FRETES);
   });
 
   it('plano desconhecido vale zero — e é por isso que existe o aviso', () => {

@@ -9,7 +9,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { IsoDate, Pedido } from '@/types';
-import { diasInclusivos } from '@/lib/dates';
+import { diaSP, diasInclusivos } from '@/lib/dates';
 import { pedidosAtivos } from '@/lib/pedidos';
 import { situacaoDoPedido } from '@/lib/indicadores';
 
@@ -51,10 +51,7 @@ export interface FilaCobranca {
 
 /** Data (São Paulo) de um instante do banco; 'YYYY-MM-DD' passa direto. */
 export function dataSP(iso: string): IsoDate {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(
-    new Date(iso),
-  );
+  return diaSP(iso);
 }
 
 export function faixaDe(dias: number): Faixa {

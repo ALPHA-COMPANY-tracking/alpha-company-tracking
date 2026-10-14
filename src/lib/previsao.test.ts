@@ -130,11 +130,12 @@ describe('Meta de lucro do mês', () => {
 
   it('quanto rende uma venda nova: 80% pagam, 20% frustram, menos o anúncio', () => {
     const plano = planoDaMeta(pr.lucro.previsto + 100_000, pr, pedidos, dailies, HOJE);
-    // 0,8 × (735 − 83 − 33 − 6% de 735) − 0,2 × 116 = 436,72; anúncio 700 ÷ 5 = 140.
-    expect(plano.venda!.lucro_antes_do_anuncio).toBe(43_672);
+    // Venda nova paga o frete de agora (R$ 31): 0,8 × (735 − 83 − 31 − 6% de 735) − 0,2 × 116
+    // = 438,32; anúncio 700 ÷ 5 = 140.
+    expect(plano.venda!.lucro_antes_do_anuncio).toBe(43_832);
     expect(plano.venda!.anuncio).toBe(14_000);
-    expect(plano.venda!.lucro).toBe(29_672);
-    // Faltam R$ 1.000 → 4 vendas (3,37 arredonda para cima), 3 pagas, em 22 dias.
+    expect(plano.venda!.lucro).toBe(29_832);
+    // Faltam R$ 1.000 → 4 vendas (3,35 arredonda para cima), 3 pagas, em 22 dias.
     expect(plano.falta).toBe(100_000);
     expect(plano.vendas).toBe(4);
     expect(plano.pagas).toBe(3);

@@ -22,7 +22,7 @@ import {
   COMISSAO_COBRANCA,
   comissaoDoVendedor,
   custoProdutoDoPlano,
-  FRETE_POR_PEDIDO,
+  freteDoPedido,
   perdaRealDePedido,
   perdaSemCusto,
 } from '@/lib/custosConfig';
@@ -255,7 +255,7 @@ export function calcularIndicadores(
         vieram_dos_correios.valor += valor;
       }
     } else if (s === 'rota') {
-      envio_rota += reaisToCents(custoProdutoDoPlano(p.produto_plano) + FRETE_POR_PEDIDO);
+      envio_rota += reaisToCents(custoProdutoDoPlano(p.produto_plano) + freteDoPedido(p));
       comissaoCheia += Math.round(valor * (comissaoDoVendedor(p.vendedor) + COMISSAO_COBRANCA));
     }
   }

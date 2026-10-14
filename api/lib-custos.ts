@@ -16,7 +16,22 @@ export const CUSTO_PRODUTO: { match: RegExp; custo: number }[] = [
   { match: /3\s*pote/i, custo: 32.5 },
 ];
 
-export const FRETE_POR_PEDIDO = 33.0;
+/** Frete por pacote com a data em que passou a valer — IGUAL a FRETES do
+ *  app. Vale o dia em que o pacote saiu (enviado_em); sem ele, o do agendamento. */
+export const FRETES: { desde: string; valor: number }[] = [
+  { desde: '2026-10-14', valor: 31.0 },
+  { desde: '0000-01-01', valor: 33.0 },
+];
+
+function diaSP(iso: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
+}
+
+export function freteDoPedido(p: { data?: string | null; enviado_em?: string | null }): number {
+  const dia = p.enviado_em ? diaSP(p.enviado_em) : (p.data ?? '');
+  return (FRETES.find((f) => dia >= f.desde) ?? FRETES[FRETES.length - 1]).valor;
+}
 
 /** Taxa do BlueSales: R$ 2,50 por pagamento em boleto (igual ao app). */
 export const TAXA_BOLETO = 2.5;

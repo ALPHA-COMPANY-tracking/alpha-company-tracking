@@ -8,7 +8,7 @@ import { avisoDoResumo, diaDoResumo, montarResumo } from '../../api/lib-resumo';
 
 describe('custos do servidor batem com os do app', () => {
   it('frete, comissões e percentuais por vendedor são os mesmos', () => {
-    expect(servidor.FRETE_POR_PEDIDO).toBe(app.FRETE_POR_PEDIDO);
+    expect(servidor.FRETES).toEqual(app.FRETES);
     expect(servidor.COMISSAO_VENDEDOR).toBe(app.COMISSAO_VENDEDOR);
     expect(servidor.COMISSAO_COBRANCA).toBe(app.COMISSAO_COBRANCA);
     expect(servidor.COMISSAO_POR_VENDEDOR).toEqual(app.COMISSAO_POR_VENDEDOR);

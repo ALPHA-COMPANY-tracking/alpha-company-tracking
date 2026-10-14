@@ -4,9 +4,9 @@
 // (Editável aqui por enquanto; depois pode virar uma tela de ajustes.)
 // ─────────────────────────────────────────────────────────────
 
-import type { Pedido, Periodo } from '@/types';
+import type { IsoDate, Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents } from '@/lib/money';
-import { isDentro } from '@/lib/dates';
+import { diaSP, isDentro } from '@/lib/dates';
 import { dataAprovacaoPedido, pedidosAtivos, statusBucket } from '@/lib/pedidos';
 
 /** Custo do produto (COGS) por plano — detectado pelo texto do plano.
@@ -22,8 +22,26 @@ export const CUSTO_PRODUTO: { match: RegExp; custo: number }[] = [
   { match: /3\s*pote/i, custo: 32.5 },
 ];
 
-/** Frete fixo por pedido aprovado. */
-export const FRETE_POR_PEDIDO = 33.0;
+/**
+ * Frete por pacote, com a data em que passou a valer (mais recente
+ * primeiro). Vale o dia em que o pacote SAIU (enviado_em); sem ele, o do
+ * agendamento. R$ 31,00 desde 14/10/2026 (antes R$ 33,00 — setembro e
+ * outubro até o dia 13 fecharam com o BlueSales assim).
+ * Frete novo = linha nova AQUI e em api/lib-custos.ts (há teste comparando).
+ */
+export const FRETES: { desde: IsoDate; valor: number }[] = [
+  { desde: '2026-10-14', valor: 31.0 },
+  { desde: '0000-01-01', valor: 33.0 },
+];
+
+/** Frete de agora: vendas que ainda vão acontecer (meta, projeções). */
+export const FRETE_ATUAL = FRETES[0].valor;
+
+/** Frete de um pedido, pela data em que saiu (ou foi agendado). */
+export function freteDoPedido(p: Pick<Pedido, 'data' | 'enviado_em'>): number {
+  const dia = p.enviado_em ? diaSP(p.enviado_em) : (p.data ?? '');
+  return (FRETES.find((f) => dia >= f.desde) ?? FRETES[FRETES.length - 1]).valor;
+}
 
 /**
  * Taxa de plataforma do BlueSales: R$ 2,50 por pagamento em BOLETO.
@@ -159,9 +177,9 @@ export function perdaRealDePedido(p: Pedido): number {
   if (p.perda_real != null) return Number(p.perda_real) || 0;
   if (perdaSemCusto(p)) return 0;
   const status = normStatus(p.status);
-  if (FRETE_DOBRADO.test(status)) return 2 * FRETE_POR_PEDIDO;
-  if (SO_FRETE.test(status)) return FRETE_POR_PEDIDO;
-  return custoProdutoDoPlano(p.produto_plano) + FRETE_POR_PEDIDO;
+  if (FRETE_DOBRADO.test(status)) return 2 * freteDoPedido(p);
+  if (SO_FRETE.test(status)) return freteDoPedido(p);
+  return custoProdutoDoPlano(p.produto_plano) + freteDoPedido(p);
 }
 
 /**
@@ -180,8 +198,10 @@ export function custosDeAgendados(
   );
   let custo_produtos = 0;
   let comissao_vendedor = 0;
+  let frete = 0;
   for (const p of agendados) {
     custo_produtos += reaisToCents(custoProdutoDoPlano(p.produto_plano));
+    frete += reaisToCents(freteDoPedido(p));
     // A comissão sai do mesmo laço, sobre os mesmos pedidos: separar em
     // duas fontes é como se entra numa safra e sai noutra.
     const valor = reaisToCents(Number(p.valor_agendado ?? p.valor) || 0);
@@ -189,7 +209,7 @@ export function custosDeAgendados(
   }
   return {
     custo_produtos,
-    frete: reaisToCents(FRETE_POR_PEDIDO) * agendados.length,
+    frete,
     qtd: agendados.length,
     comissao_vendedor,
   };
@@ -205,7 +225,10 @@ export function custosDePedidos(
     (p) => statusBucket(p.status) === 'aprovado' && isDentro(dataAprovacaoPedido(p), periodo.inicio, periodo.fim),
   );
   let custo_produtos = 0;
-  for (const p of aprovados) custo_produtos += reaisToCents(custoProdutoDoPlano(p.produto_plano));
-  const frete = reaisToCents(FRETE_POR_PEDIDO) * aprovados.length;
+  let frete = 0;
+  for (const p of aprovados) {
+    custo_produtos += reaisToCents(custoProdutoDoPlano(p.produto_plano));
+    frete += reaisToCents(freteDoPedido(p));
+  }
   return { custo_produtos, frete };
 }

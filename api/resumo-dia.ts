@@ -41,7 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Pedidos que podem entrar no dia: criados hoje OU pagos hoje.
     const { data: pedidos, error: erroPedidos } = await db
       .from('bluesales_pedidos')
-      .select('status,data,data_aprovacao,valor,valor_agendado,produto_plano,vendedor,metodo_pagamento')
+      .select('status,data,data_aprovacao,valor,valor_agendado,produto_plano,vendedor,metodo_pagamento,enviado_em')
       .eq('user_id', userId)
       .or(`data.eq.${dia},data_aprovacao.eq.${dia}`);
     if (erroPedidos) return res.status(200).json({ ok: false, aviso: 'Banco: ' + erroPedidos.message });

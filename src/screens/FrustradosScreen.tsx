@@ -5,7 +5,7 @@ import { formatBRL, reaisToCents } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
 import { pedidosAtivos, statusBucket } from '@/lib/pedidos';
 import { MOTIVOS, motivoFrustracao } from '@/lib/indicadores';
-import { custoProdutoDoPlano, FRETE_POR_PEDIDO, perdaRealDePedido, perdaSemCusto } from '@/lib/custosConfig';
+import { custoProdutoDoPlano, freteDoPedido, perdaRealDePedido, perdaSemCusto } from '@/lib/custosConfig';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
 import { MoneyInput } from '@/components/MoneyInput';
@@ -27,11 +27,12 @@ function planoCurto(plano?: string | null): string {
 
 /** Por que a perda é essa — as regras do BlueSales. */
 function regraDaPerda(p: Pedido, perda: number): string {
-  if (perda === 2 * FRETE_POR_PEDIDO) return 'frete de ida + de volta (devolvido reverso)';
-  if (perda === FRETE_POR_PEDIDO) {
+  const frete = freteDoPedido(p);
+  if (perda === 2 * frete) return 'frete de ida + de volta (devolvido reverso)';
+  if (perda === frete) {
     return motivoFrustracao(p) === 'frustrado' ? 'só o frete (frustrado antigo)' : 'só o frete — o produto não se perde';
   }
-  return `produto ${formatBRL(reaisToCents(custoProdutoDoPlano(p.produto_plano)))} + frete ${formatBRL(reaisToCents(FRETE_POR_PEDIDO))}`;
+  return `produto ${formatBRL(reaisToCents(custoProdutoDoPlano(p.produto_plano)))} + frete ${formatBRL(reaisToCents(frete))}`;
 }
 
 export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
@@ -273,7 +274,7 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
                 </span>
                 <span className="mono text-[12px] text-dim w-[84px] text-right">{formatBRL(reaisToCents(Number(p.valor) || 0))}</span>
                 <button
-                  onClick={() => definirPerdaPedido(p.id, FRETE_POR_PEDIDO)}
+                  onClick={() => definirPerdaPedido(p.id, freteDoPedido(p))}
                   title="Teve custo: entra no P&L perdendo o frete"
                   className="text-[11px] font-semibold rounded-full border border-line2 px-2.5 py-[3px] text-dim hover:text-tx"
                 >
