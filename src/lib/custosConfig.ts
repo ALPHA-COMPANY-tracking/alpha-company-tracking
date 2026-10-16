@@ -20,6 +20,9 @@ export const CUSTO_PRODUTO: { match: RegExp; custo: number }[] = [
   { match: /6\s*pote/i, custo: 83.0 },
   { match: /4\s*pote/i, custo: 41.0 }, // tratamento de 4 meses, a partir de 04/09/2026
   { match: /3\s*pote/i, custo: 32.5 },
+  // "(PROMO) - 3 MESES", desde 16/10/2026: o mesmo custo do 3 potes —
+  // 3 cápsulas × R$ 8,50 + gotas R$ 7,00 = R$ 32,50.
+  { match: /(^|\D)3\s*mes/i, custo: 32.5 },
 ];
 
 /**
