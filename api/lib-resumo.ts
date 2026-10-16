@@ -26,6 +26,8 @@ interface LinhaPedido {
   vendedor: string | null;
   metodo_pagamento?: string | null;
   enviado_em?: string | null;
+  /** Pagamento em partes (migração 0029): cada parcela no dia dela. */
+  parcelas?: { data?: string; valor?: number | string }[] | null;
 }
 
 /** Data de hoje no fuso de São Paulo, no formato YYYY-MM-DD. */
@@ -97,14 +99,24 @@ export function montarResumo(
       valor_agendado += Number(p.valor_agendado ?? p.valor ?? 0);
       qtd_agendados++;
     }
-    if (ehPago(p.status) && (p.data_aprovacao ?? p.data) === dia) {
-      const v = Number(p.valor ?? 0);
+    if (!ehPago(p.status)) continue;
+    const nome = (p.vendedor ?? '').trim() || 'Sem atendente';
+    // Receita: cada parcela no dia dela; sem parcelas, o valor na data do pagamento.
+    const parcelas = (p.parcelas ?? []).filter((x) => x && x.data && Number(x.valor) > 0);
+    const hoje = parcelas.length
+      ? parcelas.filter((x) => String(x.data).slice(0, 10) === dia).map((x) => Number(x.valor))
+      : (p.data_aprovacao ?? p.data) === dia
+        ? [Number(p.valor ?? 0)]
+        : [];
+    for (const v of hoje) {
       receita += v;
       qtd_pagamentos++;
+      receitaPorVendedor.set(nome, (receitaPorVendedor.get(nome) ?? 0) + v);
+    }
+    // Produto, frete e taxa: uma vez só, no primeiro pagamento.
+    if ((p.data_aprovacao ?? p.data) === dia) {
       custoProdutos += custoProdutoDoPlano(p.produto_plano);
       frete += freteDoPedido(p);
-      const nome = (p.vendedor ?? '').trim() || 'Sem atendente';
-      receitaPorVendedor.set(nome, (receitaPorVendedor.get(nome) ?? 0) + v);
       if (ehBoleto(p.metodo_pagamento)) boletosPorVendedor.set(nome, (boletosPorVendedor.get(nome) ?? 0) + 1);
     }
   }

@@ -11,7 +11,7 @@ import { useData } from '@/store/DataProvider';
 import { KpiCard, Panel } from '@/components/ui';
 import { COR } from '@/lib/cores';
 import { formatBRL, reaisToCents } from '@/lib/money';
-import { dataAprovacaoPedido, rotuloMetodo, vendasAprovadasPorDia } from '@/lib/pedidos';
+import { rotuloMetodo, vendasAprovadasPorDia } from '@/lib/pedidos';
 
 const brl = (n: number) => formatBRL(reaisToCents(n));
 const diaMes = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
@@ -42,9 +42,10 @@ export function VendasAprovadasScreen({ periodo }: { periodo: Periodo }) {
   const [forma, setForma] = useState<string | null>(null);
 
   const dias = useMemo(() => vendasAprovadasPorDia(pedidos, periodo), [pedidos, periodo]);
-  const todos = useMemo(() => dias.flatMap((d) => d.pedidos), [dias]);
-  const porAtendente = useMemo(() => somarPor(todos, (p) => atendenteDe(p.vendedor), (p) => Number(p.valor) || 0), [todos]);
-  const porForma = useMemo(() => somarPor(todos, (p) => rotuloMetodo(p.metodo_pagamento), (p) => Number(p.valor) || 0), [todos]);
+  // Um item por pagamento: o pedido pago em partes aparece no dia de cada parcela.
+  const todos = useMemo(() => dias.flatMap((d) => d.pagamentos), [dias]);
+  const porAtendente = useMemo(() => somarPor(todos, (pg) => atendenteDe(pg.pedido.vendedor), (pg) => pg.valor), [todos]);
+  const porForma = useMemo(() => somarPor(todos, (pg) => rotuloMetodo(pg.pedido.metodo_pagamento), (pg) => pg.valor), [todos]);
 
   // Filtro que sumiu do período (ex.: atendente sem venda hoje) não prende a lista vazia.
   const atendenteAtivo = atendente && porAtendente.some((a) => a.nome === atendente) ? atendente : null;
@@ -53,18 +54,18 @@ export function VendasAprovadasScreen({ periodo }: { periodo: Periodo }) {
     () =>
       dias
         .map((d) => {
-          const lista = d.pedidos.filter(
-            (p) =>
-              (!atendenteAtivo || atendenteDe(p.vendedor) === atendenteAtivo) &&
-              (!formaAtiva || rotuloMetodo(p.metodo_pagamento) === formaAtiva),
+          const lista = d.pagamentos.filter(
+            (pg) =>
+              (!atendenteAtivo || atendenteDe(pg.pedido.vendedor) === atendenteAtivo) &&
+              (!formaAtiva || rotuloMetodo(pg.pedido.metodo_pagamento) === formaAtiva),
           );
-          return { ...d, pedidos: lista, total: lista.reduce((s, p) => s + (Number(p.valor) || 0), 0) };
+          return { ...d, pagamentos: lista, total: lista.reduce((s, pg) => s + pg.valor, 0) };
         })
-        .filter((d) => d.pedidos.length > 0),
+        .filter((d) => d.pagamentos.length > 0),
     [dias, atendenteAtivo, formaAtiva],
   );
   const total = filtrados.reduce((s, d) => s + d.total, 0);
-  const qtd = filtrados.reduce((s, d) => s + d.pedidos.length, 0);
+  const qtd = filtrados.reduce((s, d) => s + d.pagamentos.length, 0);
 
   return (
     <div className="flex flex-col gap-4 lg:gap-5 w-full">
@@ -102,7 +103,7 @@ export function VendasAprovadasScreen({ periodo }: { periodo: Periodo }) {
         </Panel>
       ) : (
         filtrados.map((d) => (
-          <Panel key={d.data} title={diaDaSemana(d.data)} hint={`${d.pedidos.length} ${d.pedidos.length === 1 ? 'venda' : 'vendas'} · ${brl(d.total)}`}>
+          <Panel key={d.data} title={diaDaSemana(d.data)} hint={`${d.pagamentos.length} ${d.pagamentos.length === 1 ? 'venda' : 'vendas'} · ${brl(d.total)}`}>
             <div className="overflow-x-auto">
               {/* Largura fixa: as colunas ficam alinhadas de um dia para o outro. */}
               <table className="w-full table-fixed text-[13px] min-w-[335px]">
@@ -116,11 +117,12 @@ export function VendasAprovadasScreen({ periodo }: { periodo: Periodo }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {d.pedidos.map((p) => {
-                    const valor = Number(p.valor) || 0;
+                  {d.pagamentos.map((pg) => {
+                    const p = pg.pedido;
+                    const valor = pg.valor;
                     const agendado = Number(p.valor_agendado ?? p.valor) || 0;
                     return (
-                      <tr key={p.id} className="border-t border-line/70 hover:bg-white/[0.015]">
+                      <tr key={`${p.id}:${pg.data}:${pg.parcela?.n ?? 1}`} className="border-t border-line/70 hover:bg-white/[0.015]">
                         <td className="px-3 lg:px-5 py-3">
                           <div className={`truncate ${p.cliente ? 'text-tx font-medium' : 'text-dim2 italic'}`}>
                             {p.cliente || 'Cliente sem nome'}
@@ -133,11 +135,18 @@ export function VendasAprovadasScreen({ periodo }: { periodo: Periodo }) {
                         </td>
                         <td className="px-2 lg:px-3 py-3 text-dim truncate">{atendenteDe(p.vendedor)}</td>
                         <td className="hidden sm:table-cell px-3 py-3 text-dim whitespace-nowrap">{rotuloMetodo(p.metodo_pagamento)}</td>
-                        <td className="hidden sm:table-cell px-3 py-3 text-dim mono whitespace-nowrap">{diaMes(dataAprovacaoPedido(p))}</td>
+                        <td className="hidden sm:table-cell px-3 py-3 text-dim mono whitespace-nowrap">{diaMes(pg.data)}</td>
                         <td className="px-3 lg:px-5 py-3 text-right whitespace-nowrap">
                           <div className="mono font-bold text-grn">{brl(valor)}</div>
-                          {/* Pagou diferente do agendado (desconto, acerto da planilha). */}
-                          {Math.abs(agendado - valor) >= 0.01 && <div className="text-[10px] text-dim2 mono">agendado {brl(agendado)}</div>}
+                          {pg.parcela ? (
+                            // Pagamento em partes: qual parcela e o total do pedido.
+                            <div className="text-[10px] text-dim2 mono">
+                              parcela {pg.parcela.n} de {pg.parcela.de} · total {brl(Number(p.valor) || 0)}
+                            </div>
+                          ) : (
+                            /* Pagou diferente do agendado (desconto, acerto da planilha). */
+                            Math.abs(agendado - valor) >= 0.01 && <div className="text-[10px] text-dim2 mono">agendado {brl(agendado)}</div>
+                          )}
                         </td>
                       </tr>
                     );

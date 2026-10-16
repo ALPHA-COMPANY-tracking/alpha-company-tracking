@@ -88,6 +88,28 @@ export function dataAprovacaoPedido(p: Pedido): string {
   return p.data_aprovacao || p.data;
 }
 
+export interface Pagamento {
+  data: string;
+  valor: number;
+  /** Pagamento em partes: qual parcela (1 de 2…). */
+  parcela?: { n: number; de: number };
+}
+
+/**
+ * Os pagamentos de um pedido pago. Com parcelas (pagamento em partes, da
+ * planilha), cada uma no dia dela; senão, um só: o valor na data do
+ * pagamento. Pedido não pago não tem pagamento.
+ */
+export function pagamentosDoPedido(p: Pedido): Pagamento[] {
+  if (statusBucket(p.status) !== 'aprovado') return [];
+  const parcelas = (p.parcelas ?? []).filter((x) => x && x.data && Number(x.valor) > 0);
+  if (parcelas.length > 0) {
+    const ordem = [...parcelas].sort((a, b) => a.data.localeCompare(b.data));
+    return ordem.map((x, i) => ({ data: x.data, valor: Number(x.valor), parcela: { n: i + 1, de: ordem.length } }));
+  }
+  return [{ data: dataAprovacaoPedido(p), valor: Number(p.valor) || 0 }];
+}
+
 /** Agrega os pedidos de um período (lado da receita).
  *  - Agendado e frustrado contam pela data de CRIAÇÃO (p.data).
  *  - Aprovado/receita conta pela data de PAGAMENTO (p.data_aprovacao ?? p.data),
@@ -95,7 +117,6 @@ export function dataAprovacaoPedido(p: Pedido): string {
 export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedidos {
   const pedidos = pedidosAtivos(todos);
   const criacaoNoPeriodo = (p: Pedido) => isDentro(p.data, periodo.inicio, periodo.fim);
-  const pagamentoNoPeriodo = (p: Pedido) => isDentro(dataAprovacaoPedido(p), periodo.inicio, periodo.fim);
 
   let receita_aprovada = 0, qtd_pagamentos = 0;
   let valor_agendado = 0, qtd_agendados = 0;
@@ -141,13 +162,15 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
       if (ehCancelado(p)) valor_frustrado_cancelado += valor;
     }
 
-    // Lado da RECEITA APROVADA — por data de pagamento.
-    if (bucket === 'aprovado' && pagamentoNoPeriodo(p)) {
-      receita_aprovada += valor;
+    // Lado da RECEITA APROVADA — por data de pagamento (cada parcela no
+    // dia dela, quando o pedido foi pago em partes).
+    for (const pg of pagamentosDoPedido(p)) {
+      if (!isDentro(pg.data, periodo.inicio, periodo.fim)) continue;
+      receita_aprovada += pg.valor;
       qtd_pagamentos += 1;
 
       const a = atendente(nome);
-      a.receita += valor;
+      a.receita += pg.valor;
       a.aprovados += 1;
       atendentes.set(nome, a);
     }
@@ -245,11 +268,16 @@ export function agendadoPorDia(todos: Pedido[], periodo: Periodo): AgendadoDoDia
   return [...dias.values()].sort((a, b) => b.data.localeCompare(a.data));
 }
 
+export interface PagoNoDia extends Pagamento {
+  pedido: Pedido;
+}
+
 export interface PagosDoDia {
   /** Dia do pagamento. */
   data: string;
   total: number;
-  pedidos: Pedido[];
+  /** Um por pagamento (o pedido pago em partes aparece no dia de cada parcela). */
+  pagamentos: PagoNoDia[];
 }
 
 /**
@@ -260,15 +288,17 @@ export interface PagosDoDia {
 export function vendasAprovadasPorDia(todos: Pedido[], periodo: Periodo): PagosDoDia[] {
   const dias = new Map<string, PagosDoDia>();
   for (const p of pedidosAtivos(todos)) {
-    if (statusBucket(p.status) !== 'aprovado') continue;
-    const data = dataAprovacaoPedido(p);
-    if (!isDentro(data, periodo.inicio, periodo.fim)) continue;
-    const d = dias.get(data) ?? { data, total: 0, pedidos: [] };
-    d.total += Number(p.valor) || 0;
-    d.pedidos.push(p);
-    dias.set(data, d);
+    for (const pg of pagamentosDoPedido(p)) {
+      if (!isDentro(pg.data, periodo.inicio, periodo.fim)) continue;
+      const d = dias.get(pg.data) ?? { data: pg.data, total: 0, pagamentos: [] };
+      d.total += pg.valor;
+      d.pagamentos.push({ ...pg, pedido: p });
+      dias.set(pg.data, d);
+    }
   }
-  for (const d of dias.values()) d.pedidos.sort((a, b) => (b.internal_id ?? 0) - (a.internal_id ?? 0) || a.id.localeCompare(b.id));
+  for (const d of dias.values()) {
+    d.pagamentos.sort((a, b) => (b.pedido.internal_id ?? 0) - (a.pedido.internal_id ?? 0) || a.pedido.id.localeCompare(b.pedido.id));
+  }
   return [...dias.values()].sort((a, b) => b.data.localeCompare(a.data));
 }
 

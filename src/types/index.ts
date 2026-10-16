@@ -135,6 +135,9 @@ export interface Pedido {
    *  Correios/entregue) — anotado pelo banco (migração 0028). Cancelado só
    *  custa o frete se saiu. O rastreio NÃO serve: a etiqueta nasce antes. */
   enviado_em?: string | null;
+  /** Pagamento em partes (planilha de pagamentos): cada parcela conta na
+   *  receita do dia dela. null = pagamento único (migração 0029). */
+  parcelas?: { data: IsoDate; valor: number }[] | null;
   /** Estado (UF) e cidade da entrega — só isso do endereço (migração 0021). */
   uf?: string | null;
   cidade?: string | null;

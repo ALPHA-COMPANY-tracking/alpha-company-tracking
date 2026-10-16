@@ -24,7 +24,7 @@ import type { AfterpayDaily, CustoVariavel, IsoDate, Pedido } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
 import { addDias, diasInclusivos, isDentro, parseYmd, primeiroDiaMes, ultimoDiaMes } from '@/lib/dates';
 import { calcularPnl } from '@/lib/pnl';
-import { dataAprovacaoPedido, pedidosAtivos } from '@/lib/pedidos';
+import { dataAprovacaoPedido, pagamentosDoPedido, pedidosAtivos } from '@/lib/pedidos';
 import { motivoFrustracao, situacaoDoPedido } from '@/lib/indicadores';
 import {
   COMISSAO_COBRANCA,
@@ -241,9 +241,9 @@ export function preverMes(pedidos: Pedido[], dailies: AfterpayDaily[], custos: C
   // ── Série do gráfico: recebido de verdade até hoje, previsto depois ──
   const pagosNoMes = new Map<string, number>();
   for (const p of ativos) {
-    if (situacaoDoPedido(p.status) !== 'pago') continue;
-    const d = dataAprovacaoPedido(p);
-    if (isDentro(d, inicio, hoje)) pagosNoMes.set(d, (pagosNoMes.get(d) ?? 0) + (Number(p.valor) || 0));
+    for (const pg of pagamentosDoPedido(p)) {
+      if (isDentro(pg.data, inicio, hoje)) pagosNoMes.set(pg.data, (pagosNoMes.get(pg.data) ?? 0) + pg.valor);
+    }
   }
   const serie: PontoDia[] = [];
   let acumReal = 0;

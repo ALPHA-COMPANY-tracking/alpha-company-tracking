@@ -118,7 +118,7 @@ describe('Vendas Aprovadas', () => {
     ];
     const dias = vendasAprovadasPorDia(pedidos, periodo);
     expect(dias.map((d) => d.data)).toEqual(['2026-08-11', '2026-08-10']);
-    expect(dias[1].pedidos.map((x) => x.id)).toEqual(['2', '1']);
+    expect(dias[1].pagamentos.map((x) => x.pedido.id)).toEqual(['2', '1']);
     expect(dias[1].total).toBe(1435);
     const soma = dias.reduce((s, d) => s + d.total, 0);
     expect(soma).toBe(agregarPedidos(pedidos, periodo).receita_aprovada);

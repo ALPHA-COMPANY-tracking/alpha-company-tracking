@@ -78,14 +78,14 @@ export function PainelVendedor({
     if (!supabase) return;
     setCarregando(true);
     // O banco só devolve os pedidos em que este login é o vendedor.
-    const [{ data, error }, meusAlertas] = await Promise.all([
-      supabase.from('bluesales_pedidos').select(CAMPOS).eq('user_id', donoId),
-      alertasDoVendedor(),
-    ]);
+    const buscar = (campos: string) => supabase!.from('bluesales_pedidos').select(campos).eq('user_id', donoId);
+    let [{ data, error }, meusAlertas] = await Promise.all([buscar(`${CAMPOS},parcelas`), alertasDoVendedor()]);
+    // Migração 0029 (pagamento em partes) ainda não rodada: segue sem parcelas.
+    if (error && /parcelas/.test(error.message)) ({ data, error } = await buscar(CAMPOS));
     setCarregando(false);
     if (error) return setErro(error.message);
     setErro(null);
-    setPedidos((data ?? []).map((r) => pedidoDaLinha(r as Record<string, unknown>)));
+    setPedidos(((data ?? []) as unknown as Record<string, unknown>[]).map((r) => pedidoDaLinha(r)));
     setAlertas(meusAlertas);
   }, [donoId]);
 

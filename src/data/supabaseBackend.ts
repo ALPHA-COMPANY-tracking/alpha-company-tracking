@@ -36,6 +36,11 @@ export function pedidoDaLinha(r: Record<string, unknown>): Pedido {
     passou_correios: r.passou_correios === true,
     entregue_em: S(r.entregue_em),
     enviado_em: S(r.enviado_em),
+    parcelas: Array.isArray(r.parcelas)
+      ? (r.parcelas as { data?: unknown; valor?: unknown }[])
+          .filter((x) => x && x.data && N(x.valor) > 0)
+          .map((x) => ({ data: String(x.data).slice(0, 10), valor: N(x.valor) }))
+      : null,
     uf: S(r.uf),
     cidade: S(r.cidade),
     cpf_hash: S(r.cpf_hash),

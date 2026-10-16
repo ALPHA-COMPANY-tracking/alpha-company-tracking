@@ -12,7 +12,7 @@
 import type { AfterpayDaily, Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
-import { agregarPedidos, dataAprovacaoPedido, pedidosAtivos, statusBucket } from '@/lib/pedidos';
+import { agregarPedidos, pagamentosDoPedido, pedidosAtivos, statusBucket } from '@/lib/pedidos';
 import { COMISSAO_POR_VENDEDOR, comissaoDoVendedor } from '@/lib/custosConfig';
 import { comissaoVendedores } from '@/lib/pnl';
 import { taxasDoPeriodo } from '@/lib/taxas';
@@ -117,7 +117,6 @@ export function rankingVendedores(
     const a = pegar(nomeDe(p));
     const bucket = statusBucket(p.status);
     const criadoNoPeriodo = isDentro(p.data, periodo.inicio, periodo.fim);
-    const pagoNoPeriodo = isDentro(dataAprovacaoPedido(p), periodo.inicio, periodo.fim);
 
     if (criadoNoPeriodo) {
       const valor = reaisToCents(Number(p.valor_agendado ?? p.valor) || 0);
@@ -131,8 +130,9 @@ export function rankingVendedores(
       }
     }
 
-    if (bucket === 'aprovado' && pagoNoPeriodo) {
-      a.aprovado += reaisToCents(Number(p.valor) || 0);
+    for (const pg of pagamentosDoPedido(p)) {
+      if (!isDentro(pg.data, periodo.inicio, periodo.fim)) continue;
+      a.aprovado += reaisToCents(pg.valor);
       a.qtd_aprovados++;
     }
   }

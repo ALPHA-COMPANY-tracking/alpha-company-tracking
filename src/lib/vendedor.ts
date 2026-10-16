@@ -13,7 +13,7 @@
 import type { Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
-import { dataAprovacaoPedido, ehCancelado, pedidosAtivos, statusBucket } from '@/lib/pedidos';
+import { ehCancelado, pagamentosDoPedido, pedidosAtivos } from '@/lib/pedidos';
 import { comissaoDoVendedor } from '@/lib/custosConfig';
 import { chaveVendedor } from '@/lib/pnl';
 import { type Fatia, type Situacao, situacaoDosAgendados } from '@/lib/indicadores';
@@ -64,9 +64,10 @@ export function resumoDoVendedor(todos: Pedido[], vendedor: string, periodo: Per
       agendado_hoje.qtd += 1;
       agendado_hoje.valor += valorAgendado;
     }
-    if (statusBucket(p.status) === 'aprovado' && isDentro(dataAprovacaoPedido(p), periodo.inicio, periodo.fim)) {
+    for (const pg of pagamentosDoPedido(p)) {
+      if (!isDentro(pg.data, periodo.inicio, periodo.fim)) continue;
       pagos.qtd += 1;
-      pagos.valor += reaisToCents(Number(p.valor) || 0);
+      pagos.valor += reaisToCents(pg.valor);
     }
   }
 

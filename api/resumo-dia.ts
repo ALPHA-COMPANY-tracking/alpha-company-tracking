@@ -38,13 +38,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const dia = diaDoResumo();
 
-    // Pedidos que podem entrar no dia: criados hoje OU pagos hoje.
-    const { data: pedidos, error: erroPedidos } = await db
-      .from('bluesales_pedidos')
-      .select('status,data,data_aprovacao,valor,valor_agendado,produto_plano,vendedor,metodo_pagamento,enviado_em')
-      .eq('user_id', userId)
-      .or(`data.eq.${dia},data_aprovacao.eq.${dia}`);
-    if (erroPedidos) return res.status(200).json({ ok: false, aviso: 'Banco: ' + erroPedidos.message });
+    // Pedidos que podem entrar no dia: criados hoje, pagos hoje, ou pagos
+    // em partes (uma parcela pode cair hoje — migração 0029).
+    const CAMPOS = 'id,status,data,data_aprovacao,valor,valor_agendado,produto_plano,vendedor,metodo_pagamento,enviado_em';
+    const doDia = (campos: string) =>
+      db.from('bluesales_pedidos').select(campos).eq('user_id', userId).or(`data.eq.${dia},data_aprovacao.eq.${dia}`);
+    let r = await doDia(`${CAMPOS},parcelas`);
+    // Migração 0029 ainda não rodada: segue sem parcelas.
+    if (r.error && /parcelas/.test(r.error.message)) r = await doDia(CAMPOS);
+    if (r.error) return res.status(200).json({ ok: false, aviso: 'Banco: ' + r.error.message });
+    const pedidos = (r.data ?? []) as unknown as (Parameters<typeof montarResumo>[1][number] & { id: string })[];
+    const emPartes = await db.from('bluesales_pedidos').select(`${CAMPOS},parcelas`).eq('user_id', userId).not('parcelas', 'is', null);
+    if (!emPartes.error) {
+      const ja = new Set(pedidos.map((p) => p.id));
+      for (const p of (emPartes.data ?? []) as unknown as typeof pedidos) if (!ja.has(p.id)) pedidos.push(p);
+    }
 
     // Ads e taxa do dia (lançados na tela de Marketing).
     const { data: diario } = await db
@@ -61,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const resumo = montarResumo(
       dia,
-      pedidos ?? [],
+      pedidos,
       Number(diario?.investimento_ads ?? 0),
       conferida ? taxaLancada : null,
     );
