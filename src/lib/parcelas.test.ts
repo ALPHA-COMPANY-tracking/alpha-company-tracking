@@ -65,7 +65,17 @@ describe('pagamento em partes', () => {
 
   it('painel do vendedor e resumo do celular também', () => {
     expect(resumoDoVendedor([emPartes], 'PETER', OUT, '2026-10-07').pagos).toEqual({ qtd: 1, valor: 35_000 });
-    const linha = { ...emPartes, valor_agendado: 735, produto_plano: emPartes.produto_plano ?? null, vendedor: 'PETER' };
+    const linha = {
+      status: emPartes.status,
+      data: emPartes.data,
+      data_aprovacao: emPartes.data_aprovacao ?? null,
+      valor: emPartes.valor,
+      valor_agendado: 735,
+      produto_plano: emPartes.produto_plano ?? null,
+      vendedor: 'PETER',
+      metodo_pagamento: 'pix',
+      parcelas: emPartes.parcelas,
+    };
     const dia7 = montarResumo('2026-10-07', [linha], 0, null);
     expect(dia7.receita).toBe(350);
     expect(dia7.qtd_pagamentos).toBe(1);
