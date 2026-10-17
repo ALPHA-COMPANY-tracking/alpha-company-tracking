@@ -106,5 +106,13 @@ describe('plano promocional de 3 meses (16/10/2026)', () => {
   it('não confunde com outros planos', () => {
     expect(app.custoProdutoDoPlano('DERMAX PREMIUM - 6 POTE + 1 GOTA')).toBe(83);
     expect(app.custoProdutoDoPlano('PLANO 13 MESES')).toBe(0); // 13 não é 3
+    expect(app.custoProdutoDoPlano('PLANO 14 MESES')).toBe(0); // 14 não é 4
+  });
+
+  it('promo de 4 meses (17/10/2026): R$ 41,00, igual ao 4 potes — 4 cápsulas × R$ 8,50 + gotas R$ 7,00', () => {
+    expect(app.custoProdutoDoPlano('(PROMO) - 4 MESES')).toBe(41);
+    expect(app.custoProdutoDoPlano('DERMAX PREMIUM - 4 POTE + 1 GOTA')).toBe(41);
+    expect(app.planoTemCusto('(PROMO) - 4 MESES')).toBe(true);
+    expect(servidor.custoProdutoDoPlano('(PROMO) - 4 MESES')).toBe(41);
   });
 });

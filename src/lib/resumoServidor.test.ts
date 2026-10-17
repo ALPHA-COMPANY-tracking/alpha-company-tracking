@@ -15,7 +15,7 @@ describe('custos do servidor batem com os do app', () => {
   });
 
   it('custo por plano é o mesmo', () => {
-    for (const plano of ['DERMAX PREMIUM - 6 POTE + 1 GOTA', 'DERMAX PREMIUM - 3 POTE + 1 GOTA', '(PROMO) - 3 MESES', 'outro']) {
+    for (const plano of ['DERMAX PREMIUM - 6 POTE + 1 GOTA', 'DERMAX PREMIUM - 3 POTE + 1 GOTA', '(PROMO) - 3 MESES', '(PROMO) - 4 MESES', 'outro']) {
       expect(servidor.custoProdutoDoPlano(plano)).toBe(app.custoProdutoDoPlano(plano));
     }
   });
