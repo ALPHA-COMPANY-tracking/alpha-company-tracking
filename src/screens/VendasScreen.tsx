@@ -3,7 +3,7 @@ import { Copy, RotateCcw, Search, ShoppingBag, Trash2, TriangleAlert, X } from '
 import type { Pedido, Periodo } from '@/types';
 import { formatBRL, reaisToCents } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
-import { agendadoPorDia, casaComBusca, ehCancelado, possiveisDuplicados, statusBucket } from '@/lib/pedidos';
+import { agendadoPorDia, casaComBusca, foraDoAgendado, possiveisDuplicados, statusBucket } from '@/lib/pedidos';
 import { alertasDosPedidos } from '@/lib/clientes';
 import type { RegistroAlertas } from '@/store/useRegistroAlertas';
 import { SeloAlerta } from '@/components/alertas/SeloAlerta';
@@ -84,7 +84,7 @@ export function VendasScreen({ periodo, registro }: { periodo: Periodo; registro
   const listaRemovidos = buscando ? achados.filter((p) => p.removido_em) : removidos;
 
   // Cancelado continua na lista, mas não é mais venda: fora do saldo agendado.
-  const validos = ativos.filter((p) => !ehCancelado(p));
+  const validos = ativos.filter((p) => !foraDoAgendado(p));
   const cancelados = ativos.length - validos.length;
   const totalAtivo = validos.reduce((s, p) => s + (Number(p.valor_agendado ?? p.valor) || 0), 0);
   const pagos = ativos.filter((p) => statusBucket(p.status) === 'aprovado').length;
@@ -178,7 +178,7 @@ export function VendasScreen({ periodo, registro }: { periodo: Periodo; registro
         <td className="hidden sm:table-cell px-3 lg:px-5 py-3.5 lg:py-4 text-dim">{p.vendedor?.trim() || '—'}</td>
         <td className="hidden md:table-cell px-3 lg:px-5 py-3.5 lg:py-4 text-dim">{planoCurto(p.produto_plano)}</td>
         <td className="px-2 sm:px-3 lg:px-5 py-3.5 lg:py-4 text-right">
-          <span className={`mono font-bold ${removido || ehCancelado(p) ? 'text-dim2 line-through' : 'text-gold2'}`}>
+          <span className={`mono font-bold ${removido || foraDoAgendado(p) ? 'text-dim2 line-through' : 'text-gold2'}`}>
             {formatBRL(reaisToCents(valor))}
           </span>
         </td>

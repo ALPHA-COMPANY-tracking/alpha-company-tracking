@@ -49,7 +49,8 @@ export function serieTendencia(
       agendado: p.valor_agendado,
       aprovado: p.receita_aprovada,
       ads: p.investimento_ads,
-      lucro: p.lucro_real,
+      // O card do topo mostra o lucro como o BlueSales (sem custos variáveis).
+      lucro: p.lucro_sem_variaveis,
     };
   });
 }

@@ -50,6 +50,26 @@ export function ehCancelado(p: Pick<Pedido, 'status'>): boolean {
 }
 
 /**
+ * Cancelado conta no saldo agendado? Desde 17/10/2026 SIM: o Jonas quer os
+ * números IGUAIS aos do BlueSales, que soma os cancelados no agendado (de 07
+ * a 17/10 eles ficaram de fora). Trocar para false volta a tirá-los.
+ */
+export const CANCELADO_NO_AGENDADO = true;
+
+/** O pedido fica fora do saldo agendado? (Só o cancelado, e só se a chave mandar.) */
+export function foraDoAgendado(p: Pick<Pedido, 'status'>, canceladoConta = CANCELADO_NO_AGENDADO): boolean {
+  return !canceladoConta && ehCancelado(p);
+}
+
+/**
+ * A 2ª parcela em diante de um pedido pago em partes (planilha) entra na
+ * receita? Desde 17/10/2026 NÃO: números iguais aos do BlueSales, que só
+ * registra o primeiro pagamento. As parcelas continuam guardadas no pedido;
+ * true volta a contá-las, cada uma no dia dela.
+ */
+export const PARCELAS_EXTRAS_NA_RECEITA = false;
+
+/**
  * Tira as vendas removidas à mão (canceladas e excluídas no BlueSales).
  * TODO cálculo passa por aqui — se ficasse só na tela, o Faturamento
  * Agendado continuaria contando uma venda que não existe mais.
@@ -100,11 +120,13 @@ export interface Pagamento {
  * planilha), cada uma no dia dela; senão, um só: o valor na data do
  * pagamento. Pedido não pago não tem pagamento.
  */
-export function pagamentosDoPedido(p: Pedido): Pagamento[] {
+export function pagamentosDoPedido(p: Pedido, comParcelasExtras = PARCELAS_EXTRAS_NA_RECEITA): Pagamento[] {
   if (statusBucket(p.status) !== 'aprovado') return [];
   const parcelas = (p.parcelas ?? []).filter((x) => x && x.data && Number(x.valor) > 0);
   if (parcelas.length > 0) {
     const ordem = [...parcelas].sort((a, b) => a.data.localeCompare(b.data));
+    // Como o BlueSales: só o primeiro pagamento.
+    if (!comParcelasExtras) return [{ data: ordem[0].data, valor: Number(ordem[0].valor) }];
     return ordem.map((x, i) => ({ data: x.data, valor: Number(x.valor), parcela: { n: i + 1, de: ordem.length } }));
   }
   return [{ data: dataAprovacaoPedido(p), valor: Number(p.valor) || 0 }];
@@ -138,7 +160,7 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
     const nome = p.vendedor?.trim() || 'Sem atendente';
 
     // Lado do AGENDADO / funil — por data de criação. Cancelado não conta.
-    if (criacaoNoPeriodo(p) && !ehCancelado(p)) {
+    if (criacaoNoPeriodo(p) && !foraDoAgendado(p)) {
       valor_agendado += agendado;
       qtd_agendados += 1;
       total += 1;
@@ -159,7 +181,7 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
       valor_frustrado += valor;
       qtd_frustrados += 1;
       perda_real_frustrados += perdaRealDePedido(p);
-      if (ehCancelado(p)) valor_frustrado_cancelado += valor;
+      if (foraDoAgendado(p)) valor_frustrado_cancelado += valor;
     }
 
     // Lado da RECEITA APROVADA — por data de pagamento (cada parcela no
@@ -232,7 +254,7 @@ export function casaComBusca(p: Pedido, busca: string): boolean {
 export function possiveisDuplicados(todos: Pedido[], periodo: Periodo): Pedido[][] {
   const grupos = new Map<string, Pedido[]>();
   for (const p of pedidosAtivos(todos)) {
-    if (!isDentro(p.data, periodo.inicio, periodo.fim) || ehCancelado(p)) continue;
+    if (!isDentro(p.data, periodo.inicio, periodo.fim) || foraDoAgendado(p)) continue;
     const chave = nomeComparavel(p.cliente);
     if (chave.length < 4) continue; // sem nome não dá para casar
     const g = grupos.get(chave);
@@ -259,7 +281,7 @@ export interface AgendadoDoDia {
 export function agendadoPorDia(todos: Pedido[], periodo: Periodo): AgendadoDoDia[] {
   const dias = new Map<string, AgendadoDoDia>();
   for (const p of pedidosAtivos(todos)) {
-    if (!isDentro(p.data, periodo.inicio, periodo.fim) || ehCancelado(p)) continue;
+    if (!isDentro(p.data, periodo.inicio, periodo.fim) || foraDoAgendado(p)) continue;
     const d = dias.get(p.data) ?? { data: p.data, qtd: 0, valor: 0 };
     d.qtd += 1;
     d.valor += Number(p.valor_agendado ?? p.valor) || 0;

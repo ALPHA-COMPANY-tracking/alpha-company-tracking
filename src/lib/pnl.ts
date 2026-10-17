@@ -154,6 +154,10 @@ export interface PnlResult {
   lucro_real_com_frustrados: Cents;
   /** lucro_real − lucro_afterpay (o "buraco" que o Afterpay não mostra). */
   diferenca_afterpay: Cents;
+  /** O lucro do BlueSales: o lucro real SEM os custos variáveis (imposto,
+   *  ferramentas…), que o BlueSales não tem. É o do card do topo. */
+  lucro_sem_variaveis: Cents;
+  margem_sem_variaveis: number;
 
   // Funil
   valor_agendado: Cents;
@@ -368,6 +372,8 @@ export function calcularPnl(
   const margem_real = safeDiv(lucro_real, receita_aprovada);
   const lucro_real_com_frustrados = receita_aprovada - (custosBase + valor_frustrado);
   const diferenca_afterpay = lucro_real - lucro_afterpay;
+  const lucro_sem_variaveis = receita_aprovada - (custos_afterpay + desconto_frustrados);
+  const margem_sem_variaveis = safeDiv(lucro_sem_variaveis, receita_aprovada);
 
   const valor_pendente = valor_agendado - receita_aprovada;
   const conversao_agendado = safeDiv(qtd_pagamentos, qtd_agendados);
@@ -441,6 +447,8 @@ export function calcularPnl(
     margem_real,
     lucro_real_com_frustrados,
     diferenca_afterpay,
+    lucro_sem_variaveis,
+    margem_sem_variaveis,
     valor_agendado,
     qtd_agendados,
     valor_pendente,

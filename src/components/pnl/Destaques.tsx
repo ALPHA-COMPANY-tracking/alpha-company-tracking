@@ -221,7 +221,8 @@ export function Destaques({
   const pontos = (campo: 'agendado' | 'aprovado' | 'ads' | 'lucro'): PontoArea[] =>
     serie.map((p) => ({ rotulo: dm(p.data), valor: p[campo] / 100, exibir: formatBRL(p[campo]) }));
 
-  const lucroPositivo = pnl.lucro_real >= 0;
+  // Como o BlueSales: sem os custos variáveis (o Demonstrativo abaixo tem o lucro completo).
+  const lucroPositivo = pnl.lucro_sem_variaveis >= 0;
   const corLucro = lucroPositivo ? HEX.verde : HEX.vermelho;
 
   return (
@@ -292,8 +293,8 @@ export function Destaques({
           <Cabecalho
             Icon={TrendingUp}
             cor={lucroPositivo ? COR.verde : COR.vermelho}
-            rotulo={lucroPositivo ? 'Lucro real' : 'Prejuízo real'}
-            sub={`Margem ${formatPercent(pnl.margem_real)}`}
+            rotulo={lucroPositivo ? 'Lucro total' : 'Prejuízo total'}
+            sub={`Sem custos variáveis · margem ${formatPercent(pnl.margem_sem_variaveis)}`}
             selo={selo}
           />
           <div className="flex items-end justify-between gap-3 mt-auto pt-5">
@@ -301,9 +302,9 @@ export function Destaques({
               <div
                 className={`mono text-[24px] lg:text-[26px] font-extrabold tracking-tight leading-none truncate ${lucroPositivo ? 'text-grn' : 'text-red'}`}
               >
-                {formatBRL(pnl.lucro_real)}
+                {formatBRL(pnl.lucro_sem_variaveis)}
               </div>
-              <Variacao atual={pnl.lucro_real} anterior={antes.lucro_real} maiorEhMelhor rotulo={comparar} />
+              <Variacao atual={pnl.lucro_sem_variaveis} anterior={antes.lucro_sem_variaveis} maiorEhMelhor rotulo={comparar} />
             </div>
             <div className="w-[38%] max-w-[150px] shrink-0">
               <AreaTendencia dados={pontos('lucro')} cor={corLucro} id="tend-lucro" altura={56} eixo={false} ponto={false} />

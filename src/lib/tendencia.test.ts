@@ -78,7 +78,7 @@ describe('série do gráfico', () => {
     expect(dia14.agendado).toBe(73_500);
     expect(dia15.aprovado).toBe(43_500);
     // Bate com o P&L do dia, inclusive o lucro.
-    expect(dia15.lucro).toBe(calcularPnl([], [], { inicio: HOJE, fim: HOJE }, {}, pedidos).lucro_real);
+    expect(dia15.lucro).toBe(calcularPnl([], [], { inicio: HOJE, fim: HOJE }, {}, pedidos).lucro_sem_variaveis);
   });
 });
 

@@ -3,7 +3,7 @@
 // Mesmas regras do P&L da tela (ver src/lib/pnl.ts).
 // ─────────────────────────────────────────────────────────────
 
-import { COMISSAO_COBRANCA, TAXA_BOLETO, freteDoPedido, comissaoDoVendedor, custoProdutoDoPlano, ehBoleto, ehPago } from './lib-custos.js';
+import { CANCELADO_NO_AGENDADO, COMISSAO_COBRANCA, PARCELAS_EXTRAS_NA_RECEITA, TAXA_BOLETO, freteDoPedido, comissaoDoVendedor, custoProdutoDoPlano, ehBoleto, ehPago } from './lib-custos.js';
 
 export interface ResumoDia {
   data: string;
@@ -95,14 +95,18 @@ export function montarResumo(
 
   for (const p of pedidos) {
     // Cancelado não é mais venda: fora do agendado (como na dashboard).
-    if (p.data === dia && !/cancel/i.test(p.status ?? '')) {
+    if (p.data === dia && (CANCELADO_NO_AGENDADO || !/cancel/i.test(p.status ?? ''))) {
       valor_agendado += Number(p.valor_agendado ?? p.valor ?? 0);
       qtd_agendados++;
     }
     if (!ehPago(p.status)) continue;
     const nome = (p.vendedor ?? '').trim() || 'Sem atendente';
     // Receita: cada parcela no dia dela; sem parcelas, o valor na data do pagamento.
-    const parcelas = (p.parcelas ?? []).filter((x) => x && x.data && Number(x.valor) > 0);
+    const todas = (p.parcelas ?? [])
+      .filter((x) => x && x.data && Number(x.valor) > 0)
+      .sort((a, b) => String(a.data).localeCompare(String(b.data)));
+    // Como o BlueSales: só o primeiro pagamento, a menos que a chave mande contar todas.
+    const parcelas = PARCELAS_EXTRAS_NA_RECEITA ? todas : todas.slice(0, 1);
     const hoje = parcelas.length
       ? parcelas.filter((x) => String(x.data).slice(0, 10) === dia).map((x) => Number(x.valor))
       : (p.data_aprovacao ?? p.data) === dia

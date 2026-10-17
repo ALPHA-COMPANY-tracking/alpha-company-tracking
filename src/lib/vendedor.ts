@@ -13,7 +13,7 @@
 import type { Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
-import { ehCancelado, pagamentosDoPedido, pedidosAtivos } from '@/lib/pedidos';
+import { foraDoAgendado, pagamentosDoPedido, pedidosAtivos } from '@/lib/pedidos';
 import { comissaoDoVendedor } from '@/lib/custosConfig';
 import { chaveVendedor } from '@/lib/pnl';
 import { type Fatia, type Situacao, situacaoDosAgendados } from '@/lib/indicadores';
@@ -54,13 +54,13 @@ export function resumoDoVendedor(todos: Pedido[], vendedor: string, periodo: Per
     const valorAgendado = reaisToCents(Number(p.valor_agendado ?? p.valor) || 0);
     if (isDentro(p.data, periodo.inicio, periodo.fim)) {
       // Cancelado aparece na lista, mas não soma no agendado.
-      if (!ehCancelado(p)) {
+      if (!foraDoAgendado(p)) {
         agendado.qtd += 1;
         agendado.valor += valorAgendado;
       }
       doPeriodo.push(p);
     }
-    if (p.data === hoje && !ehCancelado(p)) {
+    if (p.data === hoje && !foraDoAgendado(p)) {
       agendado_hoje.qtd += 1;
       agendado_hoje.valor += valorAgendado;
     }
