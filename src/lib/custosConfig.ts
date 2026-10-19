@@ -26,6 +26,9 @@ export const CUSTO_PRODUTO: { match: RegExp; custo: number }[] = [
   // "(PROMO) - 4 MESES", desde 17/10/2026: o mesmo custo do 4 potes —
   // 4 cápsulas × R$ 8,50 + gotas R$ 7,00 = R$ 41,00.
   { match: /(^|\D)4\s*mes/i, custo: 41.0 },
+  // "DERMAX PREMIUM - 1 POTE + 1 GOTA", desde 19/10/2026:
+  // 1 frasco de cápsula R$ 8,50 + 1 de gotas R$ 7,00 = R$ 15,50.
+  { match: /(^|\D)1\s*pote/i, custo: 15.5 },
 ];
 
 /**

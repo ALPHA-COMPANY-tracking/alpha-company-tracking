@@ -116,3 +116,18 @@ describe('plano promocional de 3 meses (16/10/2026)', () => {
     expect(servidor.custoProdutoDoPlano('(PROMO) - 4 MESES')).toBe(41);
   });
 });
+
+describe('plano de 1 pote (19/10/2026)', () => {
+  it('custa R$ 15,50: 1 frasco de cápsula R$ 8,50 + 1 de gotas R$ 7,00', () => {
+    expect(app.custoProdutoDoPlano('DERMAX PREMIUM - 1 POTE + 1 GOTA')).toBe(15.5);
+    expect(app.planoTemCusto('DERMAX PREMIUM - 1 POTE + 1 GOTA')).toBe(true);
+    expect(servidor.custoProdutoDoPlano('DERMAX PREMIUM - 1 POTE + 1 GOTA')).toBe(15.5);
+  });
+
+  it('os outros planos não mudam (o "1 GOTA" deles não é "1 pote")', () => {
+    expect(app.custoProdutoDoPlano('DERMAX PREMIUM - 6 POTE + 1 GOTA + 1 SÉRUM + 1 CREME')).toBe(83);
+    expect(app.custoProdutoDoPlano('DERMAX PREMIUM - 4 POTE + 1 GOTA')).toBe(41);
+    expect(app.custoProdutoDoPlano('DERMAX PREMIUM - 3 POTE + 1 GOTA')).toBe(32.5);
+    expect(app.custoProdutoDoPlano('PLANO 11 POTE')).toBe(0); // 11 não é 1
+  });
+});
