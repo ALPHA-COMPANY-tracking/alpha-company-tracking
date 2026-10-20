@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapearPedido, semDadosPessoais } from '../../api/bluesales-webhook';
+import { mapearPedido, semDadosPessoais, voltariaDoPago } from '../../api/bluesales-webhook';
 
 const USER = 'fabbf23a-e34b-4445-b563-222c18642189';
 
@@ -152,5 +152,33 @@ describe('nome do cliente', () => {
     const guardado = JSON.stringify(p);
     expect(guardado).not.toContain('x@y.com');
     expect(guardado).not.toContain('000.000.000-00');
+  });
+});
+
+describe('pagamento (caso do #2913, 20/10/2026)', () => {
+  const pago = {
+    event: 'ORDER_PAID',
+    order: { id: 'BLV-3K1DB5GBMY', internal_id: 2913, status: 'saiu_para_entrega', created_at: '2026-10-13T19:10:52Z' },
+    payment: { amount: 700, method: 'pix' },
+  };
+
+  it('ORDER_PAID é pagamento, mesmo vindo com a etapa de entrega', () => {
+    expect(mapearPedido(pago, USER)!.status).toBe('pagos');
+    expect(mapearPedido({ ...pago, event: 'SHIPPING_UPDATE' }, USER)!.status).toBe('saiu_para_entrega');
+  });
+
+  it('pago não volta atrás com aviso de entrega atrasado', () => {
+    expect(voltariaDoPago('pagos', 'entregues')).toBe(true);
+    expect(voltariaDoPago('pagos', 'saiu_para_entrega')).toBe(true);
+    expect(voltariaDoPago('pagos', 'cobrados')).toBe(true);
+  });
+
+  it('mas frustração depois do pago passa, e quem não está pago segue normal', () => {
+    expect(voltariaDoPago('pagos', 'devolvido')).toBe(false);
+    expect(voltariaDoPago('pagos', 'aguardando_devolucao')).toBe(false);
+    expect(voltariaDoPago('pagos', 'cancelados')).toBe(false);
+    expect(voltariaDoPago('pagos', 'pagos')).toBe(false);
+    expect(voltariaDoPago('entregues', 'enviados')).toBe(false);
+    expect(voltariaDoPago(null, 'entregues')).toBe(false);
   });
 });

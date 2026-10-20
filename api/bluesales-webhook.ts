@@ -214,6 +214,21 @@ export function semDadosPessoais(body: Record<string, unknown>): Record<string, 
  * às vezes chegam sem pagamento/produto, e sobrescrever apagaria o que já
  * está salvo.
  */
+/** Etapas de antes do pagamento (logística e cobrança). */
+const ANTES_DO_PAGAMENTO = /cadastr|confirm|coleta|enviad|saiu|transit|rota|retir|correio|entregue|cobrad/;
+
+/**
+ * Um aviso com esta etapa faria um pedido PAGO voltar atrás? Avisos de
+ * entrega chegam atrasados (20/10/2026: "entregues" 25 min depois do
+ * ORDER_PAID do #2913) e não podem tirar o pago. Frustração (devolução,
+ * cancelamento…) depois do pago continua passando.
+ */
+export function voltariaDoPago(statusAtual: unknown, statusNovo: unknown): boolean {
+  const atual = String(statusAtual ?? '').trim().toLowerCase();
+  const novo = String(statusNovo ?? '').trim().toLowerCase();
+  return /^pagos?$/.test(atual) && !/^pagos?$/.test(novo) && ANTES_DO_PAGAMENTO.test(novo);
+}
+
 export function mapearPedido(
   body: Record<string, unknown>,
   userId: string,
@@ -232,6 +247,10 @@ export function mapearPedido(
     status: order.status ?? null,
     atualizado_em: new Date().toISOString(),
   };
+  // ORDER_PAID é pagamento, qualquer que seja a etapa que venha junto: quando
+  // a cliente paga na entrega, o BlueSales manda o aviso ainda com a etapa
+  // "saiu_para_entrega" e nunca manda "pagos" depois (20/10/2026, #2913).
+  if (String(body.event ?? '').toUpperCase() === 'ORDER_PAID') pedido.status = 'pagos';
   if (order.internal_id != null) pedido.internal_id = order.internal_id;
   if (order.created_at) pedido.data = dataSP(order.created_at);
 
@@ -365,6 +384,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch {
       libCliente = null; // sem o código o pedido grava igual — só fica sem alerta
     }
+  }
+
+  // Pago não volta atrás: aviso de entrega atrasado mantém o resto (rastreio,
+  // valor…), mas não a etapa.
+  if (pedido.status != null) {
+    const { data: atual } = await supabase()
+      .from('bluesales_pedidos')
+      .select('status')
+      .eq('user_id', userId)
+      .eq('id', pedido.id as string)
+      .maybeSingle();
+    if (atual && voltariaDoPago(atual.status, pedido.status)) delete pedido.status;
   }
 
   let { error } = await supabase()
