@@ -29,6 +29,10 @@ export const CUSTO_PRODUTO: { match: RegExp; custo: number }[] = [
   // "DERMAX PREMIUM - 1 POTE + 1 GOTA", desde 19/10/2026:
   // 1 frasco de cápsula R$ 8,50 + 1 de gotas R$ 7,00 = R$ 15,50.
   { match: /(^|\D)1\s*pote/i, custo: 15.5 },
+  // Tratamento de 2 meses, desde 21/10/2026 ("2 POTE + 1 GOTA" e a promo
+  // "2 MESES"): 2 cápsulas × R$ 8,50 + gotas R$ 7,00 = R$ 24,00.
+  { match: /(^|\D)2\s*pote/i, custo: 24.0 },
+  { match: /(^|\D)2\s*mes/i, custo: 24.0 },
 ];
 
 /**

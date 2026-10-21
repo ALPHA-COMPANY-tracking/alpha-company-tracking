@@ -131,3 +131,18 @@ describe('plano de 1 pote (19/10/2026)', () => {
     expect(app.custoProdutoDoPlano('PLANO 11 POTE')).toBe(0); // 11 não é 1
   });
 });
+
+describe('tratamento de 2 meses (21/10/2026)', () => {
+  it('custa R$ 24,00: 2 cápsulas × R$ 8,50 + gotas R$ 7,00', () => {
+    expect(app.custoProdutoDoPlano('DERMAX PREMIUM - 2 POTE + 1 GOTA')).toBe(24);
+    expect(app.custoProdutoDoPlano('(PROMO) - 2 MESES')).toBe(24);
+    expect(app.planoTemCusto('DERMAX PREMIUM - 2 POTE + 1 GOTA')).toBe(true);
+    expect(servidor.custoProdutoDoPlano('DERMAX PREMIUM - 2 POTE + 1 GOTA')).toBe(24);
+  });
+
+  it('não confunde com 12 potes nem mexe nos outros', () => {
+    expect(app.custoProdutoDoPlano('PLANO 12 POTE')).toBe(0);
+    expect(app.custoProdutoDoPlano('DERMAX PREMIUM - 1 POTE + 1 GOTA')).toBe(15.5);
+    expect(app.custoProdutoDoPlano('DERMAX PREMIUM - 6 POTE + 1 GOTA + 1 SÉRUM + 1 CREME')).toBe(83);
+  });
+});

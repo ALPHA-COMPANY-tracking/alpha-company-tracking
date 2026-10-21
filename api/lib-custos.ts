@@ -20,6 +20,9 @@ export const CUSTO_PRODUTO: { match: RegExp; custo: number }[] = [
   { match: /(^|\D)4\s*mes/i, custo: 41.0 },
   // "DERMAX PREMIUM - 1 POTE + 1 GOTA", desde 19/10/2026: cápsula 8,50 + gotas 7,00.
   { match: /(^|\D)1\s*pote/i, custo: 15.5 },
+  // Tratamento de 2 meses, desde 21/10/2026: 2 cápsulas × 8,50 + gotas 7,00.
+  { match: /(^|\D)2\s*pote/i, custo: 24.0 },
+  { match: /(^|\D)2\s*mes/i, custo: 24.0 },
 ];
 
 /** Frete por pacote com a data em que passou a valer — IGUAL a FRETES do
