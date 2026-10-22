@@ -50,12 +50,14 @@ export function ehCancelado(p: Pick<Pedido, 'status'>): boolean {
 }
 
 /**
- * Cancelado conta no saldo agendado? NÃO — regra do Jonas, reafirmada em
- * 22/10/2026: "pedido cancelado não é agendamento; todo pedido cancelado,
- * anule aquela venda". (Ficou ligada só de 17 a 22/10, quando o BlueSales
- * ainda somava os cancelados; hoje o BlueSales também tira.)
+ * Cancelado conta no saldo agendado? SIM — igual ao BlueSales, que soma os
+ * cancelados em "Vendas este mês" (conferido no export de 22/10/2026: 217
+ * pedidos, 6 cancelados, todos no número). Decisão do Jonas em 22/10/2026:
+ * o Faturamento Agendado bate sempre com o BlueSales, e o card "Cancelados"
+ * mostra quanto disso foi cancelado. false volta a tirá-los (como de 07 a
+ * 17/10 e na manhã de 22/10).
  */
-export const CANCELADO_NO_AGENDADO = false;
+export const CANCELADO_NO_AGENDADO = true;
 
 /** O pedido fica fora do saldo agendado? (Só o cancelado, e só se a chave mandar.) */
 export function foraDoAgendado(p: Pick<Pedido, 'status'>, canceladoConta = CANCELADO_NO_AGENDADO): boolean {

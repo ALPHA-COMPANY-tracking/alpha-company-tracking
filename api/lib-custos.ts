@@ -43,7 +43,7 @@ export function freteDoPedido(p: { data?: string | null; enviado_em?: string | n
 }
 
 /** IGUAIS às chaves de src/lib/pedidos.ts (há teste comparando). */
-export const CANCELADO_NO_AGENDADO = false; // cancelado não é agendamento (22/10/2026)
+export const CANCELADO_NO_AGENDADO = true; // igual ao BlueSales, que soma os cancelados (22/10/2026)
 export const PARCELAS_EXTRAS_NA_RECEITA = false;
 
 /** Taxa do BlueSales: R$ 2,50 por pagamento em boleto (igual ao app). */

@@ -189,8 +189,8 @@ export function PnlScreen({
                   : 'nenhum no período'
               }
             />
-            {/* Cancelado não é agendamento (regra do BlueSales): fica fora do
-                Faturamento Agendado e aparece aqui, separado. */}
+            {/* O Faturamento Agendado soma os cancelados, como o BlueSales;
+                aqui aparece quanto daquele número foi cancelado. */}
             <KpiCard
               Icon={Ban}
               color={COR.vermelho}
@@ -198,7 +198,7 @@ export function PnlScreen({
               value={formatBRL(reaisToCents(agg.valor_cancelados))}
               sub={
                 agg.qtd_cancelados > 0
-                  ? `${agg.qtd_cancelados} pedido${agg.qtd_cancelados === 1 ? '' : 's'} · fora do agendado`
+                  ? `${agg.qtd_cancelados} pedido${agg.qtd_cancelados === 1 ? '' : 's'} · dentro do agendado`
                   : 'nenhum no período'
               }
             />
