@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BadgeCheck, BarChart3, Crosshair, Target, TriangleAlert, TrendingDown } from 'lucide-react';
+import { BadgeCheck, Ban, BarChart3, Crosshair, Target, TriangleAlert, TrendingDown } from 'lucide-react';
 import type { Periodo } from '@/types';
 import { formatBRL, formatBRLCompact, formatMultiplier, formatPercent, reaisToCents } from '@/lib/money';
 import { formatDiaMes } from '@/lib/dates';
@@ -159,7 +159,7 @@ export function PnlScreen({
               para o topo; aqui fica o que complementa. Número com cor só
               quando a cor significa algo (custo, perda) — o resto em branco
               com o ícone dourado. */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-6 gap-2 lg:gap-[14px]">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 lg:gap-[14px]">
             <KpiCard
               Icon={TrendingDown}
               color={COR.vermelho}
@@ -186,6 +186,19 @@ export function PnlScreen({
               sub={
                 pnl.qtd_frustrados > 0
                   ? `${pnl.qtd_frustrados} pedido${pnl.qtd_frustrados === 1 ? '' : 's'} perdido${pnl.qtd_frustrados === 1 ? '' : 's'}`
+                  : 'nenhum no período'
+              }
+            />
+            {/* Cancelado não é agendamento (regra do BlueSales): fica fora do
+                Faturamento Agendado e aparece aqui, separado. */}
+            <KpiCard
+              Icon={Ban}
+              color={COR.vermelho}
+              label="Cancelados"
+              value={formatBRL(reaisToCents(agg.valor_cancelados))}
+              sub={
+                agg.qtd_cancelados > 0
+                  ? `${agg.qtd_cancelados} pedido${agg.qtd_cancelados === 1 ? '' : 's'} · fora do agendado`
                   : 'nenhum no período'
               }
             />

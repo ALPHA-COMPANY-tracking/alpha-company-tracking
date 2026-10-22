@@ -54,6 +54,15 @@ describe('cancelado não é agendamento', () => {
     expect(r.pedidos).toHaveLength(2); // aparece na lista, não soma
   });
 
+  it('card "Cancelados": quantos e quanto foi anulado no período (fora do agendado)', () => {
+    const naLixeira = ped('f', 'cancelados', 735, { removido_em: '2026-10-08T12:00:00Z' }); // excluído no BlueSales
+    const deSetembro = ped('g', 'cancelados', 735, { data: '2026-09-30' });
+    const agg = agregarPedidos([valido, cancelado, canceladoComEtiqueta, naLixeira, deSetembro], P);
+    expect(agg.qtd_cancelados).toBe(2);
+    expect(agg.valor_cancelados).toBe(535 + 735);
+    expect(agg.valor_agendado).toBe(735);
+  });
+
   it('frustração: só custa o frete se o pacote saiu (etiqueta sozinha não conta)', () => {
     expect(agregarPedidos([valido, canceladoQueSaiu], P)).toMatchObject({ valor_agendado: 735, qtd_frustrados: 1, perda_real_frustrados: 33 });
     expect(agregarPedidos([valido, canceladoComEtiqueta], P)).toMatchObject({ qtd_frustrados: 0, perda_real_frustrados: 0 });

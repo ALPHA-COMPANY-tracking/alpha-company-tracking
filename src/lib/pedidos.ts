@@ -98,6 +98,9 @@ export interface RevenuePedidos {
   perda_real_frustrados: number;
   /** Do valor_frustrado, a parte dos cancelados (que já não estão no agendado). */
   valor_frustrado_cancelado: number;
+  /** Cancelados agendados no período (data de criação) — o card "Cancelados". */
+  qtd_cancelados: number;
+  valor_cancelados: number;
   porAtendente: AtendenteAgg[];
   porMetodo: { nome: string; pedidos: number }[];
   total: number; // quantos pedidos no período (fonte real disponível?)
@@ -144,6 +147,7 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
   let receita_aprovada = 0, qtd_pagamentos = 0;
   let valor_agendado = 0, qtd_agendados = 0;
   let valor_frustrado = 0, qtd_frustrados = 0, perda_real_frustrados = 0, valor_frustrado_cancelado = 0;
+  let qtd_cancelados = 0, valor_cancelados = 0;
   let total = 0;
 
   const atendentes = new Map<string, AtendenteAgg>();
@@ -159,6 +163,12 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
     // número — desconto negociado depois muda a receita, não o agendado.
     const agendado = Number(p.valor_agendado ?? p.valor) || 0;
     const nome = p.vendedor?.trim() || 'Sem atendente';
+
+    // Cancelados do período (card próprio): o valor do agendamento que foi anulado.
+    if (criacaoNoPeriodo(p) && ehCancelado(p)) {
+      qtd_cancelados += 1;
+      valor_cancelados += agendado;
+    }
 
     // Lado do AGENDADO / funil — por data de criação. Cancelado não conta.
     if (criacaoNoPeriodo(p) && !foraDoAgendado(p)) {
@@ -208,6 +218,8 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
     qtd_frustrados,
     perda_real_frustrados,
     valor_frustrado_cancelado,
+    qtd_cancelados,
+    valor_cancelados,
     porAtendente: [...atendentes.values()].sort((a, b) => b.valor_agendado - a.valor_agendado),
     porMetodo: [...metodos.entries()].map(([nome, pedidos]) => ({ nome, pedidos })).sort((a, b) => b.pedidos - a.pedidos),
     total,
