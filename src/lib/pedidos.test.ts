@@ -36,7 +36,7 @@ describe('agregarPedidos', () => {
       p('1', 'pagos', 735, 'PETER'),
       p('2', 'pagos', 735, 'PETER'),
       p('3', 'cadastrados', 735, 'alphacomp'),
-      p('4', 'frustrados', 735, 'alphacomp'),
+      { ...p('4', 'frustrados', 735, 'alphacomp'), enviado_em: '2026-08-15T15:00:00Z' }, // já postado
       p('5', 'enviados', 735, 'PETER'),
     ];
     const r = agregarPedidos(pedidos, periodo);

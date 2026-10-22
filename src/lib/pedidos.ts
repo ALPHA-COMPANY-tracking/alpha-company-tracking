@@ -200,13 +200,15 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
     // em outubro é perda de outubro), cancelado incluído (o frete de quem
     // saiu foi gasto). Recusado, cancelado sem custo / que não saiu e
     // frustrado não postado não entram (não geraram custo) — como no BlueSales.
-    if (bucket === 'frustrado' && !perdaSemCusto(p)) {
-      if (isDentro(dataFrustracao(p), periodo.inicio, periodo.fim)) {
+    if (bucket === 'frustrado') {
+      if (!perdaSemCusto(p) && isDentro(dataFrustracao(p), periodo.inicio, periodo.fim)) {
         valor_frustrado += valor;
         qtd_frustrados += 1;
         perda_real_frustrados += perdaRealDePedido(p);
       }
-      if (criacaoNoPeriodo(p) && !foraDoAgendado(p)) valor_frustrado_safra += valor;
+      // Safra: não vai ser pago, tenha custo ou não (o cancelado que nem
+      // saiu também está no agendado) — sai da margem do agendado.
+      if (criacaoNoPeriodo(p) && !foraDoAgendado(p)) valor_frustrado_safra += agendado;
     }
 
     // Lado da RECEITA APROVADA — por data de pagamento (cada parcela no

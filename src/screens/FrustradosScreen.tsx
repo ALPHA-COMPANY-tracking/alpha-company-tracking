@@ -297,8 +297,9 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
         <p className="m-0 text-[12.5px] text-dim leading-relaxed">
           As regras de custo são as do BlueSales: <b className="text-dim">frete + produto</b> quando a mercadoria não volta
           (roubo, perdido, apreendido, perda de cobrança); <b className="text-dim">só o frete</b> no devolvido, voltando,
-          aguardando devolução, cancelado com custo e frustrado antigo; <b className="text-dim">frete de ida e de volta</b>{' '}
-          no devolvido reverso. Cancelado sem custo ou que não saiu para entrega (a etiqueta de rastreio sozinha não conta), recusado{' '}
+          aguardando devolução, cancelado com custo e frustrado antigo já postado; <b className="text-dim">frete de ida e de volta</b>{' '}
+          no devolvido reverso. Cancelado sem custo, cancelado ou frustrado antigo que não saiu para entrega (a etiqueta de rastreio sozinha
+          não conta) e recusado{' '}
           <b className="text-dim">não entram</b>. O total daqui é o <b className="text-dim">“Custo real de frustração”</b>{' '}
           que a Demonstração de Resultados desconta do lucro — no mês da <b className="text-dim">baixa</b>, não no mês em que o
           pedido foi feito.

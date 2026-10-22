@@ -17,7 +17,7 @@ const pedidos: Pedido[] = [
   { id: 'a', status: 'pagos', data: '2026-09-10', data_aprovacao: '2026-09-11', valor: 735, valor_agendado: 735, produto_plano: 'DERMAX PREMIUM - 6 POTE', vendedor: 'PETER' },
   { id: 'b', status: 'pagos', data: '2026-09-12', data_aprovacao: '2026-09-14', valor: 435, valor_agendado: 435, produto_plano: 'DERMAX PREMIUM - 3 POTE', vendedor: 'Matheus' },
   { id: 'c', status: 'cadastrados', data: '2026-09-15', valor: 735, valor_agendado: 735, produto_plano: 'DERMAX PREMIUM - 6 POTE', vendedor: 'PETER' },
-  { id: 'f', status: 'frustrados', data: '2026-09-13', valor: 735, valor_agendado: 735, produto_plano: 'DERMAX PREMIUM - 6 POTE', vendedor: 'PETER' },
+  { id: 'f', status: 'frustrados', data: '2026-09-13', enviado_em: '2026-09-13T15:00:00Z', valor: 735, valor_agendado: 735, produto_plano: 'DERMAX PREMIUM - 6 POTE', vendedor: 'PETER' },
 ];
 const dailies = [dia('2026-09-11', 120, 5), dia('2026-09-14', 80)];
 const custos: CustoVariavel[] = [

@@ -174,9 +174,9 @@ export function perdaSemCusto(
   if (p.perda_real != null) return Number(p.perda_real) === 0;
   const s = normStatus(p.status);
   if (/recus/.test(s)) return true;
-  // Cancelado só tem custo se o pacote saiu. (O frustrado antigo conta
-  // sempre com o frete: pedido velho pode não ter o histórico aqui.)
-  if (/cancel/.test(s)) return !saiuParaEntrega(p);
+  // Cancelado e frustrado antigo (legado) só têm custo se o pacote saiu —
+  // regras de custo do BlueSales, conferidas pelo Jonas em 22/10/2026.
+  if (/cancel|frustr/.test(s)) return !saiuParaEntrega(p);
   return false;
 }
 

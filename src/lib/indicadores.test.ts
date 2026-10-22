@@ -138,7 +138,7 @@ describe('indicadores', () => {
     ped('aguard_coleta', '2026-09-21', { valor: 535, valor_agendado: 535, produto_plano: 'DERMAX PREMIUM - 4 POTE' }),
     ped('cobrados', '2026-09-15'),
     ped('negociação', '2026-09-12'),
-    ped('frustrados', '2026-09-06'),
+    ped('frustrados', '2026-09-06', { enviado_em: '2026-09-06T15:00:00Z' }), // já postado
     ped('devolvido', '2026-09-07'),
     ...Array.from({ length: 3 }, () => ped('pagos', '2026-08-20', { data_aprovacao: '2026-09-02' })),
     ped('frustrados', '2026-08-11'),

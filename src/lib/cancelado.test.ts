@@ -75,6 +75,14 @@ describe('cancelado conta no agendado, como no BlueSales', () => {
     expect(com.lucro_agendado).toBe(sem.lucro_agendado);
   });
 
+  it('cancelado que nem saiu também sai da margem do agendado (não vai ser pago)', () => {
+    const com = calcularPnl([], [], P, {}, [valido, cancelado]);
+    const sem = calcularPnl([], [], P, {}, [valido]);
+    expect(com.valor_agendado).toBe(sem.valor_agendado + 53_500);
+    expect(com.lucro_agendado).toBe(sem.lucro_agendado);
+    expect(com.perda_real_frustrados).toBe(0); // e não custa nada
+  });
+
   it('a situação dos agendados soma o agendado', () => {
     const s = situacaoDosAgendados([valido, canceladoQueSaiu], P);
     expect(Object.values(s).reduce((t, f) => t + f.valor, 0)).toBe(127_000);

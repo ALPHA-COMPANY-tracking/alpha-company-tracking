@@ -34,9 +34,17 @@ describe('regras de custo do BlueSales', () => {
       expect(perdaRealDePedido(perdido('a', 735, '6 POTE', undefined, status))).toBe(116);
   });
 
-  it('só o frete: devolvido, voltando, aguardando devolução e frustrado antigo (legado)', () => {
-    for (const status of ['devolvido', 'devolvido_automatico', 'voltando', 'aguardando_devolucao', 'frustrados'])
+  it('só o frete: devolvido, voltando, aguardando devolução', () => {
+    for (const status of ['devolvido', 'devolvido_automatico', 'voltando', 'aguardando_devolucao'])
       expect(perdaRealDePedido(perdido('a', 735, '6 POTE', undefined, status))).toBe(33);
+  });
+
+  it('frustrado antigo (legado): já postado perde o frete; não postado não entra (22/10/2026)', () => {
+    const postado = { ...perdido('a', 735, '6 POTE', undefined, 'frustrados'), enviado_em: '2026-08-16T12:00:00Z' };
+    expect(perdaRealDePedido(postado)).toBe(33);
+    const naoPostado = perdido('b', 735, '6 POTE', undefined, 'frustrados');
+    expect(perdaSemCusto(naoPostado)).toBe(true);
+    expect(perdaRealDePedido(naoPostado)).toBe(0);
   });
 
   it('devolvido reverso: frete de ida + de volta', () => {
