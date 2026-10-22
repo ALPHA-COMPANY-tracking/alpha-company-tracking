@@ -210,32 +210,6 @@ export function situacaoDosAgendados(pedidos: Pedido[], periodo: Periodo): Recor
   return situacao;
 }
 
-/** O que entra na taxa de frustração (card da Demonstração): o pacote saiu
- *  e não virou dinheiro. Cancelado tem card próprio. Pedido do Jonas, 22/10/2026. */
-export const MOTIVOS_DA_TAXA: MotivoFrustracao[] = ['devolvido', 'voltando', 'aguardando_devolucao', 'roubo'];
-
-export interface TaxaFrustracao extends Fatia {
-  /** Agendamentos do período (o mesmo número do Faturamento Agendado). */
-  base: number;
-  /** qtd ÷ base. */
-  pct: number;
-}
-
-/** Quantos dos agendados do período frustraram (devolvido, voltando,
- *  aguardando devolução, roubo/perdido), em pedidos. */
-export function taxaDeFrustracao(pedidos: Pedido[], periodo: Periodo): TaxaFrustracao {
-  let qtd = 0, valor = 0, base = 0;
-  for (const p of pedidosAtivos(pedidos)) {
-    if (!isDentro(p.data, periodo.inicio, periodo.fim) || foraDoAgendado(p)) continue;
-    base += 1;
-    if (statusBucket(p.status) === 'frustrado' && MOTIVOS_DA_TAXA.includes(motivoFrustracao(p))) {
-      qtd += 1;
-      valor += valorAgendado(p);
-    }
-  }
-  return { qtd, valor, base, pct: safeDiv(qtd, base) };
-}
-
 /** Dos pagamentos do período, quantos são de pedidos agendados nele (o
  *  resto é venda de antes que pagou agora). */
 export function pagosDaSafra(pedidos: Pedido[], periodo: Periodo): number {

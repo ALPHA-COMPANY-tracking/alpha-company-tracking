@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
 import { BadgeCheck, Ban, BarChart3, Crosshair, PackageX, Target, TriangleAlert, TrendingDown } from 'lucide-react';
 import type { Periodo } from '@/types';
-import { formatBRL, formatBRLCompact, formatMultiplier, formatPercent, reaisToCents } from '@/lib/money';
+import { formatBRL, formatBRLCompact, formatMultiplier, formatPercent, reaisToCents, safeDiv } from '@/lib/money';
 import { formatDiaMes } from '@/lib/dates';
 import { calcularPnl } from '@/lib/pnl';
 import { agregarPedidos } from '@/lib/pedidos';
-import { pagosDaSafra, situacaoDosAgendados, taxaDeFrustracao } from '@/lib/indicadores';
+import { pagosDaSafra, situacaoDosAgendados } from '@/lib/indicadores';
 import { FRUSTRACAO_PREVISTA } from '@/lib/previsao';
 import { planosSemCusto } from '@/lib/custosConfig';
 import { useData } from '@/store/DataProvider';
@@ -55,7 +55,7 @@ export function PnlScreen({
 
   // Desempenho por vendedor no período (fonte: pedidos do BlueSales).
   const agg = useMemo(() => agregarPedidos(pedidos, periodo), [pedidos, periodo]);
-  const taxa = useMemo(() => taxaDeFrustracao(pedidos, periodo), [pedidos, periodo]);
+  const taxaFrustracao = safeDiv(pnl.qtd_frustrados, pnl.qtd_agendados);
   // Filtra quem ficou zerado: um vendedor entra na lista só por ter tido
   // pagamento no período, e apareceria como barra vazia.
   const barrasAgendado = useMemo(
@@ -228,14 +228,15 @@ export function PnlScreen({
               value={formatMultiplier(pnl.roas)}
               sub={`ROI real ${formatPercent(pnl.roi_real)}`}
             />
-            {/* Devolvido, voltando, aguardando devolução e roubo ÷ agendamentos.
-                Âmbar até o limite de 20% (o da Previsão); acima, vermelho. */}
+            {/* Os MESMOS pedidos do card Frustrados (inclusive o cancelado que
+                chegou a sair) ÷ agendamentos. Âmbar até o limite de 20% (o da
+                Previsão); acima, vermelho. */}
             <KpiCard
               Icon={PackageX}
-              color={taxa.pct > FRUSTRACAO_PREVISTA ? COR.vermelho : COR.ambar}
+              color={taxaFrustracao > FRUSTRACAO_PREVISTA ? COR.vermelho : COR.ambar}
               label="Taxa de frustração"
-              value={formatPercent(taxa.pct)}
-              sub={`${taxa.qtd} de ${taxa.base} agendamentos · ${formatBRL(taxa.valor)}`}
+              value={formatPercent(taxaFrustracao)}
+              sub={`${pnl.qtd_frustrados} de ${pnl.qtd_agendados} agendamentos · ${formatBRL(pnl.valor_frustrado)}`}
             />
           </div>
 
