@@ -8,6 +8,7 @@ import {
   pagosDaSafra,
   situacaoDoPedido,
   situacaoDosAgendados,
+  taxaDeFrustracao,
 } from '@/lib/indicadores';
 
 const P = { inicio: '2026-09-01', fim: '2026-09-30' };
@@ -209,5 +210,33 @@ describe('indicadores', () => {
     const vazio = calcularIndicadores([], [], [ped('enviados', '2026-09-20')], P);
     expect(vazio.projecao.taxa_recebimento).toBe(0);
     expect(vazio.projecao.a_receber).toBe(0);
+  });
+});
+
+describe('taxa de frustração (card da Demonstração)', () => {
+  it('devolvido, voltando, aguardando devolução e roubo ÷ agendamentos do período', () => {
+    const pedidos = [
+      ped('devolvido', '2026-09-02'),
+      ped('voltando', '2026-09-03'),
+      ped('aguardando_devolucao', '2026-09-04'),
+      ped('roubo', '2026-09-05'),
+      ped('perdido', '2026-09-05'), // roubo / perdido
+      ped('cancelados', '2026-09-06'), // tem card próprio: conta na base, não na taxa
+      ped('perda_cobranca', '2026-09-06'),
+      ped('pagos', '2026-09-07'),
+      ped('enviados', '2026-09-08'),
+      ped('enviados', '2026-09-09'),
+      ped('roubo', '2026-08-31'), // outro mês
+      ped('devolvido', '2026-09-10', { removido_em: '2026-09-11T10:00:00Z' }), // lixeira
+    ];
+    const t = taxaDeFrustracao(pedidos, P);
+    expect(t.base).toBe(10);
+    expect(t.qtd).toBe(5);
+    expect(t.valor).toBe(5 * 73_500);
+    expect(t.pct).toBe(0.5);
+  });
+
+  it('sem agendamento, zero em vez de erro', () => {
+    expect(taxaDeFrustracao([], P)).toEqual({ qtd: 0, valor: 0, base: 0, pct: 0 });
   });
 });

@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
-import { BadgeCheck, Ban, BarChart3, Crosshair, Target, TriangleAlert, TrendingDown } from 'lucide-react';
+import { useMemo } from 'react';
+import { BadgeCheck, Ban, BarChart3, Crosshair, PackageX, Target, TriangleAlert, TrendingDown } from 'lucide-react';
 import type { Periodo } from '@/types';
 import { formatBRL, formatBRLCompact, formatMultiplier, formatPercent, reaisToCents } from '@/lib/money';
 import { formatDiaMes } from '@/lib/dates';
-import { type DescontoFrustrados, calcularPnl } from '@/lib/pnl';
+import { calcularPnl } from '@/lib/pnl';
 import { agregarPedidos } from '@/lib/pedidos';
-import { pagosDaSafra, situacaoDosAgendados } from '@/lib/indicadores';
+import { pagosDaSafra, situacaoDosAgendados, taxaDeFrustracao } from '@/lib/indicadores';
+import { FRUSTRACAO_PREVISTA } from '@/lib/previsao';
 import { planosSemCusto } from '@/lib/custosConfig';
 import { useData } from '@/store/DataProvider';
 import { KpiCard, Panel } from '@/components/ui';
@@ -17,6 +18,13 @@ import { COR } from '@/lib/cores';
 import { saudacao } from '@/lib/saudacao';
 import type { RegistroAlertas } from '@/store/useRegistroAlertas';
 import { AvisoAlertas } from '@/components/alertas/AvisoAlertas';
+
+// O Lucro Real SEMPRE desconta o custo real de frustração (produto + frete,
+// pelas regras de custo), como o Lucro Líquido do BlueSales desde 30/09/2026.
+// Jonas, 22/10/2026: o resultado tem que ser o positivo/negativo de verdade —
+// a opção "Nada" (frustrados fora do lucro) saiu da tela. Fora do componente
+// para ser sempre o mesmo objeto: os gráficos do topo refazem o P&L dia a dia.
+const OPCOES_PNL = { descontarFrustrados: 'real' } as const;
 
 export function PnlScreen({
   nome = 'Jonas',
@@ -36,14 +44,7 @@ export function PnlScreen({
   onVerAlertas?: () => void;
 }) {
   const { dailies, custos, categorias, pedidos } = useData();
-  // Padrão 'real' para ESPELHAR o BlueSales: desde 30/09/2026 o Lucro
-  // Líquido de lá desconta o "Custo real de frustração" (frete e produto,
-  // pelas regras de custo); a receita frustrada é só informativa.
-  const [modoFrustrados, setModoFrustrados] = useState<DescontoFrustrados>('real');
-
-  // Memorizado: os gráficos do topo recalculam o P&L dia a dia, e um
-  // objeto novo a cada render refaria tudo à toa.
-  const opts = useMemo(() => ({ descontarFrustrados: modoFrustrados }), [modoFrustrados]);
+  const opts = OPCOES_PNL;
   const pnl = useMemo(() => calcularPnl(dailies, custos, periodo, opts, pedidos), [dailies, custos, periodo, opts, pedidos]);
 
   const vazio = pnl.receita_aprovada === 0 && pnl.custos_totais_reais === 0;
@@ -54,6 +55,7 @@ export function PnlScreen({
 
   // Desempenho por vendedor no período (fonte: pedidos do BlueSales).
   const agg = useMemo(() => agregarPedidos(pedidos, periodo), [pedidos, periodo]);
+  const taxa = useMemo(() => taxaDeFrustracao(pedidos, periodo), [pedidos, periodo]);
   // Filtra quem ficou zerado: um vendedor entra na lista só por ter tido
   // pagamento no período, e apareceria como barra vazia.
   const barrasAgendado = useMemo(
@@ -226,6 +228,15 @@ export function PnlScreen({
               value={formatMultiplier(pnl.roas)}
               sub={`ROI real ${formatPercent(pnl.roi_real)}`}
             />
+            {/* Devolvido, voltando, aguardando devolução e roubo ÷ agendamentos.
+                Âmbar até o limite de 20% (o da Previsão); acima, vermelho. */}
+            <KpiCard
+              Icon={PackageX}
+              color={taxa.pct > FRUSTRACAO_PREVISTA ? COR.vermelho : COR.ambar}
+              label="Taxa de frustração"
+              value={formatPercent(taxa.pct)}
+              sub={`${taxa.qtd} de ${taxa.base} agendamentos · ${formatBRL(taxa.valor)}`}
+            />
           </div>
 
           <Demonstrativo
@@ -233,8 +244,6 @@ export function PnlScreen({
             categorias={categorias}
             custos={custos}
             periodo={periodo}
-            modoFrustrados={modoFrustrados}
-            onModoFrustrados={setModoFrustrados}
             onAddCusto={onAddCusto}
           />
 

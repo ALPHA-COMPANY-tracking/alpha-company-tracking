@@ -15,7 +15,7 @@ import {
 import type { CategoriaCusto, CustoVariavel, Periodo } from '@/types';
 import type { Cents } from '@/lib/money';
 import { formatBRL, formatPercent, safeDiv } from '@/lib/money';
-import { type DescontoFrustrados, type PnlResult, custoNoPeriodo } from '@/lib/pnl';
+import { type PnlResult, custoNoPeriodo } from '@/lib/pnl';
 import { COMISSAO_COBRANCA, RESPONSAVEL_COBRANCA } from '@/lib/custosConfig';
 import { COR_GRUPO, type DegrauCascata, type GrupoDRE, degrausCascata, montarDRE, porReal } from '@/lib/dre';
 import { alfa, corDaCategoria } from '@/lib/cores';
@@ -225,26 +225,23 @@ export function Demonstrativo({
   categorias,
   custos,
   periodo,
-  modoFrustrados,
-  onModoFrustrados,
   onAddCusto,
 }: {
   pnl: PnlResult;
   categorias: CategoriaCusto[];
   custos: CustoVariavel[];
   periodo: Periodo;
-  modoFrustrados: DescontoFrustrados;
-  onModoFrustrados: (v: DescontoFrustrados) => void;
   onAddCusto: () => void;
 }) {
   const [aberta, setAberta] = useState<Set<string | null>>(new Set());
   const catMap = new Map(categorias.map((c) => [c.id, c]));
   const receita = pnl.receita_aprovada;
   const dre = useMemo(() => montarDRE(pnl), [pnl]);
-  const degraus = useMemo(() => degrausCascata(dre, modoFrustrados === 'real'), [dre, modoFrustrados]);
+  // Quem decide se a frustração desconta é o cálculo (a tela usa sempre 'real').
+  const descontando = pnl.modo_frustrados === 'real';
+  const degraus = useMemo(() => degrausCascata(dre, descontando), [dre, descontando]);
   const { grupos } = dre;
   const lucroPositivo = pnl.lucro_real >= 0;
-  const descontando = modoFrustrados === 'real';
 
   function toggleCat(id: string | null) {
     setAberta((prev) => {
@@ -257,16 +254,6 @@ export function Demonstrativo({
 
   const corCategoria = (id: string | null) =>
     corDaCategoria(catMap.get(id ?? '')?.cor, categorias.findIndex((c) => c.id === id));
-
-  // Lucro que cada opção de desconto produz — dentro dos botões, para
-  // comparar sem precisar clicar em cada uma.
-  const lucroSemFrustrados = pnl.lucro_real + pnl.desconto_frustrados;
-  const opcoesFrustrados: { id: DescontoFrustrados; label: string; hint: string; lucro: Cents }[] = [
-    // O BlueSales também não desconta os frustrados — mas o lucro dele não
-    // tem os custos variáveis, então o número não é o mesmo.
-    { id: 'real', label: 'Custo real de frustração', hint: 'frete e produto · como no BlueSales', lucro: lucroSemFrustrados - pnl.perda_real_frustrados },
-    { id: 'nenhum', label: 'Nada', hint: 'frustrados fora do lucro', lucro: lucroSemFrustrados },
-  ];
 
   const taxaNasComissoes = pnl.comissoes_por_vendedor.reduce((s, v) => s + v.taxa_descontada, 0);
 
@@ -510,7 +497,7 @@ export function Demonstrativo({
             )}
           </Bloco>
 
-          {/* Perdas: sempre mostradas; só descontam se o botão mandar. */}
+          {/* Perdas: o custo real da frustração sai do Lucro Real. */}
           <Bloco
             grupo={grupos.perdas}
             Icon={TriangleAlert}
@@ -552,29 +539,11 @@ export function Demonstrativo({
                 {descontando ? saida(pnl.perda_real_frustrados) : formatBRL(pnl.perda_real_frustrados)}
               </div>
             </div>
-            <div className="px-4 py-3 bg-card3">
-              <div className="text-[11px] text-dim2 mb-2">Descontar do Lucro Real:</div>
-              <div className="grid grid-cols-2 gap-2">
-                {opcoesFrustrados.map((op) => {
-                  const ativo = modoFrustrados === op.id;
-                  return (
-                    <button
-                      key={op.id}
-                      onClick={() => onModoFrustrados(op.id)}
-                      className={`text-left px-3 py-2.5 rounded-[10px] border transition-colors ${
-                        ativo ? 'border-gold/50 bg-gold/10' : 'border-line2 hover:border-dim2'
-                      }`}
-                    >
-                      <span className={`block text-[12px] font-semibold ${ativo ? 'text-tx' : 'text-dim'}`}>{op.label}</span>
-                      {/* O lucro que cada opção produz, para comparar sem clicar */}
-                      <span className={`block mono text-[13.5px] font-extrabold mt-0.5 ${op.lucro >= 0 ? 'text-grn' : 'text-red'}`}>
-                        {formatBRL(op.lucro)}
-                      </span>
-                      <span className="block text-[10px] text-dim2 mt-0.5">{op.hint}</span>
-                    </button>
-                  );
-                })}
-              </div>
+            {/* Sempre descontado (decisão do Jonas, 22/10/2026). As regras são
+                as de custosConfig.perdaRealDePedido, iguais às do BlueSales. */}
+            <div className="px-4 py-3 bg-card3 text-[11px] text-dim2 leading-relaxed">
+              Sempre descontado do Lucro Real. Roubo, perdido ou perda de cobrança: produto + frete.
+              Devolvido, voltando, aguardando devolução e cancelado que saiu: só o frete (o produto volta).
             </div>
           </Bloco>
         </div>
