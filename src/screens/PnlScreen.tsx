@@ -55,7 +55,10 @@ export function PnlScreen({
 
   // Desempenho por vendedor no período (fonte: pedidos do BlueSales).
   const agg = useMemo(() => agregarPedidos(pedidos, periodo), [pedidos, periodo]);
-  const taxaFrustracao = safeDiv(pnl.qtd_frustrados, pnl.qtd_agendados);
+  // Dos pedidos que se RESOLVERAM no período (pagos + frustrados, cada um
+  // pela sua data: pagamento e baixa), quantos frustraram. Dividir pelos
+  // agendados do mês misturava safras: a baixa pode ser de pedido antigo.
+  const taxaFrustracao = safeDiv(pnl.qtd_frustrados, pnl.qtd_pagamentos + pnl.qtd_frustrados);
   // Filtra quem ficou zerado: um vendedor entra na lista só por ter tido
   // pagamento no período, e apareceria como barra vazia.
   const barrasAgendado = useMemo(
@@ -228,15 +231,15 @@ export function PnlScreen({
               value={formatMultiplier(pnl.roas)}
               sub={`ROI real ${formatPercent(pnl.roi_real)}`}
             />
-            {/* Os MESMOS pedidos do card Frustrados (inclusive o cancelado que
-                chegou a sair) ÷ agendamentos. Âmbar até o limite de 20% (o da
+            {/* Os MESMOS pedidos do card Frustrados (baixa no período) ÷ os que
+                se resolveram no período. Âmbar até o limite de 20% (o da
                 Previsão); acima, vermelho. */}
             <KpiCard
               Icon={PackageX}
               color={taxaFrustracao > FRUSTRACAO_PREVISTA ? COR.vermelho : COR.ambar}
               label="Taxa de frustração"
               value={formatPercent(taxaFrustracao)}
-              sub={`${pnl.qtd_frustrados} de ${pnl.qtd_agendados} agendamentos · ${formatBRL(pnl.valor_frustrado)}`}
+              sub={`${pnl.qtd_frustrados} frustrados · ${pnl.qtd_pagamentos} pagos no período`}
             />
           </div>
 

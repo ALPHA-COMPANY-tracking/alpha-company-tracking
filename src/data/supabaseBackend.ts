@@ -36,6 +36,7 @@ export function pedidoDaLinha(r: Record<string, unknown>): Pedido {
     passou_correios: r.passou_correios === true,
     entregue_em: S(r.entregue_em),
     enviado_em: S(r.enviado_em),
+    frustrado_em: S(r.frustrado_em),
     parcelas: Array.isArray(r.parcelas)
       ? (r.parcelas as { data?: unknown; valor?: unknown }[])
           .filter((x) => x && x.data && N(x.valor) > 0)

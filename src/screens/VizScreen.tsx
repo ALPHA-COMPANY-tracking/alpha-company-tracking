@@ -196,7 +196,7 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
           <div className="divide-y divide-line">
             <Linha
               rotulo="Lucro real até agora"
-              nota={`o mesmo da Demonstração de Resultados · já com ${formatBRL(pr.perda_frustracao)} de frustração descontados`}
+              nota={`o mesmo da Demonstração de Resultados · já com ${formatBRL(pr.frustracao_no_lucro)} de frustração descontados`}
               cents={pr.lucro_real}
               sinal="="
             />

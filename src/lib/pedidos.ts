@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { Pedido, Periodo } from '@/types';
-import { isDentro } from '@/lib/dates';
+import { diaSP, isDentro } from '@/lib/dates';
 import { perdaRealDePedido, perdaSemCusto } from '@/lib/custosConfig';
 
 /** Normaliza status: minúsculo, sem acento, sem espaços nas bordas. */
@@ -98,14 +98,22 @@ export interface RevenuePedidos {
   qtd_frustrados: number;
   /** Dinheiro que de fato saiu do caixa nos frustrados (produto + frete). */
   perda_real_frustrados: number;
-  /** Do valor_frustrado, a parte dos cancelados (que já não estão no agendado). */
-  valor_frustrado_cancelado: number;
+  /** Safra: dos agendados do PERÍODO (data de criação, os que estão no
+   *  agendado), o valor dos que já frustraram — sai da margem do agendado. */
+  valor_frustrado_safra: number;
   /** Cancelados agendados no período (data de criação) — o card "Cancelados". */
   qtd_cancelados: number;
   valor_cancelados: number;
   porAtendente: AtendenteAgg[];
   porMetodo: { nome: string; pedidos: number }[];
   total: number; // quantos pedidos no período (fonte real disponível?)
+}
+
+/** Dia da BAIXA da frustração (quando o pedido virou roubo, devolvido,
+ *  cancelado…): é nele que a perda conta — decisão do Jonas, 22/10/2026.
+ *  Sem a marca (pedido antigo, corrigido à mão), o dia em que foi feito. */
+export function dataFrustracao(p: Pick<Pedido, 'data' | 'frustrado_em'>): string {
+  return p.frustrado_em ? diaSP(p.frustrado_em) : p.data;
 }
 
 /** Data de pagamento do pedido (o BlueSales conta o "aprovado" por aqui).
@@ -139,7 +147,8 @@ export function pagamentosDoPedido(p: Pedido, comParcelasExtras = PARCELAS_EXTRA
 }
 
 /** Agrega os pedidos de um período (lado da receita).
- *  - Agendado e frustrado contam pela data de CRIAÇÃO (p.data).
+ *  - Agendado conta pela data de CRIAÇÃO (p.data).
+ *  - Frustrado conta pelo dia da BAIXA (dataFrustracao).
  *  - Aprovado/receita conta pela data de PAGAMENTO (p.data_aprovacao ?? p.data),
  *    para bater com o "Faturamento Aprovado" do BlueSales. */
 export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedidos {
@@ -148,7 +157,7 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
 
   let receita_aprovada = 0, qtd_pagamentos = 0;
   let valor_agendado = 0, qtd_agendados = 0;
-  let valor_frustrado = 0, qtd_frustrados = 0, perda_real_frustrados = 0, valor_frustrado_cancelado = 0;
+  let valor_frustrado = 0, qtd_frustrados = 0, perda_real_frustrados = 0, valor_frustrado_safra = 0;
   let qtd_cancelados = 0, valor_cancelados = 0;
   let total = 0;
 
@@ -187,14 +196,17 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
       metodos.set(met, (metodos.get(met) ?? 0) + 1);
     }
 
-    // Frustração — também por data de criação, cancelado incluído (o frete
-    // de quem foi postado saiu). Recusado, cancelado sem custo / não postado
-    // e frustrado não postado não entram (não geraram custo) — como no BlueSales.
-    if (criacaoNoPeriodo(p) && bucket === 'frustrado' && !perdaSemCusto(p)) {
-      valor_frustrado += valor;
-      qtd_frustrados += 1;
-      perda_real_frustrados += perdaRealDePedido(p);
-      if (foraDoAgendado(p)) valor_frustrado_cancelado += valor;
+    // Frustração — pelo dia da BAIXA (o roubo de um pedido de agosto dado
+    // em outubro é perda de outubro), cancelado incluído (o frete de quem
+    // saiu foi gasto). Recusado, cancelado sem custo / que não saiu e
+    // frustrado não postado não entram (não geraram custo) — como no BlueSales.
+    if (bucket === 'frustrado' && !perdaSemCusto(p)) {
+      if (isDentro(dataFrustracao(p), periodo.inicio, periodo.fim)) {
+        valor_frustrado += valor;
+        qtd_frustrados += 1;
+        perda_real_frustrados += perdaRealDePedido(p);
+      }
+      if (criacaoNoPeriodo(p) && !foraDoAgendado(p)) valor_frustrado_safra += valor;
     }
 
     // Lado da RECEITA APROVADA — por data de pagamento (cada parcela no
@@ -219,7 +231,7 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
     valor_frustrado,
     qtd_frustrados,
     perda_real_frustrados,
-    valor_frustrado_cancelado,
+    valor_frustrado_safra,
     qtd_cancelados,
     valor_cancelados,
     porAtendente: [...atendentes.values()].sort((a, b) => b.valor_agendado - a.valor_agendado),

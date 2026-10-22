@@ -128,9 +128,12 @@ export interface Projecao {
   /** Lucro real do período — o mesmo número da Demonstração de Resultados
    *  (já com o custo de frustração descontado). */
   lucro_real: Cents;
-  /** Produto + frete dos agendados do período que já frustraram (já está
-   *  dentro do lucro real; aparece só como informação). */
+  /** Produto + frete dos agendados do período que já frustraram (a safra;
+   *  aparece só como informação). */
   perda_frustracao: Cents;
+  /** O custo de frustração que o lucro real já desconta: o das BAIXAS do
+   *  período, que pode incluir pedido de outro mês. */
+  frustracao_no_lucro: Cents;
   /** Pedidos em rota: valor e quantidade. */
   rota: Fatia;
   /** Dos pedidos que já se resolveram (pago ou frustração), quantos % pagaram. */
@@ -311,6 +314,7 @@ export function calcularIndicadores(
     projecao: {
       lucro_real: pnl.lucro_real,
       perda_frustracao,
+      frustracao_no_lucro: pnl.desconto_frustrados,
       rota: situacao.rota,
       taxa_recebimento,
       base_taxa: resolvidos,
