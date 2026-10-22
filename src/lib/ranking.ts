@@ -12,7 +12,7 @@
 import type { AfterpayDaily, Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
-import { agregarPedidos, pagamentosDoPedido, pedidosAtivos, statusBucket } from '@/lib/pedidos';
+import { agregarPedidos, ehCancelado, pagamentosDoPedido, pedidosAtivos, statusBucket } from '@/lib/pedidos';
 import { COMISSAO_POR_VENDEDOR, comissaoDoVendedor } from '@/lib/custosConfig';
 import { comissaoVendedores } from '@/lib/pnl';
 import { taxasDoPeriodo } from '@/lib/taxas';
@@ -121,8 +121,11 @@ export function rankingVendedores(
     if (criadoNoPeriodo) {
       const valor = reaisToCents(Number(p.valor_agendado ?? p.valor) || 0);
       if (bucket === 'frustrado') {
-        a.frustrado += valor;
-        a.qtd_frustrados++;
+        // Cancelado não é frustração (card próprio) nem está de pé.
+        if (!ehCancelado(p)) {
+          a.frustrado += valor;
+          a.qtd_frustrados++;
+        }
       } else {
         a.agendado += valor;
         a.qtd_agendados++;

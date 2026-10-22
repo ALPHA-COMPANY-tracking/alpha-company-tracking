@@ -1,5 +1,9 @@
 -- Dia em que o pedido VIROU frustração (a "baixa" no BlueSales).
 --
+-- ATUALIZAÇÃO (mesmo dia, depois de rodada): o Jonas decidiu que a perda
+-- conta no mês em que o pedido foi FEITO, mesmo com a baixa depois. A
+-- coluna ficou como informação (a tela Frustrados mostra a data da baixa).
+--
 -- Até aqui a frustração contava no mês em que o pedido foi FEITO. Decisão
 -- do Jonas em 22/10/2026: conta no mês em que foi dada a baixa — o roubo
 -- de um pedido de agosto marcado em outubro é perda de OUTUBRO (é assim que

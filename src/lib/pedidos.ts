@@ -21,10 +21,9 @@ function norm(s: string | null | undefined): string {
 // O singular entra por segurança: o backfill veio "Pagos" e o webhook manda
 // "pagos", mas não custa aceitar as duas formas.
 const APROVADO = new Set(['pagos', 'pago']);
-// Status que contam como FRUSTRADO (pedido perdido). É a mesma conta do
-// card "Frustrados" do BlueSales, conferida em 21/09/2026: setembro deu
-// 5 pedidos / R$ 3.675 = Roubo (3) + Aguard. Devolução (1) + Cancelados (1).
-// Só "frustrados" deixava roubo, devolução e cancelamento de fora.
+// Status de pedido PERDIDO (não vai ser pago). O cancelado está aqui por
+// isso, mas NÃO conta como frustração nos números — ver ehFrustracao
+// (22/10/2026). Só "frustrados" deixava roubo e devolução de fora.
 // Por padrão de texto: etapa nova com uma dessas palavras já entra.
 // (Negociação, Atenção, Cobrados, Enviados etc. seguem como pipeline.)
 // "Voltando" entrou em 21/09/2026: o BlueSales passou a usar essa etapa
@@ -58,6 +57,20 @@ export function ehCancelado(p: Pick<Pedido, 'status'>): boolean {
  * 17/10 e na manhã de 22/10).
  */
 export const CANCELADO_NO_AGENDADO = true;
+
+/**
+ * Entra na FRUSTRAÇÃO (cards Frustrados e Taxa, Perdas do P&L, tela
+ * Frustrados, Visualização, Mapa)? Devolvido, voltando, aguardando
+ * devolução, roubo/perdido, perda de cobrança e frustrado antigo — com as
+ * regras de custo do BlueSales. CANCELADO NÃO: tem card próprio (Jonas,
+ * 22/10/2026). O que não gerou custo (recusado, frustrado antigo que não
+ * saiu, marcado "s/ custo") também fica fora.
+ */
+export function ehFrustracao(
+  p: Pick<Pedido, 'status' | 'perda_real' | 'enviado_em' | 'entregue_em' | 'passou_correios'>,
+): boolean {
+  return statusBucket(p.status) === 'frustrado' && !ehCancelado(p) && !perdaSemCusto(p);
+}
 
 /** O pedido fica fora do saldo agendado? (Só o cancelado, e só se a chave mandar.) */
 export function foraDoAgendado(p: Pick<Pedido, 'status'>, canceladoConta = CANCELADO_NO_AGENDADO): boolean {
@@ -109,9 +122,9 @@ export interface RevenuePedidos {
   total: number; // quantos pedidos no período (fonte real disponível?)
 }
 
-/** Dia da BAIXA da frustração (quando o pedido virou roubo, devolvido,
- *  cancelado…): é nele que a perda conta — decisão do Jonas, 22/10/2026.
- *  Sem a marca (pedido antigo, corrigido à mão), o dia em que foi feito. */
+/** Dia da BAIXA da frustração (quando o pedido virou roubo, devolvido…).
+ *  Só informação: a perda conta no mês em que o pedido foi FEITO (Jonas,
+ *  22/10/2026). Sem a marca (corrigido à mão), o dia do pedido. */
 export function dataFrustracao(p: Pick<Pedido, 'data' | 'frustrado_em'>): string {
   return p.frustrado_em ? diaSP(p.frustrado_em) : p.data;
 }
@@ -147,8 +160,7 @@ export function pagamentosDoPedido(p: Pedido, comParcelasExtras = PARCELAS_EXTRA
 }
 
 /** Agrega os pedidos de um período (lado da receita).
- *  - Agendado conta pela data de CRIAÇÃO (p.data).
- *  - Frustrado conta pelo dia da BAIXA (dataFrustracao).
+ *  - Agendado e frustrado contam pela data de CRIAÇÃO (p.data).
  *  - Aprovado/receita conta pela data de PAGAMENTO (p.data_aprovacao ?? p.data),
  *    para bater com o "Faturamento Aprovado" do BlueSales. */
 export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedidos {
@@ -196,12 +208,12 @@ export function agregarPedidos(todos: Pedido[], periodo: Periodo): RevenuePedido
       metodos.set(met, (metodos.get(met) ?? 0) + 1);
     }
 
-    // Frustração — pelo dia da BAIXA (o roubo de um pedido de agosto dado
-    // em outubro é perda de outubro), cancelado incluído (o frete de quem
-    // saiu foi gasto). Recusado, cancelado sem custo / que não saiu e
-    // frustrado não postado não entram (não geraram custo) — como no BlueSales.
+    // Frustração — no mês em que o pedido foi FEITO, mesmo que a baixa venha
+    // depois (pedido de outubro com baixa em novembro é perda de outubro —
+    // Jonas, 22/10/2026). Cancelado não é frustração (card próprio);
+    // recusado e frustrado não postado não geraram custo.
     if (bucket === 'frustrado') {
-      if (!perdaSemCusto(p) && isDentro(dataFrustracao(p), periodo.inicio, periodo.fim)) {
+      if (ehFrustracao(p) && criacaoNoPeriodo(p)) {
         valor_frustrado += valor;
         qtd_frustrados += 1;
         perda_real_frustrados += perdaRealDePedido(p);

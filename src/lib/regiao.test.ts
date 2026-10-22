@@ -99,20 +99,20 @@ describe('perdas por região', () => {
     ped('voltando', 'SP', 'São Paulo'),
     ped('enviados', 'SP', 'São Paulo'),
     ped('pagos', 'MG', 'Belo Horizonte'),
-    ped('cancelados', 'MG', 'Belo Horizonte', { rastreamento: 'AP1BR', enviado_em: '2026-09-02T12:00:00Z' }), // saiu: entra com o frete
+    ped('cancelados', 'MG', 'Belo Horizonte', { rastreamento: 'AP1BR', enviado_em: '2026-09-02T12:00:00Z' }), // cancelado: não é frustração
     ped('roubo', null),
     ped('roubo', 'RJ', 'Niterói', { data: '2026-08-30' }), // fora do período
     ped('roubo', 'RJ', 'Niterói', { removido_em: '2026-09-11T00:00:00Z' }), // excluído
   ];
   const r = perdasPorRegiao(pedidos, P);
 
-  it('por estado: roubo e frustração (roubo + devolução + cancelado…)', () => {
+  it('por estado: roubo e frustração (roubo + devolução…; cancelado não)', () => {
     const sp = r.estados.find((e) => e.uf === 'SP')!;
     expect(sp).toMatchObject({ pedidos: 5, roubos: 2, frustrados: 3 });
     expect(sp.pct_roubo).toBeCloseTo(0.4, 5);
     expect(sp.pct_frustracao).toBeCloseTo(0.6, 5);
     const mg = r.estados.find((e) => e.uf === 'MG')!;
-    expect(mg).toMatchObject({ pedidos: 2, roubos: 0, frustrados: 1 });
+    expect(mg).toMatchObject({ pedidos: 2, roubos: 0, frustrados: 0 });
     expect(r.estados[0].uf).toBe('SP'); // mais frustração primeiro
   });
 
@@ -120,13 +120,13 @@ describe('perdas por região', () => {
     expect(r.total).toBe(8);
     expect(r.semRegiao).toBe(1);
     expect(r.estados.some((e) => e.uf === 'RJ')).toBe(false);
-    expect(r.brasil).toMatchObject({ pedidos: 7, roubos: 2, frustrados: 4 });
+    expect(r.brasil).toMatchObject({ pedidos: 7, roubos: 2, frustrados: 3 });
   });
 
   it('por cidade, com o estado', () => {
     const campinas = r.cidades.find((c) => c.cidade === 'Campinas')!;
     expect(campinas).toMatchObject({ uf: 'SP', pedidos: 3, roubos: 2 });
-    // Roubo perde produto + frete; devolução e cancelado, só o frete.
+    // Roubo perde produto + frete; devolução, só o frete.
     const sp = r.estados.find((e) => e.uf === 'SP')!;
     expect(sp.perda).toBeGreaterThan(0);
   });

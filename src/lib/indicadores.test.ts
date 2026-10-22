@@ -107,9 +107,9 @@ describe('situação do pedido', () => {
     expect(calcularPnl([], [], ago, {}, todos).qtd_frustrados).toBe(16);
   });
 
-  it('card de Frustrados como o BlueSales: cancelado não postado não entra (regras de 30/09/2026)', () => {
+  it('card de Frustrados: roubo e devolução entram; cancelado não, nem postado (22/10/2026)', () => {
     // Roubo (#576, #577, #593) + Aguard. Devolução (#850); o cancelado
-    // (#1488) não foi postado — não gerou custo, fica fora.
+    // (#1488) tem card próprio.
     const setembro: Pedido[] = [
       ped('roubo', '2026-09-02'),
       ped('roubo', '2026-09-02'),
@@ -121,9 +121,9 @@ describe('situação do pedido', () => {
     const pnl = calcularPnl([], [], P, {}, setembro);
     expect(pnl.qtd_frustrados).toBe(4);
     expect(pnl.valor_frustrado).toBe(294_000);
-    // Postado (com rastreio), o cancelado entra perdendo o frete.
+    // Mesmo postado, o cancelado continua fora da frustração.
     const postado = setembro.map((p) => (p.status === 'cancelados' ? { ...p, rastreamento: 'AP1BR', enviado_em: '2026-09-02T12:00:00Z' } : p));
-    expect(calcularPnl([], [], P, {}, postado).qtd_frustrados).toBe(5);
+    expect(calcularPnl([], [], P, {}, postado).qtd_frustrados).toBe(4);
   });
 });
 
@@ -172,17 +172,16 @@ describe('indicadores', () => {
     expect(ind.pct_frustracao).toBeCloseTo(0.2, 5);
     // Em valor: 2 × 735 de 9 × 735 + 535 agendados.
     expect(ind.pct_frustracao_valor).toBeCloseTo(1470 / (9 * 735 + 535), 5);
-    // Os seis motivos aparecem sempre, mesmo zerados; "Outros" só com pedido.
+    // Os cinco motivos aparecem sempre, mesmo zerados; "Outros" só com pedido.
     expect(ind.frustracao_por_motivo.map((f) => f.motivo)).toEqual([
       'devolvido',
       'voltando',
       'aguardando_devolucao',
-      'cancelado',
       'roubo',
       'frustrado',
     ]);
     const qtd = Object.fromEntries(ind.frustracao_por_motivo.map((f) => [f.motivo, f.qtd]));
-    expect(qtd).toMatchObject({ devolvido: 1, frustrado: 1, cancelado: 0, roubo: 0, voltando: 0 });
+    expect(qtd).toMatchObject({ devolvido: 1, frustrado: 1, roubo: 0, voltando: 0 });
   });
 
   it('taxa de recebimento vem só dos pedidos já resolvidos', () => {

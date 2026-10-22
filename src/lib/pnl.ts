@@ -403,8 +403,8 @@ export function calcularPnl(
   // O frustrado sai dos DOIS lados: ele não vai ser pago, então não é
   // receita a projetar, e o custo dele também não entra aqui — a perda
   // dos frustrados tem linha própria, com o modo que você escolhe.
-  // A safra é a dos pedidos FEITOS no período — a frustração da linha de
-  // perdas conta pela baixa e pode ser de pedido de outro mês.
+  // Sai TODO pedido da safra que não vai ser pago — inclusive o cancelado e
+  // o frustrado sem custo, que não estão na linha de perdas.
   const agendado_de_pe = valor_agendado - frustrado_da_safra;
   let lucro_agendado = 0;
   let margem_agendado = 0;

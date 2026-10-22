@@ -17,14 +17,13 @@ import type { AfterpayDaily, CustoVariavel, Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
 import { calcularPnl } from '@/lib/pnl';
-import { dataAprovacaoPedido, foraDoAgendado, pedidosAtivos, statusBucket } from '@/lib/pedidos';
+import { dataAprovacaoPedido, ehCancelado, ehFrustracao, foraDoAgendado, pedidosAtivos, statusBucket } from '@/lib/pedidos';
 import {
   COMISSAO_COBRANCA,
   comissaoDoVendedor,
   custoProdutoDoPlano,
   freteDoPedido,
   perdaRealDePedido,
-  perdaSemCusto,
 } from '@/lib/custosConfig';
 
 export type Situacao = 'pago' | 'rota' | 'preparo' | 'aguardando' | 'negociacao' | 'frustracao';
@@ -83,13 +82,13 @@ export type MotivoFrustracao =
   | 'perda_cobranca'
   | 'outros';
 
-/** Os motivos na ordem da tela. Os seis primeiros aparecem sempre, mesmo zerados;
+/** Os motivos na ordem da tela (cancelado não é frustração: card próprio, 22/10/2026).
+ *  Os cinco primeiros aparecem sempre, mesmo zerados;
  *  perda de cobrança e outros, só quando têm pedido. */
 export const MOTIVOS: { id: MotivoFrustracao; rotulo: string; nota: string }[] = [
   { id: 'devolvido', rotulo: 'Devolvidos', nota: 'o produto já voltou · perde o frete de ida (reverso: ida e volta)' },
   { id: 'voltando', rotulo: 'Voltando', nota: 'o pacote está retornando · perde o frete' },
   { id: 'aguardando_devolucao', rotulo: 'Aguardando devolução', nota: 'a cliente vai devolver · perde o frete' },
-  { id: 'cancelado', rotulo: 'Cancelados', nota: 'c/ custo perde o frete · s/ custo, nada' },
   { id: 'roubo', rotulo: 'Roubo / perdido', nota: 'roubo, furto, perdido ou apreendido · perde frete + produto' },
   { id: 'frustrado', rotulo: 'Frustrados', nota: 'frustrado antigo (legado) · perde o frete' },
   { id: 'perda_cobranca', rotulo: 'Perda de cobrança', nota: 'entregue e não pago · perde frete + produto' },
@@ -131,8 +130,7 @@ export interface Projecao {
   /** Produto + frete dos agendados do período que já frustraram (a safra;
    *  aparece só como informação). */
   perda_frustracao: Cents;
-  /** O custo de frustração que o lucro real já desconta: o das BAIXAS do
-   *  período, que pode incluir pedido de outro mês. */
+  /** O custo de frustração que o lucro real já desconta (o da Demonstração). */
   frustracao_no_lucro: Cents;
   /** Pedidos em rota: valor e quantidade. */
   rota: Fatia;
@@ -205,8 +203,8 @@ export function situacaoDosAgendados(pedidos: Pedido[], periodo: Periodo): Recor
     // Cancelado não está no agendado (as fatias somam o Faturamento Agendado).
     if (!isDentro(p.data, periodo.inicio, periodo.fim) || foraDoAgendado(p)) continue;
     const s = situacaoDoPedido(p.status);
-    // Recusado e frustrado não postado não são frustração (BlueSales).
-    if (s === 'frustracao' && perdaSemCusto(p)) continue;
+    // Cancelado (card próprio), recusado e frustrado não postado não são frustração.
+    if (s === 'frustracao' && !ehFrustracao(p)) continue;
     situacao[s].qtd += 1;
     situacao[s].valor += valorAgendado(p);
   }
@@ -248,7 +246,7 @@ export function calcularIndicadores(
     const s = situacaoDoPedido(p.status);
     const valor = valorAgendado(p);
 
-    if (s === 'frustracao' && !perdaSemCusto(p)) {
+    if (s === 'frustracao' && ehFrustracao(p)) {
       const f = porMotivo.get(motivoFrustracao(p))!;
       f.qtd += 1;
       f.valor += valor;
@@ -272,7 +270,7 @@ export function calcularIndicadores(
   let resolvidosPagos = 0;
   let resolvidos = 0;
   for (const p of ativos) {
-    if (p.data > periodo.fim) continue;
+    if (p.data > periodo.fim || ehCancelado(p)) continue; // cancelado não é frustração
     const s = situacaoDoPedido(p.status);
     if (s === 'pago') resolvidosPagos += 1;
     if (s === 'pago' || s === 'frustracao') resolvidos += 1;

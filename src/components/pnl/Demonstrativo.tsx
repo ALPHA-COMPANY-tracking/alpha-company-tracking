@@ -543,8 +543,8 @@ export function Demonstrativo({
                 as de custosConfig.perdaRealDePedido, iguais às do BlueSales. */}
             <div className="px-4 py-3 bg-card3 text-[11px] text-dim2 leading-relaxed">
               Sempre descontado do Lucro Real. Roubo, perdido ou perda de cobrança: produto + frete.
-              Devolvido, voltando, aguardando devolução, cancelado e frustrado antigo que saíram: só o frete (o
-              produto volta). Devolvido reverso: frete de ida e de volta.
+              Devolvido, voltando, aguardando devolução e frustrado antigo que saiu: só o frete (o produto
+              volta). Devolvido reverso: frete de ida e de volta. Cancelado não é frustração (card próprio).
             </div>
           </Bloco>
         </div>

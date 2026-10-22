@@ -9,9 +9,9 @@
 import type { Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents, safeDiv } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
-import { pedidosAtivos } from '@/lib/pedidos';
-import { perdaRealDePedido, perdaSemCusto } from '@/lib/custosConfig';
-import { motivoFrustracao, situacaoDoPedido } from '@/lib/indicadores';
+import { ehFrustracao, pedidosAtivos } from '@/lib/pedidos';
+import { perdaRealDePedido } from '@/lib/custosConfig';
+import { motivoFrustracao } from '@/lib/indicadores';
 import type { RegiaoPedido } from '@/data/backend';
 import { lerCsvBluesales, numeroDoPedido } from '@/lib/csvBluesales';
 
@@ -155,7 +155,7 @@ export function perdasPorRegiao(pedidos: Pedido[], periodo: Periodo): PerdasPorR
       alvos.push(c);
     }
 
-    const frustrado = situacaoDoPedido(p.status) === 'frustracao' && !perdaSemCusto(p);
+    const frustrado = ehFrustracao(p); // sem cancelado — card próprio
     const roubo = frustrado && motivoFrustracao(p) === 'roubo';
     const valor = reaisToCents(Number(p.valor_agendado ?? p.valor) || 0);
     const perda = frustrado ? reaisToCents(perdaRealDePedido(p)) : 0;

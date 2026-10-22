@@ -189,7 +189,7 @@ export function MapaScreen({ periodo }: { periodo: Periodo }) {
         </div>
 
         <div className="px-4 lg:px-5 py-3 border-t border-line text-[11px] text-dim2 leading-relaxed">
-          Frustração = roubo, devolvido, voltando, aguardando devolução, cancelado e frustrado — o mesmo card de Frustrados.
+          Frustração = roubo, devolvido, voltando, aguardando devolução e frustrado — o mesmo card de Frustrados (cancelado não entra).
           A cor do estado segue a quantidade; a porcentagem é sobre os pedidos agendados nele (com poucos pedidos, ela
           diz pouco).
         </div>

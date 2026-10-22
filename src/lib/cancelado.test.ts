@@ -1,8 +1,8 @@
 // Cancelado e o saldo agendado.
 // O Faturamento Agendado é IGUAL ao do BlueSales, que soma os cancelados
 // (CANCELADO_NO_AGENDADO = true; conferido no export de 22/10/2026). O card
-// "Cancelados" mostra quanto daquele número foi cancelado. O custo (frete de
-// quem saiu) vai para a frustração.
+// "Cancelados" mostra quanto daquele número foi cancelado. Cancelado NÃO é
+// frustração (22/10/2026), nem que o pacote tenha saído.
 import { describe, expect, it } from 'vitest';
 import type { Pedido, Periodo } from '@/types';
 import { agendadoPorDia, agregarPedidos, CANCELADO_NO_AGENDADO, ehCancelado, foraDoAgendado, possiveisDuplicados } from '@/lib/pedidos';
@@ -62,8 +62,8 @@ describe('cancelado conta no agendado, como no BlueSales', () => {
     expect(agg.valor_agendado).toBe(735 + 535 + 735); // os cancelados estão dentro
   });
 
-  it('frustração: só custa o frete se o pacote saiu (etiqueta sozinha não conta)', () => {
-    expect(agregarPedidos([valido, canceladoQueSaiu], P)).toMatchObject({ qtd_frustrados: 1, perda_real_frustrados: 33 });
+  it('cancelado não é frustração (card próprio), nem que o pacote tenha saído (22/10/2026)', () => {
+    expect(agregarPedidos([valido, canceladoQueSaiu], P)).toMatchObject({ qtd_frustrados: 0, perda_real_frustrados: 0 });
     expect(agregarPedidos([valido, canceladoComEtiqueta], P)).toMatchObject({ qtd_frustrados: 0, perda_real_frustrados: 0 });
     expect(agregarPedidos([valido, cancelado], P).qtd_frustrados).toBe(0);
   });
@@ -83,10 +83,10 @@ describe('cancelado conta no agendado, como no BlueSales', () => {
     expect(com.perda_real_frustrados).toBe(0); // e não custa nada
   });
 
-  it('a situação dos agendados soma o agendado', () => {
+  it('a situação dos agendados: o cancelado não aparece como frustração', () => {
     const s = situacaoDosAgendados([valido, canceladoQueSaiu], P);
-    expect(Object.values(s).reduce((t, f) => t + f.valor, 0)).toBe(127_000);
-    expect(s.frustracao.qtd).toBe(1);
+    expect(Object.values(s).reduce((t, f) => t + f.valor, 0)).toBe(73_500);
+    expect(s.frustracao.qtd).toBe(0);
   });
 
   it('pedido refeito com a mesma cliente aparece como possível duplicado', () => {

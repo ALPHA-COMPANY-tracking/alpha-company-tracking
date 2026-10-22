@@ -3,7 +3,7 @@ import { Check, Pencil, RotateCcw, TriangleAlert, X } from 'lucide-react';
 import type { Pedido, Periodo } from '@/types';
 import { formatBRL, reaisToCents } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
-import { dataFrustracao, pedidosAtivos, statusBucket } from '@/lib/pedidos';
+import { dataFrustracao, ehCancelado, ehFrustracao, pedidosAtivos, statusBucket } from '@/lib/pedidos';
 import { MOTIVOS, motivoFrustracao } from '@/lib/indicadores';
 import { custoProdutoDoPlano, freteDoPedido, perdaRealDePedido, perdaSemCusto } from '@/lib/custosConfig';
 import { useData } from '@/store/DataProvider';
@@ -43,18 +43,18 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
   const frustrados = useMemo(
     () =>
       // Vendas tiradas da plataforma (lixeira) não contam aqui também. O
-      // período é o da BAIXA (quando virou frustração), como no P&L.
+      // período é o do PEDIDO (mesmo com a baixa depois), como no P&L.
       pedidosAtivos(pedidos)
-        .filter((p) => statusBucket(p.status) === 'frustrado' && !perdaSemCusto(p) && isDentro(dataFrustracao(p), periodo.inicio, periodo.fim))
-        .sort((a, b) => dataFrustracao(b).localeCompare(dataFrustracao(a))),
+        .filter((p) => ehFrustracao(p) && isDentro(p.data, periodo.inicio, periodo.fim))
+        .sort((a, b) => b.data.localeCompare(a.data)),
     [pedidos, periodo],
   );
   // Perdidos que não entram no P&L (não geraram custo) — como no BlueSales.
   const semCustoLista = useMemo(
     () =>
       pedidosAtivos(pedidos)
-        .filter((p) => statusBucket(p.status) === 'frustrado' && perdaSemCusto(p) && isDentro(dataFrustracao(p), periodo.inicio, periodo.fim))
-        .sort((a, b) => dataFrustracao(b).localeCompare(dataFrustracao(a))),
+        .filter((p) => statusBucket(p.status) === 'frustrado' && !ehCancelado(p) && perdaSemCusto(p) && isDentro(p.data, periodo.inicio, periodo.fim))
+        .sort((a, b) => b.data.localeCompare(a.data)),
     [pedidos, periodo],
   );
 
@@ -129,7 +129,7 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
           <table className="w-full text-[13px] min-w-[860px]">
             <thead>
               <tr className="text-dim2 text-[11px] uppercase tracking-wide">
-                <th className="text-left font-semibold px-3 lg:px-5 py-3">Baixa</th>
+                <th className="text-left font-semibold px-3 lg:px-5 py-3">Pedido</th>
                 <th className="text-left font-semibold px-3 lg:px-5 py-3">Cliente / pedido</th>
                 <th className="text-left font-semibold px-3 lg:px-5 py-3">Motivo</th>
                 <th className="text-left font-semibold px-3 lg:px-5 py-3">Plano</th>
@@ -154,9 +154,9 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
                   return (
                     <tr key={p.id} className="border-t border-line/70 hover:bg-white/[0.015]">
                       <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-tx font-medium whitespace-nowrap">
-                        {diaMes(dataFrustracao(p))}
+                        {diaMes(p.data)}
                         {dataFrustracao(p) !== p.data && (
-                          <div className="text-[10px] mono text-dim2 font-normal">pedido {diaMes(p.data)}</div>
+                          <div className="text-[10px] mono text-dim2 font-normal">baixa {diaMes(dataFrustracao(p))}</div>
                         )}
                       </td>
                       <td className="px-3 lg:px-5 py-3.5 lg:py-4">
@@ -266,7 +266,7 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
           <div>
             {semCustoLista.map((p) => (
               <div key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 lg:px-5 py-2.5 border-t border-line/70 first:border-t-0">
-                <span className="text-tx font-medium w-[46px]">{diaMes(dataFrustracao(p))}</span>
+                <span className="text-tx font-medium w-[46px]">{diaMes(p.data)}</span>
                 <div className="min-w-0 flex-1 basis-[200px]">
                   <div className="text-tx text-[12.5px] truncate">{p.cliente ?? '—'}</div>
                   <div className="text-[10px] mono text-dim2">#{p.internal_id ?? '—'} · {rotuloMotivo[motivoFrustracao(p)]}</div>
@@ -297,12 +297,12 @@ export function FrustradosScreen({ periodo }: { periodo: Periodo }) {
         <p className="m-0 text-[12.5px] text-dim leading-relaxed">
           As regras de custo são as do BlueSales: <b className="text-dim">frete + produto</b> quando a mercadoria não volta
           (roubo, perdido, apreendido, perda de cobrança); <b className="text-dim">só o frete</b> no devolvido, voltando,
-          aguardando devolução, cancelado com custo e frustrado antigo já postado; <b className="text-dim">frete de ida e de volta</b>{' '}
-          no devolvido reverso. Cancelado sem custo, cancelado ou frustrado antigo que não saiu para entrega (a etiqueta de rastreio sozinha
-          não conta) e recusado{' '}
+          aguardando devolução e frustrado antigo já postado; <b className="text-dim">frete de ida e de volta</b>{' '}
+          no devolvido reverso. Frustrado antigo que não saiu para entrega (a etiqueta de rastreio sozinha não conta) e recusado{' '}
           <b className="text-dim">não entram</b>. O total daqui é o <b className="text-dim">“Custo real de frustração”</b>{' '}
-          que a Demonstração de Resultados desconta do lucro — no mês da <b className="text-dim">baixa</b>, não no mês em que o
-          pedido foi feito.
+          que a Demonstração de Resultados desconta do lucro — no <b className="text-dim">mês em que o pedido foi feito</b>,
+          mesmo que a baixa venha depois. <b className="text-dim">Cancelado não é frustração</b>: tem card próprio na
+          Demonstração.
         </p>
       </div>
     </div>
