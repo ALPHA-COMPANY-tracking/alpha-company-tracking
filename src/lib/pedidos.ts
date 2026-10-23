@@ -79,11 +79,12 @@ export function foraDoAgendado(p: Pick<Pedido, 'status'>, canceladoConta = CANCE
 
 /**
  * A 2ª parcela em diante de um pedido pago em partes (planilha) entra na
- * receita? Desde 17/10/2026 NÃO: números iguais aos do BlueSales, que só
- * registra o primeiro pagamento. As parcelas continuam guardadas no pedido;
- * true volta a contá-las, cada uma no dia dela.
+ * receita? SIM, cada uma no dia dela: a planilha de pagamentos é a verdade
+ * dos recebimentos (Jonas, 23/10/2026 — outubro fecha R$ 72.092,95 com as
+ * três 2ªs parcelas). De 17 a 23/10 ficou false, igual ao BlueSales, que só
+ * registra o primeiro pagamento.
  */
-export const PARCELAS_EXTRAS_NA_RECEITA = false;
+export const PARCELAS_EXTRAS_NA_RECEITA = true;
 
 /**
  * Tira as vendas removidas à mão (canceladas e excluídas no BlueSales).
