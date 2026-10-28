@@ -4,8 +4,8 @@
 // Receita Aprovada da Demonstração de Resultados: os totais batem.
 // ─────────────────────────────────────────────────────────────
 
-import { useMemo, useState } from 'react';
-import { CheckCircle2, Receipt, Wallet } from 'lucide-react';
+import { Fragment, useMemo, useState } from 'react';
+import { CheckCircle2, Receipt, Trash2, Wallet } from 'lucide-react';
 import type { Periodo } from '@/types';
 import { useData } from '@/store/DataProvider';
 import { KpiCard, Panel } from '@/components/ui';
@@ -37,7 +37,9 @@ function somarPor<T>(itens: T[], chave: (i: T) => string, valor: (i: T) => numbe
 }
 
 export function VendasAprovadasScreen({ periodo }: { periodo: Periodo }) {
-  const { pedidos } = useData();
+  const { pedidos, desfazerPagamento } = useData();
+  // Lixeira com confirmação: qual pagamento está esperando o "sim".
+  const [confirmando, setConfirmando] = useState<string | null>(null);
   const [atendente, setAtendente] = useState<string | null>(null);
   const [forma, setForma] = useState<string | null>(null);
 
@@ -114,6 +116,7 @@ export function VendasAprovadasScreen({ periodo }: { periodo: Periodo }) {
                     <th className="hidden sm:table-cell sm:w-[14%] text-left font-semibold px-3 py-2.5">Forma</th>
                     <th className="hidden sm:table-cell sm:w-[12%] text-left font-semibold px-3 py-2.5">Pago em</th>
                     <th className="w-[112px] sm:w-[19%] text-right font-semibold px-3 lg:px-5 py-2.5">Valor pago</th>
+                    <th className="w-[40px] lg:w-[52px]" aria-label="Tirar pagamento" />
                   </tr>
                 </thead>
                 <tbody>
@@ -121,34 +124,73 @@ export function VendasAprovadasScreen({ periodo }: { periodo: Periodo }) {
                     const p = pg.pedido;
                     const valor = pg.valor;
                     const agendado = Number(p.valor_agendado ?? p.valor) || 0;
+                    const chave = `${p.id}:${pg.data}:${pg.parcela?.n ?? 1}`;
                     return (
-                      <tr key={`${p.id}:${pg.data}:${pg.parcela?.n ?? 1}`} className="border-t border-line/70 hover:bg-white/[0.015]">
-                        <td className="px-3 lg:px-5 py-3">
-                          <div className={`truncate ${p.cliente ? 'text-tx font-medium' : 'text-dim2 italic'}`}>
-                            {p.cliente || 'Cliente sem nome'}
-                          </div>
-                          <div className="text-[10px] mono mt-[2px]">
-                            {p.internal_id != null && <span className="text-dim font-bold">#{p.internal_id}</span>}
-                            {/* No celular a forma vai aqui embaixo (a coluna some). */}
-                            <span className="sm:hidden text-dim2"> · {rotuloMetodo(p.metodo_pagamento)}</span>
-                          </div>
-                        </td>
-                        <td className="px-2 lg:px-3 py-3 text-dim truncate">{atendenteDe(p.vendedor)}</td>
-                        <td className="hidden sm:table-cell px-3 py-3 text-dim whitespace-nowrap">{rotuloMetodo(p.metodo_pagamento)}</td>
-                        <td className="hidden sm:table-cell px-3 py-3 text-dim mono whitespace-nowrap">{diaMes(pg.data)}</td>
-                        <td className="px-3 lg:px-5 py-3 text-right whitespace-nowrap">
-                          <div className="mono font-bold text-grn">{brl(valor)}</div>
-                          {pg.parcela ? (
-                            // Pagamento em partes: qual parcela e o total do pedido.
-                            <div className="text-[10px] text-dim2 mono">
-                              parcela {pg.parcela.n} de {pg.parcela.de} · total {brl(Number(p.valor) || 0)}
+                      <Fragment key={chave}>
+                        <tr className="border-t border-line/70 hover:bg-white/[0.015]">
+                          <td className="px-3 lg:px-5 py-3">
+                            <div className={`truncate ${p.cliente ? 'text-tx font-medium' : 'text-dim2 italic'}`}>
+                              {p.cliente || 'Cliente sem nome'}
                             </div>
-                          ) : (
-                            /* Pagou diferente do agendado (desconto, acerto da planilha). */
-                            Math.abs(agendado - valor) >= 0.01 && <div className="text-[10px] text-dim2 mono">agendado {brl(agendado)}</div>
-                          )}
-                        </td>
-                      </tr>
+                            <div className="text-[10px] mono mt-[2px]">
+                              {p.internal_id != null && <span className="text-dim font-bold">#{p.internal_id}</span>}
+                              {/* No celular a forma vai aqui embaixo (a coluna some). */}
+                              <span className="sm:hidden text-dim2"> · {rotuloMetodo(p.metodo_pagamento)}</span>
+                            </div>
+                          </td>
+                          <td className="px-2 lg:px-3 py-3 text-dim truncate">{atendenteDe(p.vendedor)}</td>
+                          <td className="hidden sm:table-cell px-3 py-3 text-dim whitespace-nowrap">{rotuloMetodo(p.metodo_pagamento)}</td>
+                          <td className="hidden sm:table-cell px-3 py-3 text-dim mono whitespace-nowrap">{diaMes(pg.data)}</td>
+                          <td className="px-3 lg:px-5 py-3 text-right whitespace-nowrap">
+                            <div className="mono font-bold text-grn">{brl(valor)}</div>
+                            {pg.parcela ? (
+                              // Pagamento em partes: qual parcela e o total do pedido.
+                              <div className="text-[10px] text-dim2 mono">
+                                parcela {pg.parcela.n} de {pg.parcela.de} · total {brl(Number(p.valor) || 0)}
+                              </div>
+                            ) : (
+                              /* Pagou diferente do agendado (desconto, acerto da planilha). */
+                              Math.abs(agendado - valor) >= 0.01 && <div className="text-[10px] text-dim2 mono">agendado {brl(agendado)}</div>
+                            )}
+                          </td>
+                          <td className="pr-2 lg:pr-3 py-3 text-right">
+                            {/* Pago em partes: acerto pela planilha, não pela lixeira. */}
+                            {!pg.parcela && (
+                              <button
+                                onClick={() => setConfirmando(confirmando === chave ? null : chave)}
+                                title="Tirar este pagamento (baixa dada sem querer)"
+                                className="inline-grid place-items-center w-8 h-8 rounded-lg text-red/70 hover:text-red hover:bg-red/10"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                        {confirmando === chave && (
+                          <tr className="bg-red/[0.05]">
+                            <td colSpan={6} className="px-3 lg:px-5 py-3">
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                                <span className="text-[12.5px] text-tx flex-1 min-w-[220px]">
+                                  Tirar o pagamento de <b>{p.internal_id != null ? `#${p.internal_id}` : 'esta venda'}</b> ({brl(valor)})? Ele sai dos
+                                  pagamentos e o pedido volta para a etapa de antes — a venda continua agendada.
+                                </span>
+                                <button
+                                  onClick={() => {
+                                    desfazerPagamento(p.id);
+                                    setConfirmando(null);
+                                  }}
+                                  className="px-2.5 py-[5px] rounded-lg text-[11.5px] font-semibold text-red border border-red/40 bg-red/10 hover:bg-red/20"
+                                >
+                                  Tirar pagamento
+                                </button>
+                                <button onClick={() => setConfirmando(null)} className="px-2.5 py-[5px] rounded-lg text-[11.5px] text-dim2 hover:text-tx">
+                                  Não
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -160,7 +202,8 @@ export function VendasAprovadasScreen({ periodo }: { periodo: Periodo }) {
 
       <p className="text-[11.5px] text-dim2 leading-relaxed px-1">
         Conta pela data do pagamento — a mesma regra da Receita Aprovada da Demonstração de Resultados, então os totais batem.
-        O valor pago já vem com as correções da planilha de pagamentos. Venda excluída da plataforma não entra.
+        O valor pago já vem com as correções da planilha de pagamentos. Venda excluída da plataforma não entra. Baixa dada
+        sem querer: a lixeira tira o pagamento e o pedido volta para a etapa de antes.
       </p>
     </div>
   );

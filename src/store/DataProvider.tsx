@@ -9,7 +9,7 @@ import type { ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { AfterpayDaily, AtendenteStat, CategoriaCusto, CustoVariavel, Pedido, PlataformaStat } from '@/types';
 import { type Dataset, novoId } from '@/data/db';
-import { type Backend, type RegiaoPedido, LocalBackend, aplicarRegioes } from '@/data/backend';
+import { type Backend, type RegiaoPedido, ETAPA_SEM_PAGAMENTO, LocalBackend, aplicarRegioes } from '@/data/backend';
 
 interface DataContextValue {
   categorias: CategoriaCusto[];
@@ -35,6 +35,9 @@ interface DataContextValue {
   definirTaxaPedido: (id: string, taxa: number | null) => void;
   /** Tira (ou devolve) uma venda da plataforma. Sai de todos os cálculos. */
   removerPedido: (id: string, removido: boolean) => void;
+  /** Baixa de pagamento dada sem querer: o pedido deixa de ser pago (sai dos
+   *  pagamentos) e volta para a etapa de antes. A venda continua agendada. */
+  desfazerPagamento: (id: string) => void;
   /** Preenche o nome do cliente de uma venda antiga, à mão. */
   definirClientePedido: (id: string, nome: string | null) => void;
   /** Estado e cidade dos pedidos (CSV do BlueSales). Devolve quantos achou. */
@@ -198,6 +201,24 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
     [aplicar],
   );
 
+  const desfazerPagamento = useCallback<DataContextValue['desfazerPagamento']>(
+    (id) => {
+      // A etapa certa vem do banco (o último aviso do BlueSales antes do
+      // pagamento); até lá, "cobrados".
+      const semPagamento = (status: string) => (d: Dataset | null) =>
+        d && { ...d, pedidos: d.pedidos.map((p) => (p.id === id ? { ...p, status, data_aprovacao: null, parcelas: null } : p)) };
+      setData(semPagamento(ETAPA_SEM_PAGAMENTO));
+      backendRef.current
+        .desfazerPagamento(id)
+        .then((status) => setData(semPagamento(status)))
+        .catch((e) => {
+          console.error('Falha ao desfazer o pagamento, re-sincronizando:', e);
+          resync();
+        });
+    },
+    [resync],
+  );
+
   const definirClientePedido = useCallback<DataContextValue['definirClientePedido']>(
     (id, nome) => {
       aplicar(
@@ -279,6 +300,7 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
       definirPerdaPedido,
       definirTaxaPedido,
       removerPedido,
+      desfazerPagamento,
       definirClientePedido,
       importarRegioes,
       lancarDaily,
@@ -286,7 +308,7 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
       marcarSync,
       recarregar,
     };
-  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, definirPerdaPedido, definirTaxaPedido, removerPedido, definirClientePedido, importarRegioes, lancarDaily, lancarDailies, marcarSync, recarregar]);
+  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, definirPerdaPedido, definirTaxaPedido, removerPedido, desfazerPagamento, definirClientePedido, importarRegioes, lancarDaily, lancarDailies, marcarSync, recarregar]);
 
   if (!value) {
     return (

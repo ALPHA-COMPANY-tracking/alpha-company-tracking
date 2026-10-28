@@ -7,7 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AfterpayDaily, CategoriaCusto, CustoVariavel, Pedido } from '@/types';
 import type { Dataset } from '@/data/db';
 import { SEED_CATEGORIAS } from '@/data/seed';
-import type { Backend, RegiaoPedido } from '@/data/backend';
+import { type Backend, ETAPA_SEM_PAGAMENTO, type RegiaoPedido } from '@/data/backend';
 
 const N = (v: unknown) => Number(v ?? 0);
 
@@ -211,6 +211,34 @@ export class SupabaseBackend implements Backend {
       .eq('id', id)
       .eq('user_id', this.userId);
     if (error) throw error;
+  }
+  async desfazerPagamento(id: string) {
+    // A etapa de antes: o último aviso do BlueSales que não era de pagamento.
+    // (Se o BlueSales já desfez a baixa, o aviso dele chegou — o webhook não
+    // tira pedido de "pago" sozinho — e é ele que vale.)
+    const { data: avisos } = await this.db
+      .from('webhook_logs')
+      .select('payload')
+      .eq('user_id', this.userId)
+      .eq('payload->order->>id', id)
+      .order('recebido_em', { ascending: false })
+      .limit(50);
+    let etapa = ETAPA_SEM_PAGAMENTO;
+    for (const a of avisos ?? []) {
+      const payload = (a.payload ?? {}) as { event?: unknown; order?: { status?: unknown } };
+      const status = String(payload.order?.status ?? '').trim();
+      if (status && !/^pagos?$/i.test(status) && String(payload.event ?? '').toUpperCase() !== 'ORDER_PAID') {
+        etapa = status;
+        break;
+      }
+    }
+    const { error } = await this.db
+      .from('bluesales_pedidos')
+      .update({ status: etapa, data_aprovacao: null, parcelas: null })
+      .eq('id', id)
+      .eq('user_id', this.userId);
+    if (error) throw error;
+    return etapa;
   }
   async definirClientePedido(id: string, nome: string | null) {
     const { error } = await this.db

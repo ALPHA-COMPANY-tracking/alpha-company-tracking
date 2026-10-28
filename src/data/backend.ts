@@ -41,6 +41,9 @@ export interface Backend {
   definirTaxaPedido(id: string, taxa: number | null): Promise<void>;
   /** Tira (ou devolve) uma venda da plataforma, sem apagar do banco. */
   removerPedido(id: string, removido: boolean): Promise<void>;
+  /** Baixa de pagamento dada sem querer: o pedido deixa de ser pago e volta
+   *  para a etapa de antes. Devolve a etapa em que ficou. */
+  desfazerPagamento(id: string): Promise<string>;
   /** Nome do cliente da venda (null = apagar o que estava lá). */
   definirClientePedido(id: string, nome: string | null): Promise<void>;
   /** Estado e cidade de vários pedidos (pelo número). Devolve quantos achou. */
@@ -49,6 +52,10 @@ export interface Backend {
   lancarDailies(ds: AfterpayDaily[]): Promise<void>;
   marcarSync(iso: string): Promise<void>;
 }
+
+/** Etapa de um pagamento desfeito quando não se sabe a de antes: entregue,
+ *  em cobrança (cai na Fila de Cobrança). */
+export const ETAPA_SEM_PAGAMENTO = 'cobrados';
 
 /** Backend local: localStorage. Fonte da verdade é o próprio storage. */
 export class LocalBackend implements Backend {
@@ -103,6 +110,13 @@ export class LocalBackend implements Backend {
       ...ds,
       pedidos: ds.pedidos.map((p) => (p.id === id ? { ...p, removido_em: quando } : p)),
     }));
+  }
+  async desfazerPagamento(id: string) {
+    this.mut((ds) => ({
+      ...ds,
+      pedidos: ds.pedidos.map((p) => (p.id === id ? { ...p, status: ETAPA_SEM_PAGAMENTO, data_aprovacao: null, parcelas: null } : p)),
+    }));
+    return ETAPA_SEM_PAGAMENTO;
   }
   async definirClientePedido(id: string, nome: string | null) {
     this.mut((ds) => ({
