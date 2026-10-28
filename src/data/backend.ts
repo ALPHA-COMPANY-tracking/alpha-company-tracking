@@ -41,6 +41,9 @@ export interface Backend {
   definirTaxaPedido(id: string, taxa: number | null): Promise<void>;
   /** Tira (ou devolve) uma venda da plataforma, sem apagar do banco. */
   removerPedido(id: string, removido: boolean): Promise<void>;
+  /** Valor que de fato entrou (ex.: boleto com juros), corrigido à mão —
+   *  fica travado contra o aviso do BlueSales. */
+  definirValorPago(id: string, valor: number): Promise<void>;
   /** Baixa de pagamento dada sem querer: o pedido deixa de ser pago e volta
    *  para a etapa de antes. Devolve a etapa em que ficou. */
   desfazerPagamento(id: string): Promise<string>;
@@ -109,6 +112,12 @@ export class LocalBackend implements Backend {
     this.mut((ds) => ({
       ...ds,
       pedidos: ds.pedidos.map((p) => (p.id === id ? { ...p, removido_em: quando } : p)),
+    }));
+  }
+  async definirValorPago(id: string, valor: number) {
+    this.mut((ds) => ({
+      ...ds,
+      pedidos: ds.pedidos.map((p) => (p.id === id ? { ...p, valor, valor_manual: true } : p)),
     }));
   }
   async desfazerPagamento(id: string) {

@@ -35,6 +35,8 @@ interface DataContextValue {
   definirTaxaPedido: (id: string, taxa: number | null) => void;
   /** Tira (ou devolve) uma venda da plataforma. Sai de todos os cálculos. */
   removerPedido: (id: string, removido: boolean) => void;
+  /** Corrige o valor pago (ex.: boleto com juros); fica travado contra o BlueSales. */
+  definirValorPago: (id: string, valor: number) => void;
   /** Baixa de pagamento dada sem querer: o pedido deixa de ser pago (sai dos
    *  pagamentos) e volta para a etapa de antes. A venda continua agendada. */
   desfazerPagamento: (id: string) => void;
@@ -201,6 +203,16 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
     [aplicar],
   );
 
+  const definirValorPago = useCallback<DataContextValue['definirValorPago']>(
+    (id, valor) => {
+      aplicar(
+        (d) => ({ ...d, pedidos: d.pedidos.map((p) => (p.id === id ? { ...p, valor, valor_manual: true } : p)) }),
+        (b) => b.definirValorPago(id, valor),
+      );
+    },
+    [aplicar],
+  );
+
   const desfazerPagamento = useCallback<DataContextValue['desfazerPagamento']>(
     (id) => {
       // A etapa certa vem do banco (o último aviso do BlueSales antes do
@@ -300,6 +312,7 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
       definirPerdaPedido,
       definirTaxaPedido,
       removerPedido,
+      definirValorPago,
       desfazerPagamento,
       definirClientePedido,
       importarRegioes,
@@ -308,7 +321,7 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
       marcarSync,
       recarregar,
     };
-  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, definirPerdaPedido, definirTaxaPedido, removerPedido, desfazerPagamento, definirClientePedido, importarRegioes, lancarDaily, lancarDailies, marcarSync, recarregar]);
+  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, definirPerdaPedido, definirTaxaPedido, removerPedido, definirValorPago, desfazerPagamento, definirClientePedido, importarRegioes, lancarDaily, lancarDailies, marcarSync, recarregar]);
 
   if (!value) {
     return (

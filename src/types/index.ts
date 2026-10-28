@@ -135,6 +135,9 @@ export interface Pedido {
    *  Correios/entregue) — anotado pelo banco (migração 0028). Cancelado só
    *  custa o frete se saiu. O rastreio NÃO serve: a etiqueta nasce antes. */
   enviado_em?: string | null;
+  /** Valor pago corrigido à mão (planilha ou lápis de Vendas Aprovadas):
+   *  o aviso do BlueSales não sobrescreve (migração 0015). */
+  valor_manual?: boolean;
   /** Quando o pedido virou frustração — a "baixa" no BlueSales (migração
    *  0030). A perda conta no mês dela, não no mês em que o pedido foi feito. */
   frustrado_em?: string | null;

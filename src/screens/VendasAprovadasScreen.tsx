@@ -5,10 +5,11 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Fragment, useMemo, useState } from 'react';
-import { CheckCircle2, Receipt, Trash2, Wallet } from 'lucide-react';
+import { Check, CheckCircle2, Pencil, Receipt, Trash2, Wallet, X } from 'lucide-react';
 import type { Periodo } from '@/types';
 import { useData } from '@/store/DataProvider';
 import { KpiCard, Panel } from '@/components/ui';
+import { MoneyInput } from '@/components/MoneyInput';
 import { COR } from '@/lib/cores';
 import { formatBRL, reaisToCents } from '@/lib/money';
 import { rotuloMetodo, vendasAprovadasPorDia } from '@/lib/pedidos';
@@ -37,7 +38,10 @@ function somarPor<T>(itens: T[], chave: (i: T) => string, valor: (i: T) => numbe
 }
 
 export function VendasAprovadasScreen({ periodo }: { periodo: Periodo }) {
-  const { pedidos, desfazerPagamento } = useData();
+  const { pedidos, desfazerPagamento, definirValorPago } = useData();
+  // Lápis: qual pagamento está sendo corrigido e o valor digitado (centavos).
+  const [editando, setEditando] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState(0);
   // Lixeira com confirmação: qual pagamento está esperando o "sim".
   const [confirmando, setConfirmando] = useState<string | null>(null);
   const [atendente, setAtendente] = useState<string | null>(null);
@@ -116,7 +120,7 @@ export function VendasAprovadasScreen({ periodo }: { periodo: Periodo }) {
                     <th className="hidden sm:table-cell sm:w-[14%] text-left font-semibold px-3 py-2.5">Forma</th>
                     <th className="hidden sm:table-cell sm:w-[12%] text-left font-semibold px-3 py-2.5">Pago em</th>
                     <th className="w-[112px] sm:w-[19%] text-right font-semibold px-3 lg:px-5 py-2.5">Valor pago</th>
-                    <th className="w-[40px] lg:w-[52px]" aria-label="Tirar pagamento" />
+                    <th className="w-[76px] lg:w-[84px]" aria-label="Corrigir ou tirar pagamento" />
                   </tr>
                 </thead>
                 <tbody>
@@ -142,27 +146,75 @@ export function VendasAprovadasScreen({ periodo }: { periodo: Periodo }) {
                           <td className="hidden sm:table-cell px-3 py-3 text-dim whitespace-nowrap">{rotuloMetodo(p.metodo_pagamento)}</td>
                           <td className="hidden sm:table-cell px-3 py-3 text-dim mono whitespace-nowrap">{diaMes(pg.data)}</td>
                           <td className="px-3 lg:px-5 py-3 text-right whitespace-nowrap">
-                            <div className="mono font-bold text-grn">{brl(valor)}</div>
+                            {editando === chave ? (
+                              <div className="w-[124px] ml-auto">
+                                <MoneyInput cents={rascunho} onChange={setRascunho} autoFocus />
+                              </div>
+                            ) : (
+                              <div className="mono font-bold text-grn">{brl(valor)}</div>
+                            )}
                             {pg.parcela ? (
                               // Pagamento em partes: qual parcela e o total do pedido.
                               <div className="text-[10px] text-dim2 mono">
                                 parcela {pg.parcela.n} de {pg.parcela.de} · total {brl(Number(p.valor) || 0)}
                               </div>
                             ) : (
-                              /* Pagou diferente do agendado (desconto, acerto da planilha). */
-                              Math.abs(agendado - valor) >= 0.01 && <div className="text-[10px] text-dim2 mono">agendado {brl(agendado)}</div>
+                              /* Pagou diferente do agendado (desconto, juros, acerto da planilha). */
+                              Math.abs(agendado - valor) >= 0.01 && (
+                                <div className="text-[10px] text-dim2 mono">
+                                  agendado {brl(agendado)}
+                                  {p.valor_manual && ' · corrigido'}
+                                </div>
+                              )
                             )}
                           </td>
                           <td className="pr-2 lg:pr-3 py-3 text-right">
-                            {/* Pago em partes: acerto pela planilha, não pela lixeira. */}
-                            {!pg.parcela && (
-                              <button
-                                onClick={() => setConfirmando(confirmando === chave ? null : chave)}
-                                title="Tirar este pagamento (baixa dada sem querer)"
-                                className="inline-grid place-items-center w-8 h-8 rounded-lg text-red/70 hover:text-red hover:bg-red/10"
-                              >
-                                <Trash2 size={15} />
-                              </button>
+                            {/* Pago em partes: acerto pela planilha, não pelo lápis nem pela lixeira. */}
+                            {!pg.parcela && editando === chave && (
+                              <div className="inline-flex">
+                                <button
+                                  onClick={() => {
+                                    if (rascunho > 0) definirValorPago(p.id, rascunho / 100);
+                                    setEditando(null);
+                                  }}
+                                  title="Salvar o valor pago"
+                                  className="grid place-items-center w-8 h-8 rounded-lg text-grn hover:bg-grn/10"
+                                >
+                                  <Check size={15} />
+                                </button>
+                                <button
+                                  onClick={() => setEditando(null)}
+                                  title="Cancelar"
+                                  className="grid place-items-center w-8 h-8 rounded-lg text-dim2 hover:text-tx hover:bg-white/5"
+                                >
+                                  <X size={15} />
+                                </button>
+                              </div>
+                            )}
+                            {!pg.parcela && editando !== chave && (
+                              <div className="inline-flex">
+                                <button
+                                  onClick={() => {
+                                    setEditando(chave);
+                                    setRascunho(reaisToCents(valor));
+                                    setConfirmando(null);
+                                  }}
+                                  title="Corrigir o valor pago (ex.: boleto com juros)"
+                                  className="grid place-items-center w-8 h-8 rounded-lg text-dim2 hover:text-gold2 hover:bg-gold/10"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setConfirmando(confirmando === chave ? null : chave);
+                                    setEditando(null);
+                                  }}
+                                  title="Tirar este pagamento (baixa dada sem querer)"
+                                  className="grid place-items-center w-8 h-8 rounded-lg text-red/70 hover:text-red hover:bg-red/10"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -202,8 +254,9 @@ export function VendasAprovadasScreen({ periodo }: { periodo: Periodo }) {
 
       <p className="text-[11.5px] text-dim2 leading-relaxed px-1">
         Conta pela data do pagamento — a mesma regra da Receita Aprovada da Demonstração de Resultados, então os totais batem.
-        O valor pago já vem com as correções da planilha de pagamentos. Venda excluída da plataforma não entra. Baixa dada
-        sem querer: a lixeira tira o pagamento e o pedido volta para a etapa de antes.
+        O valor pago já vem com as correções da planilha de pagamentos. Venda excluída da plataforma não entra. Entrou valor
+        diferente (boleto com juros, cartão parcelado)? O lápis corrige o valor pago, e o aviso do BlueSales não desfaz. Baixa
+        dada sem querer: a lixeira tira o pagamento e o pedido volta para a etapa de antes.
       </p>
     </div>
   );

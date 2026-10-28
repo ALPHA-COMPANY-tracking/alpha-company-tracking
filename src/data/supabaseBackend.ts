@@ -37,6 +37,7 @@ export function pedidoDaLinha(r: Record<string, unknown>): Pedido {
     entregue_em: S(r.entregue_em),
     enviado_em: S(r.enviado_em),
     frustrado_em: S(r.frustrado_em),
+    valor_manual: r.valor_manual === true,
     parcelas: Array.isArray(r.parcelas)
       ? (r.parcelas as { data?: unknown; valor?: unknown }[])
           .filter((x) => x && x.data && N(x.valor) > 0)
@@ -208,6 +209,15 @@ export class SupabaseBackend implements Backend {
     const { error } = await this.db
       .from('bluesales_pedidos')
       .update({ removido_em: removido ? new Date().toISOString() : null })
+      .eq('id', id)
+      .eq('user_id', this.userId);
+    if (error) throw error;
+  }
+  async definirValorPago(id: string, valor: number) {
+    // Travado (valor_manual): o próximo aviso do BlueSales não volta o valor.
+    const { error } = await this.db
+      .from('bluesales_pedidos')
+      .update({ valor, valor_manual: true })
       .eq('id', id)
       .eq('user_id', this.userId);
     if (error) throw error;
