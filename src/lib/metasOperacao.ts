@@ -3,8 +3,8 @@
 //
 // Pedido do Jonas (30/10/2026): "não estou identificando de um mês para o
 // outro se a operação melhora". As metas são as dele — ROAS agendado de no
-// mínimo 3,5, CPA por agendamento de no máximo R$ 150 e ROAS aprovado de no
-// mínimo 2. O EMPATE é o que ESTA operação aguenta, com a conversão, os
+// mínimo 4, CPA por agendamento de no máximo R$ 150 e ROAS aprovado de no
+// mínimo 2,5. O EMPATE é o que ESTA operação aguenta, com a conversão, os
 // custos e a frustração que ela teve no período: o anúncio que zera o
 // lucro real. Acima dele, prejuízo.
 // ─────────────────────────────────────────────────────────────
@@ -18,12 +18,12 @@ import { ehFrustracao, foraDoAgendado, pedidosAtivos, statusBucket } from '@/lib
 import { periodoAnterior } from '@/lib/tendencia';
 import { FRUSTRACAO_PREVISTA } from '@/lib/previsao';
 
-/** As metas do Jonas. */
+/** As metas do Jonas (ROAS agendado 4 e aprovado 2,5 desde 30/10/2026). */
 export const METAS = {
-  roas_agendado: 3.5,
+  roas_agendado: 4,
   /** Em centavos: R$ 150,00 por agendamento. */
   cpa_agendamento: 15_000,
-  roas_aprovado: 2,
+  roas_aprovado: 2.5,
   /** Frustração máxima (a mesma da Previsão). */
   frustracao: FRUSTRACAO_PREVISTA,
 } as const;
