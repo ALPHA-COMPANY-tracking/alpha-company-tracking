@@ -211,8 +211,8 @@ export function PnlScreen({
               color={COR.ouro}
               valueColor={COR.texto}
               label="Ticket Médio"
-              value={formatBRL(pnl.ticket_medio)}
-              sub="sobre pedidos aprovados"
+              value={pnl.qtd_agendados ? formatBRL(Math.round(pnl.valor_agendado / pnl.qtd_agendados)) : '—'}
+              sub={`sobre ${pnl.qtd_agendados} pedido${pnl.qtd_agendados === 1 ? '' : 's'} agendado${pnl.qtd_agendados === 1 ? '' : 's'}`}
             />
             <KpiCard
               Icon={Crosshair}
