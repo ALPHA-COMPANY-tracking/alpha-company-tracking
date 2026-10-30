@@ -354,7 +354,7 @@ export function PainelGargalo({ diagnosticos }: { diagnosticos: Diagnostico[] })
   );
 }
 
-type Escolha = 'atual' | 'anterior' | 'mes';
+type Escolha = 'atual' | 'anterior' | 'faixa';
 
 /** 'YYYY-MM' do mês anterior a 'YYYY-MM'. */
 function mesAntes(mes: string): string {
@@ -362,14 +362,18 @@ function mesAntes(mes: string): string {
   return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
 }
 
-/** Mais vendidos de um mês — o atual (até hoje), o anterior ou um à escolha —
- *  contra o mês de antes dele. Independente do período do topo da tela. */
+/** Mais vendidos do mês atual (até hoje), do mês anterior ou de um período à
+ *  escolha (do dia X ao dia Y) — contra o período de antes. Independente do
+ *  período do topo da tela. */
 export function PainelTratamentos({ pedidos, hoje }: { pedidos: Pedido[]; hoje: string }) {
   const mesAtual = hoje.slice(0, 7);
   const [escolha, setEscolha] = useState<Escolha>('atual');
-  const [mesEscolhido, setMesEscolhido] = useState(mesAntes(mesAntes(mesAtual)));
-  const mes = escolha === 'atual' ? mesAtual : escolha === 'anterior' ? mesAntes(mesAtual) : mesEscolhido;
-  const periodo = useMemo(() => periodoDoMes(mes, hoje), [mes, hoje]);
+  // Personalizado começa no mês anterior inteiro; daí ajusta o dia inicial e o final.
+  const [faixa, setFaixa] = useState(() => periodoDoMes(mesAntes(mesAtual), hoje));
+  const periodo = useMemo(
+    () => (escolha === 'faixa' ? faixa : periodoDoMes(escolha === 'atual' ? mesAtual : mesAntes(mesAtual), hoje)),
+    [escolha, faixa, mesAtual, hoje],
+  );
   const periodoAntes = useMemo(() => mesAnterior(periodo), [periodo]);
   const atual = useMemo(() => mixDeTratamentos(pedidos, periodo), [pedidos, periodo]);
   const anterior = useMemo(() => mixDeTratamentos(pedidos, periodoAntes), [pedidos, periodoAntes]);
@@ -389,17 +393,31 @@ export function PainelTratamentos({ pedidos, hoje }: { pedidos: Pedido[]; hoje: 
         <button onClick={() => setEscolha('anterior')} className={botao(escolha === 'anterior')}>
           Mês anterior
         </button>
-        <button onClick={() => setEscolha('mes')} className={botao(escolha === 'mes')}>
+        <button onClick={() => setEscolha('faixa')} className={botao(escolha === 'faixa')}>
           Personalizado
         </button>
-        {escolha === 'mes' && (
-          <input
-            type="month"
-            value={mesEscolhido}
-            max={mesAtual}
-            onChange={(e) => e.target.value && setMesEscolhido(e.target.value)}
-            className="bg-card2 border border-line2 rounded-lg px-2 py-[4px] text-[12px] text-tx outline-none focus:border-gold [color-scheme:dark]"
-          />
+        {escolha === 'faixa' && (
+          // Do dia X ao dia Y — o mesmo jeito do "Custom" do topo.
+          <div className="inline-flex items-center gap-2 bg-card2 border border-line2 rounded-lg px-2.5 py-[4px]">
+            <input
+              type="date"
+              value={faixa.inicio}
+              max={faixa.fim}
+              onChange={(e) => e.target.value && setFaixa((f) => ({ ...f, inicio: e.target.value }))}
+              aria-label="Do dia"
+              className="bg-transparent text-[12px] text-tx outline-none"
+            />
+            <span className="text-dim2 text-xs">→</span>
+            <input
+              type="date"
+              value={faixa.fim}
+              min={faixa.inicio}
+              max={hoje}
+              onChange={(e) => e.target.value && setFaixa((f) => ({ ...f, fim: e.target.value }))}
+              aria-label="Até o dia"
+              className="bg-transparent text-[12px] text-tx outline-none"
+            />
+          </div>
         )}
         <span className="text-[11px] text-dim2 ml-auto">contra {rotuloAnterior}</span>
       </div>
