@@ -15,6 +15,8 @@ import { formatDiaMes } from '@/lib/dates';
 import { calcularIndicadores } from '@/lib/indicadores';
 import { useData } from '@/store/DataProvider';
 import { KpiCard, Panel } from '@/components/ui';
+import { PainelGargalo, PainelMetas, PainelTratamentos } from '@/components/viz/MetasOperacao';
+import { diagnosticar, fotografar, mesAnterior, mixDeTratamentos, rotuloPeriodo } from '@/lib/metasOperacao';
 import { COR } from '@/lib/cores';
 
 /**
@@ -28,6 +30,14 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
   const sit = ind.situacao;
   const faixa = `${formatDiaMes(periodo.inicio)} a ${formatDiaMes(periodo.fim)}`;
   const deAntes = ind.qtd_pagamentos - ind.pagos_da_safra;
+
+  // Mês contra mês: metas, empate, gargalo e tratamentos.
+  const anterior = useMemo(() => mesAnterior(periodo), [periodo]);
+  const fotoAtual = useMemo(() => fotografar(dailies, custos, pedidos, periodo), [dailies, custos, pedidos, periodo]);
+  const fotoAnterior = useMemo(() => fotografar(dailies, custos, pedidos, anterior), [dailies, custos, pedidos, anterior]);
+  const diagnosticos = useMemo(() => diagnosticar(fotoAtual, fotoAnterior), [fotoAtual, fotoAnterior]);
+  const mixAtual = useMemo(() => mixDeTratamentos(pedidos, periodo), [pedidos, periodo]);
+  const mixAnterior = useMemo(() => mixDeTratamentos(pedidos, anterior), [pedidos, anterior]);
 
   // Pagos = pagamentos do período (mesmo número do card de Pagamentos
   // aprovados). O resto é onde estão hoje os pedidos agendados no período.
@@ -131,7 +141,7 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
           Icon={Receipt}
           color={COR.ouro}
           valueColor={COR.texto}
-          label="Ticket médio real"
+          label="Ticket médio recebido"
           value={formatBRL(ind.ticket_medio_real)}
           sub={`${formatBRL(ind.receita_aprovada)} ÷ ${ind.qtd_pagamentos} pagos`}
         />
@@ -188,6 +198,13 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
           value={formatPercent(ind.pct_frustracao)}
           sub={`${sit.frustracao.qtd} de ${ind.qtd_agendados} · ${formatPercent(ind.pct_frustracao_valor)} do valor`}
         />
+      </div>
+
+      <PainelMetas atual={fotoAtual} anterior={fotoAnterior} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
+        <PainelGargalo diagnosticos={diagnosticos} />
+        <PainelTratamentos atual={mixAtual} anterior={mixAnterior} rotuloAnterior={rotuloPeriodo(anterior)} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
