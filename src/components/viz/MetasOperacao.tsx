@@ -318,37 +318,26 @@ function Delta({ valor, sobeEhBom }: { valor: number | null; sobeEhBom: boolean 
   );
 }
 
+/** Só O gargalo — o pior problema da operação agora (pedido do Jonas: uma
+ *  única resposta, não a lista do pior para o melhor). */
 export function PainelGargalo({ diagnosticos }: { diagnosticos: Diagnostico[] }) {
   const gargalo = diagnosticos.find((d) => d.nivel !== 'ok');
+  const Icone = !gargalo ? CircleCheck : gargalo.nivel === 'ruim' ? TriangleAlert : CircleAlert;
+  const cor = !gargalo ? 'text-grn' : gargalo.nivel === 'ruim' ? 'text-red' : 'text-yel';
+  const fundo = !gargalo ? 'bg-grn/[0.06]' : gargalo.nivel === 'ruim' ? 'bg-red/[0.06]' : 'bg-yel/[0.06]';
   return (
-    <Panel title="Onde está o gargalo" hint="do pior para o melhor">
-      <div
-        className={`px-[18px] py-4 border-b border-line ${
-          gargalo ? (gargalo.nivel === 'ruim' ? 'bg-red/[0.06]' : 'bg-yel/[0.06]') : 'bg-grn/[0.06]'
-        }`}
-      >
-        <div className={`text-[11px] font-bold tracking-[0.13em] uppercase ${gargalo ? (gargalo.nivel === 'ruim' ? 'text-red' : 'text-yel') : 'text-grn'}`}>
-          {gargalo ? 'O gargalo agora' : 'Tudo dentro das metas'}
+    <Panel title="Onde está o gargalo">
+      <div className={`px-[18px] py-5 flex items-start gap-3 ${fundo}`}>
+        <Icone size={20} className={`${cor} shrink-0 mt-[2px]`} />
+        <div className="min-w-0">
+          <div className={`text-[11px] font-bold tracking-[0.13em] uppercase ${cor}`}>
+            {gargalo ? 'O gargalo agora' : 'Tudo dentro das metas'}
+          </div>
+          <div className="text-[15px] text-tx font-semibold mt-1">
+            {gargalo ? gargalo.titulo : 'Nenhuma meta fora do lugar neste período.'}
+          </div>
+          {gargalo && <div className="text-[12.5px] text-dim mt-1.5 leading-relaxed">{gargalo.texto}</div>}
         </div>
-        <div className="text-[14px] text-tx font-semibold mt-1">{gargalo ? gargalo.titulo : 'Nenhuma meta fora do lugar neste período.'}</div>
-        {gargalo && <div className="text-[12px] text-dim mt-1 leading-relaxed">{gargalo.texto}</div>}
-      </div>
-      <div className="divide-y divide-line">
-        {diagnosticos
-          .filter((d) => d !== gargalo)
-          .map((d) => {
-            const Icone = d.nivel === 'ok' ? CircleCheck : d.nivel === 'ruim' ? TriangleAlert : CircleAlert;
-            const cor = d.nivel === 'ok' ? 'text-grn' : d.nivel === 'ruim' ? 'text-red' : 'text-yel';
-            return (
-              <div key={d.titulo} className="px-[18px] py-3 flex items-start gap-2.5">
-                <Icone size={15} className={`${cor} shrink-0 mt-[2px]`} />
-                <div className="min-w-0">
-                  <div className="text-[12.5px] text-tx">{d.titulo}</div>
-                  <div className="text-[11px] text-dim2 leading-relaxed">{d.texto}</div>
-                </div>
-              </div>
-            );
-          })}
       </div>
     </Panel>
   );
