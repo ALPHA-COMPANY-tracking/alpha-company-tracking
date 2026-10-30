@@ -16,6 +16,7 @@ import {
   mixDeTratamentos,
   periodoDoMes,
   rotuloPeriodo,
+  simularCpa,
 } from '@/lib/metasOperacao';
 
 type Cor = 'grn' | 'yel' | 'red' | null;
@@ -320,14 +321,14 @@ function Delta({ valor, sobeEhBom }: { valor: number | null; sobeEhBom: boolean 
 
 /** Só O gargalo — o pior problema da operação agora (pedido do Jonas: uma
  *  única resposta, não a lista do pior para o melhor). */
-export function PainelGargalo({ diagnosticos }: { diagnosticos: Diagnostico[] }) {
+export function PainelGargalo({ diagnosticos, foto, metas }: { diagnosticos: Diagnostico[]; foto: Fotografia; metas: Metas }) {
   const gargalo = diagnosticos.find((d) => d.nivel !== 'ok');
   const Icone = !gargalo ? CircleCheck : gargalo.nivel === 'ruim' ? TriangleAlert : CircleAlert;
   const cor = !gargalo ? 'text-grn' : gargalo.nivel === 'ruim' ? 'text-red' : 'text-yel';
   const fundo = !gargalo ? 'bg-grn/[0.06]' : gargalo.nivel === 'ruim' ? 'bg-red/[0.06]' : 'bg-yel/[0.06]';
   return (
     <Panel title="Onde está o gargalo">
-      <div className={`px-[18px] py-5 flex items-start gap-3 ${fundo}`}>
+      <div className={`px-[18px] py-5 flex items-start gap-3 border-b border-line ${fundo}`}>
         <Icone size={20} className={`${cor} shrink-0 mt-[2px]`} />
         <div className="min-w-0">
           <div className={`text-[11px] font-bold tracking-[0.13em] uppercase ${cor}`}>
@@ -339,7 +340,101 @@ export function PainelGargalo({ diagnosticos }: { diagnosticos: Diagnostico[] })
           {gargalo && <div className="text-[12.5px] text-dim mt-1.5 leading-relaxed">{gargalo.texto}</div>}
         </div>
       </div>
+      <ResolverProblema foto={foto} metas={metas} />
     </Panel>
+  );
+}
+
+/** "E se o CPA fosse X?" — os dados do período com outro custo por
+ *  agendamento (a meta, o empate ou um valor digitado). */
+function ResolverProblema({ foto, metas }: { foto: Fotografia; metas: Metas }) {
+  const [cpa, setCpa] = useState(metas.cpa_agendamento);
+  const sim = useMemo(() => simularCpa(foto, cpa), [foto, cpa]);
+  const semDados = foto.qtd_agendados === 0;
+  const chip = (sel: boolean) =>
+    `px-2.5 py-[4px] rounded-lg text-[11px] font-semibold border transition-colors ${
+      sel ? 'bg-chip text-tx border-gold/50' : 'text-dim border-line2 hover:text-tx'
+    }`;
+  const atalhos = [
+    { rotulo: `Meta ${formatBRL(metas.cpa_agendamento)}`, valor: metas.cpa_agendamento },
+    ...(foto.anuncio_empate > 0 ? [{ rotulo: `Empate ${formatBRL(foto.cpa_empate)}`, valor: foto.cpa_empate }] : []),
+  ];
+  const corMeta = (bate: boolean) => (bate ? 'text-grn' : 'text-red');
+  return (
+    <div className="px-[18px] py-4">
+      <div className="text-[11px] font-bold tracking-[0.13em] uppercase text-gold2">Resolver o problema</div>
+      <div className="text-[12px] text-dim mt-1">E se cada agendamento custasse:</div>
+      <div className="flex flex-wrap items-center gap-2 mt-2">
+        <div className="w-[150px]">
+          <MoneyInput cents={cpa} onChange={setCpa} />
+        </div>
+        {atalhos.map((a) => (
+          <button key={a.rotulo} onClick={() => setCpa(a.valor)} className={chip(cpa === a.valor)}>
+            {a.rotulo}
+          </button>
+        ))}
+      </div>
+
+      {semDados || cpa <= 0 ? (
+        <div className="text-[12px] text-dim2 mt-3">{semDados ? 'Sem agendamentos no período para simular.' : 'Digite um valor.'}</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <Resultado
+              rotulo="Anúncio no período"
+              valor={formatBRL(sim.anuncio)}
+              cor="text-tx"
+              nota={
+                sim.economia >= 0
+                  ? `${formatBRL(sim.economia)} a menos que o real (${formatBRL(foto.anuncio)})`
+                  : `${formatBRL(-sim.economia)} a mais que o real (${formatBRL(foto.anuncio)})`
+              }
+            />
+            <Resultado
+              rotulo="Lucro real"
+              valor={formatBRL(sim.lucro_real)}
+              cor={sim.lucro_real >= 0 ? 'text-grn' : 'text-red'}
+              nota={`margem ${formatPercent(sim.margem)} · hoje ${formatBRL(foto.lucro_real)}`}
+            />
+            <Resultado
+              rotulo="ROAS agendado"
+              valor={formatMultiplier(sim.roas_agendado)}
+              cor={corMeta(sim.roas_agendado >= metas.roas_agendado)}
+              nota={`meta ${formatMultiplier(metas.roas_agendado)} · hoje ${formatMultiplier(foto.roas_agendado)}`}
+            />
+            <Resultado
+              rotulo="ROAS aprovado"
+              valor={formatMultiplier(sim.roas_aprovado)}
+              cor={corMeta(sim.roas_aprovado >= metas.roas_aprovado)}
+              nota={`meta ${formatMultiplier(metas.roas_aprovado)} · hoje ${formatMultiplier(foto.roas_aprovado)}`}
+            />
+          </div>
+          {foto.anuncio > 0 && (
+            <div className="text-[11.5px] text-dim mt-3 leading-relaxed">
+              Ou, gastando os mesmos {formatBRL(foto.anuncio)} de anúncio, esse CPA daria{' '}
+              <b className="text-tx">{sim.agendamentos_mesmo_anuncio} agendamentos</b> no período
+              {sim.agendamentos_mesmo_anuncio > foto.qtd_agendados &&
+                ` (${sim.agendamentos_mesmo_anuncio - foto.qtd_agendados} a mais que os ${foto.qtd_agendados} de hoje)`}
+              .
+            </div>
+          )}
+          <div className="text-[10.5px] text-dim2 mt-2 leading-relaxed">
+            Mesmos {foto.qtd_agendados} agendamentos, mesma conversão em pagamento, mesmos custos e frustração do período — só o
+            custo do anúncio muda.
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Resultado({ rotulo, valor, cor, nota }: { rotulo: string; valor: string; cor: string; nota: string }) {
+  return (
+    <div className="rounded-[12px] border border-line bg-card2 px-3 py-2.5 min-w-0">
+      <div className="text-[10.5px] text-dim">{rotulo}</div>
+      <div className={`mono text-[17px] lg:text-[19px] font-extrabold tracking-tight leading-tight mt-0.5 ${cor}`}>{valor}</div>
+      <div className="text-[10px] text-dim2 leading-snug mt-0.5">{nota}</div>
+    </div>
   );
 }
 

@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AfterpayDaily, Pedido } from '@/types';
 import { calcularPnl } from '@/lib/pnl';
-import { METAS, diagnosticar, fotografar, mesAnterior, mesesDoPlano, mixDeTratamentos, normalizarMetas, periodoDoMes, rotuloPeriodo } from '@/lib/metasOperacao';
+import { METAS, diagnosticar, fotografar, mesAnterior, mesesDoPlano, mixDeTratamentos, normalizarMetas, periodoDoMes, rotuloPeriodo, simularCpa } from '@/lib/metasOperacao';
 
 const OUT = { inicio: '2026-10-01', fim: '2026-10-31' };
 
@@ -150,5 +150,36 @@ describe('sem empate', () => {
     expect(cpa.nivel).toBe('ruim');
     expect(cpa.texto).toMatch(/não há CPA que feche no lucro/);
     expect(diagnosticar(f, f).find((d) => /agendado \(ROAS\)/.test(d.titulo))!.nivel).toBe('ruim');
+  });
+});
+
+describe('resolver o problema: e se o CPA fosse outro', () => {
+  const pedidos = [
+    ped('pagos', 'DERMAX PREMIUM - 6 POTE', 735, { data_aprovacao: '2026-10-05' }),
+    ped('pagos', 'DERMAX PREMIUM - 6 POTE', 735, { data_aprovacao: '2026-10-06' }),
+    ped('enviados', 'DERMAX PREMIUM - 6 POTE', 735),
+    ped('enviados', 'DERMAX PREMIUM - 6 POTE', 735),
+  ];
+  const f = fotografar([dia('2026-10-05', 1200)], [], pedidos, OUT); // CPA real R$ 300
+
+  it('com o CPA de hoje, dá o lucro real de hoje', () => {
+    const s = simularCpa(f, f.cpa_agendamento);
+    expect(s.anuncio).toBe(f.anuncio);
+    expect(s.economia).toBe(0);
+    expect(s.lucro_real).toBe(f.lucro_real);
+  });
+
+  it('com a meta (R$ 150): metade do anúncio, o lucro sobe o que se economizou', () => {
+    const s = simularCpa(f, 15_000);
+    expect(s.anuncio).toBe(60_000);
+    expect(s.economia).toBe(60_000);
+    expect(s.lucro_real).toBe(f.lucro_real + 60_000);
+    expect(s.roas_agendado).toBeCloseTo((4 * 73_500) / 60_000, 6);
+    expect(s.roas_aprovado).toBeCloseTo((2 * 73_500) / 60_000, 6);
+    expect(s.agendamentos_mesmo_anuncio).toBe(8); // R$ 1.200 ÷ R$ 150
+  });
+
+  it('com o CPA de empate, o lucro fica em zero', () => {
+    expect(Math.abs(simularCpa(f, f.cpa_empate).lucro_real)).toBeLessThanOrEqual(4); // arredondamento por agendamento
   });
 });

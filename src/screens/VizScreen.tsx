@@ -203,7 +203,7 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
       <PainelMetas atual={fotoAtual} anterior={fotoAnterior} metas={metas} onSalvar={salvarMetas} onRestaurar={restaurarMetas} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
-        <PainelGargalo diagnosticos={diagnosticos} />
+        <PainelGargalo diagnosticos={diagnosticos} foto={fotoAtual} metas={metas} />
         <PainelTratamentos pedidos={pedidos} hoje={hojeIso()} />
       </div>
 

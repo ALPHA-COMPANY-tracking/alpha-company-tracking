@@ -84,6 +84,10 @@ export interface Fotografia {
   entregues_sem_pagar: { qtd: number; valor: Cents };
   lucro_real: Cents;
   margem_real: number;
+  /** O lucro real antes de pagar o anúncio (e o imposto dele). */
+  sobra_antes_do_anuncio: Cents;
+  /** Imposto do anúncio por real de anúncio (taxas_investimento ÷ anúncio). */
+  taxa_anuncio: number;
   /** O anúncio que zera o lucro real: tudo o que sobra antes do anúncio. */
   anuncio_empate: Cents;
   /** Até quanto cada agendamento pode custar sem prejuízo. */
@@ -117,6 +121,8 @@ export function fotografar(dailies: AfterpayDaily[], custos: CustoVariavel[], pe
     entregues_sem_pagar: ind.situacao.aguardando,
     lucro_real: pnl.lucro_real,
     margem_real: pnl.margem_real,
+    sobra_antes_do_anuncio: sobraAntesDoAnuncio,
+    taxa_anuncio: taxaDoAnuncio,
     anuncio_empate,
     cpa_empate: pnl.qtd_agendados ? Math.round(anuncio_empate / pnl.qtd_agendados) : 0,
     // Sem sobra antes do anúncio não existe empate: nenhum retorno basta.
@@ -214,6 +220,41 @@ export function mixDeTratamentos(pedidos: Pedido[], periodo: Periodo): LinhaTrat
   return [...grupos.values()]
     .map((g) => ({ ...g, pct: safeDiv(g.qtd, total), ticket: g.qtd ? Math.round(g.valor / g.qtd) : 0, pct_pagos: safeDiv(g.pagos, g.qtd) }))
     .sort((a, b) => (b.meses ?? -1) - (a.meses ?? -1));
+}
+
+// ── Resolver o problema: e se o CPA fosse outro? ────────────
+
+export interface Simulacao {
+  cpa: Cents;
+  /** Anúncio do período com esse CPA, nos mesmos agendamentos. */
+  anuncio: Cents;
+  /** Quanto se gastaria a menos (negativo = a mais) que o anúncio real. */
+  economia: Cents;
+  lucro_real: Cents;
+  margem: number;
+  roas_agendado: number;
+  roas_aprovado: number;
+  /** Com o MESMO anúncio do período, quantos agendamentos esse CPA daria. */
+  agendamentos_mesmo_anuncio: number;
+}
+
+/**
+ * Os dados do período com outro CPA: mesmos agendamentos, mesma conversão,
+ * mesmos custos — só o custo do anúncio muda.
+ */
+export function simularCpa(f: Fotografia, cpa: Cents): Simulacao {
+  const anuncio = cpa * f.qtd_agendados;
+  const lucro_real = f.sobra_antes_do_anuncio - Math.round(anuncio * (1 + f.taxa_anuncio));
+  return {
+    cpa,
+    anuncio,
+    economia: f.anuncio - anuncio,
+    lucro_real,
+    margem: safeDiv(lucro_real, f.receita),
+    roas_agendado: safeDiv(f.valor_agendado, anuncio),
+    roas_aprovado: safeDiv(f.receita, anuncio),
+    agendamentos_mesmo_anuncio: cpa > 0 ? Math.floor(f.anuncio / cpa) : 0,
+  };
 }
 
 // ── Gargalo ─────────────────────────────────────────────────
