@@ -1,9 +1,22 @@
 // Metas × operação, gargalo e tratamentos — mês contra mês (tela Indicadores).
-import { CircleAlert, CircleCheck, TriangleAlert } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { CircleAlert, CircleCheck, Pencil, TriangleAlert } from 'lucide-react';
+import type { Pedido } from '@/types';
 import { Panel } from '@/components/ui';
+import { MoneyInput } from '@/components/MoneyInput';
 import { type Cents, formatBRL, formatMultiplier, formatPercent } from '@/lib/money';
 import { variacao } from '@/lib/tendencia';
-import { type Diagnostico, type Fotografia, type LinhaTratamento, METAS, rotuloPeriodo } from '@/lib/metasOperacao';
+import {
+  type Diagnostico,
+  type Fotografia,
+  type LinhaTratamento,
+  type Metas,
+  METAS,
+  mesAnterior,
+  mixDeTratamentos,
+  periodoDoMes,
+  rotuloPeriodo,
+} from '@/lib/metasOperacao';
 
 type Cor = 'grn' | 'yel' | 'red' | null;
 const COR_TEXTO: Record<Exclude<Cor, null>, string> = { grn: 'text-grn', yel: 'text-yel', red: 'text-red' };
@@ -26,7 +39,20 @@ interface Linha {
   sobeEhBom: boolean | null;
 }
 
-export function PainelMetas({ atual, anterior }: { atual: Fotografia; anterior: Fotografia }) {
+export function PainelMetas({
+  atual,
+  anterior,
+  metas,
+  onSalvar,
+  onRestaurar,
+}: {
+  atual: Fotografia;
+  anterior: Fotografia;
+  metas: Metas;
+  onSalvar: (m: Metas) => void;
+  onRestaurar: () => void;
+}) {
+  const [editando, setEditando] = useState(false);
   const temAnuncio = atual.anuncio > 0;
   const linhas: Linha[] = [
     {
@@ -79,9 +105,9 @@ export function PainelMetas({ atual, anterior }: { atual: Fotografia; anterior: 
       nota: 'anúncio ÷ agendamentos',
       atual: formatBRL(atual.cpa_agendamento),
       anterior: formatBRL(anterior.cpa_agendamento),
-      meta: `até ${formatBRL(METAS.cpa_agendamento)}`,
-      empate: `até ${formatBRL(atual.cpa_empate)}`,
-      cor: temAnuncio ? corPorMeta(atual.cpa_agendamento <= METAS.cpa_agendamento, atual.cpa_agendamento <= atual.cpa_empate) : null,
+      meta: `até ${formatBRL(metas.cpa_agendamento)}`,
+      empate: atual.anuncio_empate > 0 ? `até ${formatBRL(atual.cpa_empate)}` : 'sem empate',
+      cor: temAnuncio ? corPorMeta(atual.cpa_agendamento <= metas.cpa_agendamento, atual.cpa_agendamento <= atual.cpa_empate) : null,
       delta: variacao(atual.cpa_agendamento, anterior.cpa_agendamento),
       sobeEhBom: false,
     },
@@ -90,9 +116,9 @@ export function PainelMetas({ atual, anterior }: { atual: Fotografia; anterior: 
       nota: 'agendado ÷ anúncio',
       atual: formatMultiplier(atual.roas_agendado),
       anterior: formatMultiplier(anterior.roas_agendado),
-      meta: `mín. ${formatMultiplier(METAS.roas_agendado)}`,
-      empate: `mín. ${formatMultiplier(atual.roas_agendado_empate)}`,
-      cor: temAnuncio ? corPorMeta(atual.roas_agendado >= METAS.roas_agendado, atual.roas_agendado >= atual.roas_agendado_empate) : null,
+      meta: `mín. ${formatMultiplier(metas.roas_agendado)}`,
+      empate: Number.isFinite(atual.roas_agendado_empate) ? `mín. ${formatMultiplier(atual.roas_agendado_empate)}` : 'sem empate',
+      cor: temAnuncio ? corPorMeta(atual.roas_agendado >= metas.roas_agendado, atual.roas_agendado >= atual.roas_agendado_empate) : null,
       delta: variacao(atual.roas_agendado, anterior.roas_agendado),
       sobeEhBom: true,
     },
@@ -101,9 +127,9 @@ export function PainelMetas({ atual, anterior }: { atual: Fotografia; anterior: 
       nota: 'recebido ÷ anúncio',
       atual: formatMultiplier(atual.roas_aprovado),
       anterior: formatMultiplier(anterior.roas_aprovado),
-      meta: `mín. ${formatMultiplier(METAS.roas_aprovado)}`,
-      empate: `mín. ${formatMultiplier(atual.roas_aprovado_empate)}`,
-      cor: temAnuncio ? corPorMeta(atual.roas_aprovado >= METAS.roas_aprovado, atual.roas_aprovado >= atual.roas_aprovado_empate) : null,
+      meta: `mín. ${formatMultiplier(metas.roas_aprovado)}`,
+      empate: Number.isFinite(atual.roas_aprovado_empate) ? `mín. ${formatMultiplier(atual.roas_aprovado_empate)}` : 'sem empate',
+      cor: temAnuncio ? corPorMeta(atual.roas_aprovado >= metas.roas_aprovado, atual.roas_aprovado >= atual.roas_aprovado_empate) : null,
       delta: variacao(atual.roas_aprovado, anterior.roas_aprovado),
       sobeEhBom: true,
     },
@@ -121,8 +147,8 @@ export function PainelMetas({ atual, anterior }: { atual: Fotografia; anterior: 
       nota: 'devolvido, roubo… dos agendados (sem cancelado)',
       atual: formatPercent(atual.pct_frustracao),
       anterior: formatPercent(anterior.pct_frustracao),
-      meta: `até ${formatPercent(METAS.frustracao, 0)}`,
-      cor: atual.qtd_agendados ? (atual.pct_frustracao <= METAS.frustracao ? 'grn' : 'red') : null,
+      meta: `até ${formatPercent(metas.frustracao, 0)}`,
+      cor: atual.qtd_agendados ? (atual.pct_frustracao <= metas.frustracao ? 'grn' : 'red') : null,
       delta: variacao(atual.pct_frustracao, anterior.pct_frustracao),
       sobeEhBom: false,
     },
@@ -138,7 +164,36 @@ export function PainelMetas({ atual, anterior }: { atual: Fotografia; anterior: 
   ];
 
   return (
-    <Panel title="Metas × operação" hint={`${rotuloPeriodo(atual.periodo)} contra ${rotuloPeriodo(anterior.periodo)}`}>
+    <Panel
+      title="Metas × operação"
+      right={
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="hidden sm:inline text-[11.5px] text-dim2 truncate">
+            {rotuloPeriodo(atual.periodo)} contra {rotuloPeriodo(anterior.periodo)}
+          </span>
+          <button
+            onClick={() => setEditando((v) => !v)}
+            className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-[5px] rounded-lg text-[11.5px] font-semibold text-gold2 border border-gold/40 hover:bg-gold/10"
+          >
+            <Pencil size={12} /> Editar metas
+          </button>
+        </div>
+      }
+    >
+      {editando && (
+        <EditorMetas
+          metas={metas}
+          onSalvar={(m) => {
+            onSalvar(m);
+            setEditando(false);
+          }}
+          onRestaurar={() => {
+            onRestaurar();
+            setEditando(false);
+          }}
+          onCancelar={() => setEditando(false)}
+        />
+      )}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[660px] text-[12.5px]">
           <thead>
@@ -178,6 +233,77 @@ export function PainelMetas({ atual, anterior }: { atual: Fotografia; anterior: 
         frustração sobem até ele se resolver.
       </div>
     </Panel>
+  );
+}
+
+/** "2,5" / "2.5" → 2.5; vazio ou inválido → NaN (volta para o padrão ao salvar). */
+const numero = (s: string) => Number(s.replace(/\s/g, '').replace(',', '.'));
+const decimal = (x: number) => x.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+
+/** As metas, editáveis. Ficam guardadas neste navegador. */
+function EditorMetas({
+  metas,
+  onSalvar,
+  onRestaurar,
+  onCancelar,
+}: {
+  metas: Metas;
+  onSalvar: (m: Metas) => void;
+  onRestaurar: () => void;
+  onCancelar: () => void;
+}) {
+  const [roasAgendado, setRoasAgendado] = useState(decimal(metas.roas_agendado));
+  const [cpa, setCpa] = useState(metas.cpa_agendamento);
+  const [roasAprovado, setRoasAprovado] = useState(decimal(metas.roas_aprovado));
+  const [frustracao, setFrustracao] = useState(decimal(metas.frustracao * 100));
+  const campo = 'w-full bg-card2 border border-line2 rounded-[10px] px-3 py-[10px] text-tx mono text-[15px] outline-none focus:border-gold';
+  return (
+    <div className="px-[18px] py-4 border-b border-line bg-gold/[0.04]">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <label className="flex flex-col gap-1 min-w-0">
+          <span className="text-[11px] text-dim">ROAS agendado mínimo</span>
+          <input inputMode="decimal" value={roasAgendado} onChange={(e) => setRoasAgendado(e.target.value)} className={campo} />
+          <span className="text-[10px] text-dim2">padrão {formatMultiplier(METAS.roas_agendado)}</span>
+        </label>
+        <label className="flex flex-col gap-1 min-w-0">
+          <span className="text-[11px] text-dim">CPA por agendamento máximo</span>
+          <MoneyInput cents={cpa} onChange={setCpa} />
+          <span className="text-[10px] text-dim2">padrão {formatBRL(METAS.cpa_agendamento)}</span>
+        </label>
+        <label className="flex flex-col gap-1 min-w-0">
+          <span className="text-[11px] text-dim">ROAS aprovado mínimo</span>
+          <input inputMode="decimal" value={roasAprovado} onChange={(e) => setRoasAprovado(e.target.value)} className={campo} />
+          <span className="text-[10px] text-dim2">padrão {formatMultiplier(METAS.roas_aprovado)}</span>
+        </label>
+        <label className="flex flex-col gap-1 min-w-0">
+          <span className="text-[11px] text-dim">Frustração máxima (%)</span>
+          <input inputMode="decimal" value={frustracao} onChange={(e) => setFrustracao(e.target.value)} className={campo} />
+          <span className="text-[10px] text-dim2">padrão {formatPercent(METAS.frustracao, 0)}</span>
+        </label>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 mt-3">
+        <button
+          onClick={() =>
+            onSalvar({
+              roas_agendado: numero(roasAgendado),
+              cpa_agendamento: cpa,
+              roas_aprovado: numero(roasAprovado),
+              frustracao: numero(frustracao) / 100,
+            })
+          }
+          className="px-3 py-[6px] rounded-lg text-[12px] font-bold bg-gold text-black hover:brightness-110"
+        >
+          Salvar metas
+        </button>
+        <button onClick={onCancelar} className="px-3 py-[6px] rounded-lg text-[12px] text-dim2 hover:text-tx">
+          Cancelar
+        </button>
+        <button onClick={onRestaurar} className="ml-auto px-3 py-[6px] rounded-lg text-[12px] text-dim2 hover:text-tx">
+          Voltar ao padrão
+        </button>
+      </div>
+      <div className="text-[10.5px] text-dim2 mt-2">As metas ficam guardadas neste navegador, como a meta diária.</div>
+    </div>
   );
 }
 
@@ -228,21 +354,57 @@ export function PainelGargalo({ diagnosticos }: { diagnosticos: Diagnostico[] })
   );
 }
 
-export function PainelTratamentos({
-  atual,
-  anterior,
-  rotuloAnterior,
-}: {
-  atual: LinhaTratamento[];
-  anterior: LinhaTratamento[];
-  rotuloAnterior: string;
-}) {
+type Escolha = 'atual' | 'anterior' | 'mes';
+
+/** 'YYYY-MM' do mês anterior a 'YYYY-MM'. */
+function mesAntes(mes: string): string {
+  const [y, m] = mes.split('-').map(Number);
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+}
+
+/** Mais vendidos de um mês — o atual (até hoje), o anterior ou um à escolha —
+ *  contra o mês de antes dele. Independente do período do topo da tela. */
+export function PainelTratamentos({ pedidos, hoje }: { pedidos: Pedido[]; hoje: string }) {
+  const mesAtual = hoje.slice(0, 7);
+  const [escolha, setEscolha] = useState<Escolha>('atual');
+  const [mesEscolhido, setMesEscolhido] = useState(mesAntes(mesAntes(mesAtual)));
+  const mes = escolha === 'atual' ? mesAtual : escolha === 'anterior' ? mesAntes(mesAtual) : mesEscolhido;
+  const periodo = useMemo(() => periodoDoMes(mes, hoje), [mes, hoje]);
+  const periodoAntes = useMemo(() => mesAnterior(periodo), [periodo]);
+  const atual = useMemo(() => mixDeTratamentos(pedidos, periodo), [pedidos, periodo]);
+  const anterior = useMemo(() => mixDeTratamentos(pedidos, periodoAntes), [pedidos, periodoAntes]);
+  const rotuloAnterior = rotuloPeriodo(periodoAntes);
   const maisVendido = atual.reduce<LinhaTratamento | null>((m, l) => (!m || l.qtd > m.qtd ? l : m), null);
   const pctAntes = (meses: number | null) => anterior.find((l) => l.meses === meses)?.pct ?? 0;
+  const botao = (sel: boolean) =>
+    `px-2.5 py-[5px] rounded-lg text-[11.5px] font-semibold border transition-colors ${
+      sel ? 'bg-chip text-tx border-gold/50' : 'text-dim border-line2 hover:text-tx'
+    }`;
   return (
-    <Panel title="Tratamentos mais vendidos" hint="agendamentos do período">
+    <Panel title="Tratamentos mais vendidos" hint={rotuloPeriodo(periodo)}>
+      <div className="px-[18px] py-2.5 border-b border-line flex flex-wrap items-center gap-1.5">
+        <button onClick={() => setEscolha('atual')} className={botao(escolha === 'atual')}>
+          Mês atual
+        </button>
+        <button onClick={() => setEscolha('anterior')} className={botao(escolha === 'anterior')}>
+          Mês anterior
+        </button>
+        <button onClick={() => setEscolha('mes')} className={botao(escolha === 'mes')}>
+          Personalizado
+        </button>
+        {escolha === 'mes' && (
+          <input
+            type="month"
+            value={mesEscolhido}
+            max={mesAtual}
+            onChange={(e) => e.target.value && setMesEscolhido(e.target.value)}
+            className="bg-card2 border border-line2 rounded-lg px-2 py-[4px] text-[12px] text-tx outline-none focus:border-gold [color-scheme:dark]"
+          />
+        )}
+        <span className="text-[11px] text-dim2 ml-auto">contra {rotuloAnterior}</span>
+      </div>
       {atual.length === 0 ? (
-        <div className="px-[18px] py-10 text-center text-[12.5px] text-dim2">Nenhum agendamento no período.</div>
+        <div className="px-[18px] py-10 text-center text-[12.5px] text-dim2">Nenhum agendamento em {rotuloPeriodo(periodo)}.</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[520px] text-[12.5px]">
@@ -306,7 +468,7 @@ export function PainelTratamentos({
         </div>
       )}
       <div className="px-[18px] py-3 border-t border-line text-[10.5px] text-dim2 leading-relaxed">
-        Pelos pedidos agendados no período (os mesmos do Faturamento Agendado). "Já pagos" é dos agendados deste período —
+        Pelos pedidos agendados no mês escolhido (os mesmos do Faturamento Agendado). "Já pagos" é dos agendados deste período —
         em mês em andamento ainda sobe. "vs" mostra se o tratamento ganhou ou perdeu espaço no mix (pontos percentuais).
       </div>
     </Panel>

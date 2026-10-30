@@ -11,12 +11,13 @@ import {
 } from 'lucide-react';
 import type { Periodo } from '@/types';
 import { type Cents, formatBRL, formatMultiplier, formatPercent } from '@/lib/money';
-import { formatDiaMes } from '@/lib/dates';
+import { formatDiaMes, hojeIso } from '@/lib/dates';
 import { calcularIndicadores } from '@/lib/indicadores';
 import { useData } from '@/store/DataProvider';
 import { KpiCard, Panel } from '@/components/ui';
 import { PainelGargalo, PainelMetas, PainelTratamentos } from '@/components/viz/MetasOperacao';
-import { diagnosticar, fotografar, mesAnterior, mixDeTratamentos, rotuloPeriodo } from '@/lib/metasOperacao';
+import { diagnosticar, fotografar, mesAnterior } from '@/lib/metasOperacao';
+import { useMetas } from '@/store/useMetas';
 import { COR } from '@/lib/cores';
 
 /**
@@ -35,9 +36,8 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
   const anterior = useMemo(() => mesAnterior(periodo), [periodo]);
   const fotoAtual = useMemo(() => fotografar(dailies, custos, pedidos, periodo), [dailies, custos, pedidos, periodo]);
   const fotoAnterior = useMemo(() => fotografar(dailies, custos, pedidos, anterior), [dailies, custos, pedidos, anterior]);
-  const diagnosticos = useMemo(() => diagnosticar(fotoAtual, fotoAnterior), [fotoAtual, fotoAnterior]);
-  const mixAtual = useMemo(() => mixDeTratamentos(pedidos, periodo), [pedidos, periodo]);
-  const mixAnterior = useMemo(() => mixDeTratamentos(pedidos, anterior), [pedidos, anterior]);
+  const [metas, salvarMetas, restaurarMetas] = useMetas();
+  const diagnosticos = useMemo(() => diagnosticar(fotoAtual, fotoAnterior, metas), [fotoAtual, fotoAnterior, metas]);
 
   // Pagos = pagamentos do período (mesmo número do card de Pagamentos
   // aprovados). O resto é onde estão hoje os pedidos agendados no período.
@@ -200,11 +200,11 @@ export function VizScreen({ periodo }: { periodo: Periodo }) {
         />
       </div>
 
-      <PainelMetas atual={fotoAtual} anterior={fotoAnterior} />
+      <PainelMetas atual={fotoAtual} anterior={fotoAnterior} metas={metas} onSalvar={salvarMetas} onRestaurar={restaurarMetas} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
         <PainelGargalo diagnosticos={diagnosticos} />
-        <PainelTratamentos atual={mixAtual} anterior={mixAnterior} rotuloAnterior={rotuloPeriodo(anterior)} />
+        <PainelTratamentos pedidos={pedidos} hoje={hojeIso()} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">

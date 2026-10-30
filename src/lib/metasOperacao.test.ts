@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AfterpayDaily, Pedido } from '@/types';
 import { calcularPnl } from '@/lib/pnl';
-import { METAS, diagnosticar, fotografar, mesAnterior, mesesDoPlano, mixDeTratamentos, rotuloPeriodo } from '@/lib/metasOperacao';
+import { METAS, diagnosticar, fotografar, mesAnterior, mesesDoPlano, mixDeTratamentos, normalizarMetas, periodoDoMes, rotuloPeriodo } from '@/lib/metasOperacao';
 
 const OUT = { inicio: '2026-10-01', fim: '2026-10-31' };
 
@@ -104,5 +104,51 @@ describe('empate: o anúncio que zera o lucro real', () => {
   it('dentro das metas: nada fora do lugar', () => {
     const barato = fotografar([dia('2026-10-05', 100)], [], pedidos, OUT); // R$ 25 por agendamento
     expect(diagnosticar(barato, barato).every((x) => x.nivel === 'ok')).toBe(true);
+  });
+});
+
+describe('metas editáveis', () => {
+  it('o padrão do Jonas: ROAS agendado 4, CPA R$ 150, ROAS aprovado 2,5, frustração 20%', () => {
+    expect(METAS).toEqual({ roas_agendado: 4, cpa_agendamento: 15_000, roas_aprovado: 2.5, frustracao: 0.2 });
+  });
+
+  it('o que foi salvo vale; campo vazio, zero ou inválido volta para o padrão', () => {
+    expect(normalizarMetas({ roas_agendado: 4.5, cpa_agendamento: 12_000, roas_aprovado: 3, frustracao: 0.15 })).toEqual({
+      roas_agendado: 4.5,
+      cpa_agendamento: 12_000,
+      roas_aprovado: 3,
+      frustracao: 0.15,
+    });
+    expect(normalizarMetas({ roas_agendado: Number.NaN, cpa_agendamento: 0, roas_aprovado: -1, frustracao: 'x' })).toEqual(METAS);
+    expect(normalizarMetas(null)).toEqual(METAS);
+  });
+
+  it('o gargalo usa as metas editadas', () => {
+    const pedidos = [ped('pagos', 'DERMAX PREMIUM - 6 POTE', 735, { data_aprovacao: '2026-10-05' }), ped('enviados', 'DERMAX PREMIUM - 6 POTE', 735)];
+    const f = fotografar([dia('2026-10-05', 300)], [], pedidos, OUT); // CPA R$ 150, ROAS agendado 4,9
+    const padrao = diagnosticar(f, f);
+    expect(padrao.find((d) => /CPA/.test(d.titulo))!.nivel).toBe('ok');
+    const exigente = diagnosticar(f, f, { ...METAS, cpa_agendamento: 10_000 });
+    expect(exigente.find((d) => /CPA/.test(d.titulo))!.nivel).not.toBe('ok');
+  });
+});
+
+describe('mês escolhido nos tratamentos', () => {
+  it('mês passado inteiro; mês corrente só até hoje', () => {
+    expect(periodoDoMes('2026-09', '2026-10-30')).toEqual({ inicio: '2026-09-01', fim: '2026-09-30' });
+    expect(periodoDoMes('2026-10', '2026-10-30')).toEqual({ inicio: '2026-10-01', fim: '2026-10-30' });
+    expect(periodoDoMes('2026-02', '2026-10-30')).toEqual({ inicio: '2026-02-01', fim: '2026-02-28' });
+  });
+});
+
+describe('sem empate', () => {
+  it('se nem sem anúncio o período fecha no lucro, não existe empate', () => {
+    const f = fotografar([dia('2026-10-05', 500)], [], [ped('enviados', 'DERMAX PREMIUM - 6 POTE', 735)], OUT);
+    expect(f.anuncio_empate).toBe(0);
+    expect(f.roas_agendado_empate).toBe(Infinity);
+    const cpa = diagnosticar(f, f).find((d) => /CPA/.test(d.titulo))!;
+    expect(cpa.nivel).toBe('ruim');
+    expect(cpa.texto).toMatch(/não há CPA que feche no lucro/);
+    expect(diagnosticar(f, f).find((d) => /agendado \(ROAS\)/.test(d.titulo))!.nivel).toBe('ruim');
   });
 });

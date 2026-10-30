@@ -18,15 +18,48 @@ import { ehFrustracao, foraDoAgendado, pedidosAtivos, statusBucket } from '@/lib
 import { periodoAnterior } from '@/lib/tendencia';
 import { FRUSTRACAO_PREVISTA } from '@/lib/previsao';
 
-/** As metas do Jonas (ROAS agendado 4 e aprovado 2,5 desde 30/10/2026). */
-export const METAS = {
+export interface Metas {
+  /** ROAS agendado mínimo. */
+  roas_agendado: number;
+  /** CPA por agendamento máximo, em centavos. */
+  cpa_agendamento: Cents;
+  /** ROAS aprovado mínimo. */
+  roas_aprovado: number;
+  /** Frustração máxima (fração). */
+  frustracao: number;
+}
+
+/** As metas-padrão do Jonas (ROAS agendado 4 e aprovado 2,5 desde
+ *  30/10/2026). Na tela dá para editar — ver store/useMetas. */
+export const METAS: Metas = {
   roas_agendado: 4,
   /** Em centavos: R$ 150,00 por agendamento. */
   cpa_agendamento: 15_000,
   roas_aprovado: 2.5,
   /** Frustração máxima (a mesma da Previsão). */
   frustracao: FRUSTRACAO_PREVISTA,
-} as const;
+};
+
+/** Metas salvas (editadas na tela) → metas válidas. Campo vazio, zero,
+ *  negativo ou que não é número volta para o padrão. */
+export function normalizarMetas(salvas: unknown): Metas {
+  const x = (salvas && typeof salvas === 'object' ? salvas : {}) as Record<string, unknown>;
+  const ok = (v: unknown, padrao: number) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : padrao);
+  return {
+    roas_agendado: ok(x.roas_agendado, METAS.roas_agendado),
+    cpa_agendamento: Math.round(ok(x.cpa_agendamento, METAS.cpa_agendamento)),
+    roas_aprovado: ok(x.roas_aprovado, METAS.roas_aprovado),
+    frustracao: Math.min(1, ok(x.frustracao, METAS.frustracao)),
+  };
+}
+
+/** O mês 'YYYY-MM' como período; o mês corrente vai só até hoje. */
+export function periodoDoMes(mes: string, hoje: string): Periodo {
+  const [y, m] = mes.split('-').map(Number);
+  const inicio = primeiroDiaMes(y, m);
+  const fim = ultimoDiaMes(y, m);
+  return { inicio, fim: hoje >= inicio && hoje < fim ? hoje : fim };
+}
 
 /** Tudo que a tela compara, de um período. */
 export interface Fotografia {
@@ -86,8 +119,9 @@ export function fotografar(dailies: AfterpayDaily[], custos: CustoVariavel[], pe
     margem_real: pnl.margem_real,
     anuncio_empate,
     cpa_empate: pnl.qtd_agendados ? Math.round(anuncio_empate / pnl.qtd_agendados) : 0,
-    roas_agendado_empate: safeDiv(pnl.valor_agendado, anuncio_empate),
-    roas_aprovado_empate: safeDiv(pnl.receita_aprovada, anuncio_empate),
+    // Sem sobra antes do anúncio não existe empate: nenhum retorno basta.
+    roas_agendado_empate: anuncio_empate > 0 ? pnl.valor_agendado / anuncio_empate : Infinity,
+    roas_aprovado_empate: anuncio_empate > 0 ? pnl.receita_aprovada / anuncio_empate : Infinity,
   };
 }
 
@@ -196,42 +230,45 @@ const brl = (c: Cents) => (c / 100).toLocaleString('pt-BR', { style: 'currency',
 const vezes = (x: number) => `${x.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}x`;
 
 /** O que está fora da meta, do pior para o melhor. O primeiro é o gargalo. */
-export function diagnosticar(atual: Fotografia, anterior: Fotografia): Diagnostico[] {
+export function diagnosticar(atual: Fotografia, anterior: Fotografia, metas: Metas = METAS): Diagnostico[] {
   const lista: (Diagnostico & { peso: number })[] = [];
   const nivelPorMeta = (bate: boolean, pagaAConta: boolean): Diagnostico['nivel'] => (bate ? 'ok' : pagaAConta ? 'atencao' : 'ruim');
 
   if (atual.qtd_agendados > 0 && atual.anuncio > 0) {
-    const acima = safeDiv(atual.cpa_agendamento - METAS.cpa_agendamento, METAS.cpa_agendamento);
+    const acima = safeDiv(atual.cpa_agendamento - metas.cpa_agendamento, metas.cpa_agendamento);
     lista.push({
-      nivel: nivelPorMeta(atual.cpa_agendamento <= METAS.cpa_agendamento, atual.cpa_agendamento <= atual.cpa_empate),
+      nivel: nivelPorMeta(atual.cpa_agendamento <= metas.cpa_agendamento, atual.cpa_agendamento <= atual.cpa_empate),
       peso: acima,
       titulo: 'Custo do anúncio (CPA por agendamento)',
       texto:
-        atual.cpa_agendamento <= METAS.cpa_agendamento
-          ? `${brl(atual.cpa_agendamento)} por agendamento, dentro da meta de ${brl(METAS.cpa_agendamento)}.`
-          : `${brl(atual.cpa_agendamento)} por agendamento — ${pct(acima)} acima da meta de ${brl(METAS.cpa_agendamento)}. ` +
-            `Com a conversão e os custos deste período, o máximo para não ter prejuízo é ${brl(atual.cpa_empate)}` +
-            (atual.cpa_agendamento > atual.cpa_empate ? ': está acima, é daí que vem o prejuízo.' : '.'),
+        atual.cpa_agendamento <= metas.cpa_agendamento
+          ? `${brl(atual.cpa_agendamento)} por agendamento, dentro da meta de ${brl(metas.cpa_agendamento)}.`
+          : `${brl(atual.cpa_agendamento)} por agendamento — ${pct(acima)} acima da meta de ${brl(metas.cpa_agendamento)}. ` +
+            (atual.anuncio_empate <= 0
+              ? 'Neste período, mesmo sem anúncio os custos passam do que entrou: não há CPA que feche no lucro.'
+              : `Com a conversão e os custos deste período, o máximo para não ter prejuízo é ${brl(atual.cpa_empate)}` +
+                (atual.cpa_agendamento > atual.cpa_empate ? ': está acima, é daí que vem o prejuízo.' : '.')),
     });
-    const falta = safeDiv(METAS.roas_agendado - atual.roas_agendado, METAS.roas_agendado);
+    const falta = safeDiv(metas.roas_agendado - atual.roas_agendado, metas.roas_agendado);
     lista.push({
-      nivel: nivelPorMeta(atual.roas_agendado >= METAS.roas_agendado, atual.roas_agendado >= atual.roas_agendado_empate),
+      nivel: nivelPorMeta(atual.roas_agendado >= metas.roas_agendado, atual.roas_agendado >= atual.roas_agendado_empate),
       peso: falta,
       titulo: 'Retorno do anúncio sobre o agendado (ROAS)',
       texto:
-        atual.roas_agendado >= METAS.roas_agendado
-          ? `${vezes(atual.roas_agendado)}, acima da meta de ${vezes(METAS.roas_agendado)}.`
-          : `${vezes(atual.roas_agendado)} contra a meta de ${vezes(METAS.roas_agendado)}; o empate desta operação é ${vezes(atual.roas_agendado_empate)}.`,
+        atual.roas_agendado >= metas.roas_agendado
+          ? `${vezes(atual.roas_agendado)}, acima da meta de ${vezes(metas.roas_agendado)}.`
+          : `${vezes(atual.roas_agendado)} contra a meta de ${vezes(metas.roas_agendado)}` +
+            (Number.isFinite(atual.roas_agendado_empate) ? `; o empate desta operação é ${vezes(atual.roas_agendado_empate)}.` : '.'),
     });
-    const faltaAprov = safeDiv(METAS.roas_aprovado - atual.roas_aprovado, METAS.roas_aprovado);
+    const faltaAprov = safeDiv(metas.roas_aprovado - atual.roas_aprovado, metas.roas_aprovado);
     lista.push({
-      nivel: nivelPorMeta(atual.roas_aprovado >= METAS.roas_aprovado, atual.roas_aprovado >= atual.roas_aprovado_empate),
+      nivel: nivelPorMeta(atual.roas_aprovado >= metas.roas_aprovado, atual.roas_aprovado >= atual.roas_aprovado_empate),
       peso: faltaAprov,
       titulo: 'Retorno do anúncio sobre o recebido (ROAS aprovado)',
       texto:
-        atual.roas_aprovado >= METAS.roas_aprovado
-          ? `${vezes(atual.roas_aprovado)}, acima da meta de ${vezes(METAS.roas_aprovado)}.`
-          : `${vezes(atual.roas_aprovado)} contra a meta de ${vezes(METAS.roas_aprovado)} — para cada R$ 1 de anúncio entraram ` +
+        atual.roas_aprovado >= metas.roas_aprovado
+          ? `${vezes(atual.roas_aprovado)}, acima da meta de ${vezes(metas.roas_aprovado)}.`
+          : `${vezes(atual.roas_aprovado)} contra a meta de ${vezes(metas.roas_aprovado)} — para cada R$ 1 de anúncio entraram ` +
             `R$ ${atual.roas_aprovado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`,
     });
   }
@@ -261,12 +298,12 @@ export function diagnosticar(atual: Fotografia, anterior: Fotografia): Diagnosti
     }
   }
 
-  if (atual.pct_frustracao > METAS.frustracao) {
+  if (atual.pct_frustracao > metas.frustracao) {
     lista.push({
       nivel: 'ruim',
-      peso: atual.pct_frustracao - METAS.frustracao,
+      peso: atual.pct_frustracao - metas.frustracao,
       titulo: 'Frustração acima do limite',
-      texto: `${pct(atual.pct_frustracao)} dos pedidos frustraram, acima do limite de ${pct(METAS.frustracao)}.`,
+      texto: `${pct(atual.pct_frustracao)} dos pedidos frustraram, acima do limite de ${pct(metas.frustracao)}.`,
     });
   }
 
