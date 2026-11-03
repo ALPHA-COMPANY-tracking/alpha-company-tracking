@@ -257,6 +257,11 @@ export function mapearPedido(
   // valor = líquido (cobrado); valor_bruto = cheio (antes do desconto)
   const v = num(pick(pagamento, 'amount', 'valor', 'value') ?? pick(produto, 'price', 'preço', 'preco'));
   if (v > 0) pedido.valor = v;
+  // Agendado = o valor ATUAL do pedido (valor − desconto), como o "Vendas" do
+  // BlueSales desde meados de out/2026: trocou o plano (6 → 3 meses) ou deu
+  // desconto, o agendado acompanha. Antes ficava congelado no 1º aviso
+  // (0008) e em 02/11/2026 sobrou R$ 300 aqui (735 → 435).
+  if (v > 0) pedido.valor_agendado = v;
   const vb = num(
     pick(pagamento, 'gross_amount', 'valor_bruto', 'amount', 'valor') ?? pick(produto, 'price', 'preço', 'preco'),
   );

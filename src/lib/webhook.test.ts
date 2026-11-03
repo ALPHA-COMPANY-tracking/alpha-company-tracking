@@ -47,6 +47,18 @@ describe('mapearPedido (payload do BlueSales)', () => {
     expect(p.valor_bruto).toBe(735);
   });
 
+  it('o agendado acompanha o valor atual do pedido (plano trocado, desconto) — como o BlueSales', () => {
+    expect(mapearPedido(ORDER_CREATE, USER)!.valor_agendado).toBe(735);
+    // Mesmo pedido, depois: trocou para 3 meses (R$ 435).
+    const trocado = mapearPedido(
+      { ...ORDER_CREATE, event: 'SHIPPING_UPDATE', payment: { amount: 435, gross_amount: 435, discount: 0, method: 'boleto' } },
+      USER,
+    )!;
+    expect(trocado.valor_agendado).toBe(435);
+    // Aviso sem valor não mexe no agendado.
+    expect('valor_agendado' in mapearPedido({ event: 'SHIPPING_UPDATE', order: { id: 'BLV-X', status: 'enviados' } }, USER)!).toBe(false);
+  });
+
   it('ainda aceita as chaves em português', () => {
     const p = mapearPedido(
       {
