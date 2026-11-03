@@ -30,6 +30,10 @@ create policy "own_insert" on public.metas_mensais for insert with check (public
 create policy "own_update" on public.metas_mensais for update using (public.pode_acessar(user_id)) with check (public.pode_acessar(user_id));
 create policy "own_delete" on public.metas_mensais for delete using (public.pode_acessar(user_id));
 
+-- Faz a API do Supabase enxergar a tabela nova na hora (sem isso o site pode
+-- continuar dizendo "Could not find the table" por alguns minutos).
+notify pgrst, 'reload schema';
+
 -- Conferência: deve dar metas_mensais = true e rls = true.
 select exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'metas_mensais') as metas_mensais,
        (select relrowsecurity from pg_class where oid = 'public.metas_mensais'::regclass) as rls;
