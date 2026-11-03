@@ -8,6 +8,7 @@ import type { AfterpayDaily, CategoriaCusto, CustoVariavel, Pedido } from '@/typ
 import type { Dataset } from '@/data/db';
 import { SEED_CATEGORIAS } from '@/data/seed';
 import { type Backend, ETAPA_SEM_PAGAMENTO, type RegiaoPedido } from '@/data/backend';
+import type { MetaMensal } from '@/lib/metasLucro';
 
 const N = (v: unknown) => Number(v ?? 0);
 
@@ -211,6 +212,38 @@ export class SupabaseBackend implements Backend {
       .update({ removido_em: removido ? new Date().toISOString() : null })
       .eq('id', id)
       .eq('user_id', this.userId);
+    if (error) throw error;
+  }
+  async carregarMetaMensal(mes: string) {
+    const { data, error } = await this.db
+      .from('metas_mensais')
+      .select('mes, premissas, faixas, resultado, updated_at')
+      .eq('user_id', this.userId)
+      .eq('mes', mes)
+      .maybeSingle();
+    if (error) throw error;
+    return data
+      ? {
+          mes: String(data.mes),
+          premissas: data.premissas as MetaMensal['premissas'],
+          faixas: data.faixas as MetaMensal['faixas'],
+          resultado: data.resultado as MetaMensal['resultado'],
+          atualizado_em: String(data.updated_at),
+        }
+      : null;
+  }
+  async salvarMetaMensal(meta: MetaMensal) {
+    const { error } = await this.db.from('metas_mensais').upsert(
+      {
+        user_id: this.userId,
+        mes: meta.mes,
+        premissas: meta.premissas,
+        faixas: meta.faixas,
+        resultado: meta.resultado,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,mes' },
+    );
     if (error) throw error;
   }
   async definirValorPago(id: string, valor: number) {

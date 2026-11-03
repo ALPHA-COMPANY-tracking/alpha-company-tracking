@@ -10,6 +10,7 @@ import { Loader2 } from 'lucide-react';
 import type { AfterpayDaily, AtendenteStat, CategoriaCusto, CustoVariavel, Pedido, PlataformaStat } from '@/types';
 import { type Dataset, novoId } from '@/data/db';
 import { type Backend, type RegiaoPedido, ETAPA_SEM_PAGAMENTO, LocalBackend, aplicarRegioes } from '@/data/backend';
+import type { MetaMensal } from '@/lib/metasLucro';
 
 interface DataContextValue {
   categorias: CategoriaCusto[];
@@ -49,6 +50,10 @@ interface DataContextValue {
   marcarSync: () => void;
   /** Re-busca todos os dados do backend (botão Atualizar). */
   recarregar: () => Promise<void>;
+  /** Metas & Lucro: a meta salva do mês ('YYYY-MM-01'), ou null. */
+  carregarMetaMensal: (mes: string) => Promise<MetaMensal | null>;
+  /** Metas & Lucro: salva (sobrescreve) a meta do mês. */
+  salvarMetaMensal: (meta: MetaMensal) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -203,6 +208,10 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
     [aplicar],
   );
 
+  // Metas & Lucro: sem estado aqui — a tela busca e salva a meta do mês.
+  const carregarMetaMensal = useCallback<DataContextValue['carregarMetaMensal']>((mes) => backendRef.current.carregarMetaMensal(mes), []);
+  const salvarMetaMensal = useCallback<DataContextValue['salvarMetaMensal']>((meta) => backendRef.current.salvarMetaMensal(meta), []);
+
   const definirValorPago = useCallback<DataContextValue['definirValorPago']>(
     (id, valor) => {
       aplicar(
@@ -320,8 +329,10 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
       lancarDailies,
       marcarSync,
       recarregar,
+      carregarMetaMensal,
+      salvarMetaMensal,
     };
-  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, definirPerdaPedido, definirTaxaPedido, removerPedido, definirValorPago, desfazerPagamento, definirClientePedido, importarRegioes, lancarDaily, lancarDailies, marcarSync, recarregar]);
+  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, definirPerdaPedido, definirTaxaPedido, removerPedido, definirValorPago, desfazerPagamento, definirClientePedido, importarRegioes, lancarDaily, lancarDailies, marcarSync, recarregar, carregarMetaMensal, salvarMetaMensal]);
 
   if (!value) {
     return (

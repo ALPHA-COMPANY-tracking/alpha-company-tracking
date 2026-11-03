@@ -5,6 +5,7 @@
 
 import type { AfterpayDaily, CategoriaCusto, CustoVariavel, Pedido } from '@/types';
 import { type Dataset, carregar, salvar } from '@/data/db';
+import type { MetaMensal } from '@/lib/metasLucro';
 
 /** Região de um pedido, pelo número dele no BlueSales (#123). */
 export interface RegiaoPedido {
@@ -41,6 +42,10 @@ export interface Backend {
   definirTaxaPedido(id: string, taxa: number | null): Promise<void>;
   /** Tira (ou devolve) uma venda da plataforma, sem apagar do banco. */
   removerPedido(id: string, removido: boolean): Promise<void>;
+  /** Meta salva de Metas & Lucro para o mês ('YYYY-MM-01'); null = nenhuma. */
+  carregarMetaMensal(mes: string): Promise<MetaMensal | null>;
+  /** Salva a meta do mês (sobrescreve a que existir). */
+  salvarMetaMensal(meta: MetaMensal): Promise<void>;
   /** Valor que de fato entrou (ex.: boleto com juros), corrigido à mão —
    *  fica travado contra o aviso do BlueSales. */
   definirValorPago(id: string, valor: number): Promise<void>;
@@ -54,6 +59,17 @@ export interface Backend {
   lancarDaily(d: AfterpayDaily): Promise<void>;
   lancarDailies(ds: AfterpayDaily[]): Promise<void>;
   marcarSync(iso: string): Promise<void>;
+}
+
+/** Metas & Lucro no modo local (sem Supabase): por mês, neste navegador. */
+const KEY_METAS = 'afterpay-pnl:metas-mensais';
+function lerMetasLocais(): Record<string, MetaMensal> {
+  try {
+    const salvas = JSON.parse(localStorage.getItem(KEY_METAS) ?? '{}');
+    return salvas && typeof salvas === 'object' ? salvas : {};
+  } catch {
+    return {};
+  }
 }
 
 /** Etapa de um pagamento desfeito quando não se sabe a de antes: entregue,
@@ -113,6 +129,16 @@ export class LocalBackend implements Backend {
       ...ds,
       pedidos: ds.pedidos.map((p) => (p.id === id ? { ...p, removido_em: quando } : p)),
     }));
+  }
+  async carregarMetaMensal(mes: string) {
+    return lerMetasLocais()[mes] ?? null;
+  }
+  async salvarMetaMensal(meta: MetaMensal) {
+    try {
+      localStorage.setItem(KEY_METAS, JSON.stringify({ ...lerMetasLocais(), [meta.mes]: { ...meta, atualizado_em: new Date().toISOString() } }));
+    } catch {
+      // Sem armazenamento (aba anônima): a meta vale só enquanto a página estiver aberta.
+    }
   }
   async definirValorPago(id: string, valor: number) {
     this.mut((ds) => ({
