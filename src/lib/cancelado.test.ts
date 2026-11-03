@@ -101,3 +101,22 @@ describe('cancelado conta no agendado, como no BlueSales', () => {
     expect(r.qtd_agendados).toBe(2);
   });
 });
+
+describe('recusado não é venda (como o "Vendas" do BlueSales, 02/11/2026)', () => {
+  const recusado = ped('r', 'recusados', 735);
+  it('fica fora do agendado, no app e no resumo do celular; cancelado continua dentro', () => {
+    const agg = agregarPedidos([valido, cancelado, recusado], P);
+    expect(agg.valor_agendado).toBe(735 + 535);
+    expect(agg.qtd_agendados).toBe(2);
+    expect(foraDoAgendado(recusado)).toBe(true);
+    expect(agendadoPorDia([valido, recusado], P)).toEqual([{ data: '2026-10-07', qtd: 1, valor: 735 }]);
+    const linha = (p: Pedido) => ({ ...p, data_aprovacao: null, valor_agendado: p.valor_agendado ?? null, produto_plano: null, vendedor: p.vendedor ?? null });
+    const r = montarResumo('2026-10-07', [linha(valido), linha(cancelado), linha(recusado)], 0, null);
+    expect(r.valor_agendado).toBe(1270);
+    expect(r.qtd_agendados).toBe(2);
+  });
+
+  it('e não é frustração (não gerou custo)', () => {
+    expect(agregarPedidos([valido, recusado], P).qtd_frustrados).toBe(0);
+  });
+});

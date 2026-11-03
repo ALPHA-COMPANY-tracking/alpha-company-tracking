@@ -72,9 +72,18 @@ export function ehFrustracao(
   return statusBucket(p.status) === 'frustrado' && !ehCancelado(p) && !perdaSemCusto(p);
 }
 
-/** O pedido fica fora do saldo agendado? (Só o cancelado, e só se a chave mandar.) */
+/** Recusado (não passou na análise): nunca foi venda. */
+export function ehRecusado(p: Pick<Pedido, 'status'>): boolean {
+  return /recus/.test(norm(p.status));
+}
+
+/**
+ * O pedido fica fora do saldo agendado? O RECUSADO sempre — o "Vendas" do
+ * BlueSales não conta (02/11/2026: 31 pedidos, 1 recusado, card com 30 e
+ * R$ 17.850). O cancelado só se a chave mandar.
+ */
 export function foraDoAgendado(p: Pick<Pedido, 'status'>, canceladoConta = CANCELADO_NO_AGENDADO): boolean {
-  return !canceladoConta && ehCancelado(p);
+  return ehRecusado(p) || (!canceladoConta && ehCancelado(p));
 }
 
 /**
