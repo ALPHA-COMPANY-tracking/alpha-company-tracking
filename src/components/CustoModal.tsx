@@ -135,7 +135,7 @@ export function CustoModal({
               onChange={(e) => setForm({ ...form, mensal: e.target.checked })}
             />
             <span className="w-[29px] h-4 rounded-full bg-line2 relative transition-colors peer-checked:bg-gold3 after:content-[''] after:absolute after:top-[2.5px] after:left-[2.5px] after:w-[11px] after:h-[11px] after:rounded-full after:bg-dim2 after:transition-all peer-checked:after:left-[15px] peer-checked:after:bg-white" />
-            Repete todo mês (rateia pelos dias do período)
+            Repete todo mês — cobrado cheio no dia {Number(form.data.slice(8, 10)) || 1} de cada mês
           </label>
 
           <Campo label="Observação (opcional)">

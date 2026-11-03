@@ -15,55 +15,36 @@ import {
   custosDePedidos,
 } from '@/lib/custosConfig';
 import { taxaPorPagamento, taxasDoPeriodo } from '@/lib/taxas';
-import {
-  diasInclusivos,
-  diasNoMes,
-  isDentro,
-  mesKey,
-  mesesNoPeriodo,
-  primeiroDiaMes,
-  ultimoDiaMes,
-} from '@/lib/dates';
+import { diasNoMes, isDentro, mesKey, mesesNoPeriodo, parseYmd } from '@/lib/dates';
 
 /**
- * Contribuição de UM custo variável ao período, em centavos.
- * - 'unico': entra integral se a competência cai no período.
- * - 'mensal' + ratear_por_dias: proporcional aos dias do mês
- *   dentro do período (mês a mês).
- * - 'mensal' sem rateio: valor integral se qualquer dia daquele
- *   mês está no período.
+ * Dias em que o custo é COBRADO dentro do período.
+ * - 'unico': o dia do lançamento.
+ * - 'mensal': programado — todo mês, no dia do mês em que foi cadastrado
+ *   (cadastrado dia 9 → todo dia 9), do lançamento até o mês do fim da
+ *   recorrência. Mês sem esse dia (31 em novembro) cobra no último dia.
+ *   Pedido do Jonas, 03/11/2026: o custo mensal entra CHEIO no dia dele, não
+ *   rateado pelos dias do mês (antes "Hoje" mostrava R$ 116,83 ÷ 30 = 3,89).
+ *   `ratear_por_dias` não é mais usado.
  */
-export function custoNoPeriodo(custo: CustoVariavel, periodo: Periodo): Cents {
-  const valorCents = reaisToCents(custo.valor);
-
-  if (custo.recorrencia === 'unico') {
-    return isDentro(custo.data, periodo.inicio, periodo.fim) ? valorCents : 0;
-  }
-
-  // mensal
-  let total = 0;
-  const inicioMesCusto = mesKey(custo.data);
-  const fimMesCusto = custo.recorrencia_fim ? mesKey(custo.recorrencia_fim) : null;
-
+export function cobrancasNoPeriodo(custo: CustoVariavel, periodo: Periodo): string[] {
+  if (custo.recorrencia === 'unico') return isDentro(custo.data, periodo.inicio, periodo.fim) ? [custo.data] : [];
+  const dia = parseYmd(custo.data).d;
+  const fimMes = custo.recorrencia_fim ? mesKey(custo.recorrencia_fim) : null;
+  const datas: string[] = [];
   for (const { y, m } of mesesNoPeriodo(periodo.inicio, periodo.fim)) {
-    const mk = `${y}-${String(m).padStart(2, '0')}`;
-    if (mk < inicioMesCusto) continue; // recorrência ainda não começou
-    if (fimMesCusto && mk > fimMesCusto) continue; // recorrência já terminou
-
-    const primeiro = primeiroDiaMes(y, m);
-    const ultimo = ultimoDiaMes(y, m);
-    const overlapInicio = periodo.inicio > primeiro ? periodo.inicio : primeiro;
-    const overlapFim = periodo.fim < ultimo ? periodo.fim : ultimo;
-    const diasPeriodo = diasInclusivos(overlapInicio, overlapFim);
-    if (diasPeriodo <= 0) continue;
-
-    if (custo.ratear_por_dias) {
-      total += Math.round((valorCents * diasPeriodo) / diasNoMes(y, m));
-    } else {
-      total += valorCents;
-    }
+    const cobranca = `${y}-${String(m).padStart(2, '0')}-${String(Math.min(dia, diasNoMes(y, m))).padStart(2, '0')}`;
+    if (cobranca < custo.data) continue; // ainda não começou
+    if (fimMes && mesKey(cobranca) > fimMes) continue; // já terminou
+    if (isDentro(cobranca, periodo.inicio, periodo.fim)) datas.push(cobranca);
   }
-  return total;
+  return datas;
+}
+
+/** Contribuição de UM custo variável ao período, em centavos: o valor
+ *  cheio em cada dia de cobrança que cai no período. */
+export function custoNoPeriodo(custo: CustoVariavel, periodo: Periodo): Cents {
+  return cobrancasNoPeriodo(custo, periodo).length * reaisToCents(custo.valor);
 }
 
 export interface CategoriaAgregada {

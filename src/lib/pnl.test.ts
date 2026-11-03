@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AfterpayDaily, CustoVariavel, Periodo } from '@/types';
 import { formatPercent } from '@/lib/money';
-import { calcularPnl, custoNoPeriodo } from '@/lib/pnl';
+import { calcularPnl, cobrancasNoPeriodo, custoNoPeriodo } from '@/lib/pnl';
 
 // ── Fixture: os números reais do Jonas (spec / critérios de aceite) ──
 const dia: AfterpayDaily = {
@@ -73,7 +73,7 @@ describe('calcularPnl — critérios de aceite', () => {
     expect(formatPercent(r.conversao_agendado)).toBe('42,9%');
   });
 
-  it('5. custo mensal 300,00 em 15 dias de um mês de 30 dias, com rateio: entra 150,00', () => {
+  it('5. custo mensal 300,00 cadastrado no dia 1º: entra cheio no dia 1º (não rateado)', () => {
     const custo: CustoVariavel = {
       id: 'm1',
       data: '2025-04-01',
@@ -84,8 +84,8 @@ describe('calcularPnl — critérios de aceite', () => {
       recorrencia_fim: null,
       ratear_por_dias: true,
     };
-    const contrib = custoNoPeriodo(custo, { inicio: '2025-04-01', fim: '2025-04-15' });
-    expect(contrib).toBe(15_000); // R$ 150,00
+    expect(custoNoPeriodo(custo, { inicio: '2025-04-01', fim: '2025-04-15' })).toBe(30_000); // R$ 300,00 no dia 1º
+    expect(custoNoPeriodo(custo, { inicio: '2025-04-02', fim: '2025-04-30' })).toBe(0); // o dia 1º ficou fora
   });
 
   it('6. receita zero no período não gera NaN na margem', () => {
@@ -123,53 +123,48 @@ describe('indicadores derivados', () => {
   });
 });
 
-describe('rateio de custos recorrentes', () => {
-  it('sem rateio: valor integral se qualquer dia do mês está no período', () => {
-    const custo: CustoVariavel = {
-      id: 'm2',
-      data: '2025-04-01',
-      categoria_id: null,
-      descricao: 'assinatura',
-      valor: 300,
-      recorrencia: 'mensal',
-      recorrencia_fim: null,
-      ratear_por_dias: false,
-    };
-    expect(custoNoPeriodo(custo, { inicio: '2025-04-01', fim: '2025-04-15' })).toBe(30_000);
+describe('custo mensal programado (03/11/2026)', () => {
+  const mensal = (data: string, valor: number, recorrencia_fim: string | null = null): CustoVariavel => ({
+    id: 'm',
+    data,
+    categoria_id: null,
+    descricao: 'assinatura',
+    valor,
+    recorrencia: 'mensal',
+    recorrencia_fim,
+    ratear_por_dias: true, // ignorado: o mensal entra cheio no dia dele
   });
 
-  it('mensal cruzando 2 meses com rateio soma as duas parcelas', () => {
-    const custo: CustoVariavel = {
-      id: 'm3',
-      data: '2025-01-01',
-      categoria_id: null,
-      descricao: 'saas',
-      valor: 310, // jan tem 31 dias → 1 dia = 1000 centavos exatos
-      recorrencia: 'mensal',
-      recorrencia_fim: null,
-      ratear_por_dias: true,
-    };
-    // 15 dias de jan (31d) + 10 dias de fev (28d)
-    const contrib = custoNoPeriodo(custo, { inicio: '2025-01-17', fim: '2025-02-10' });
-    const jan = Math.round((31_000 * 15) / 31); // R$ 3,10/dia → 15.000
-    const fev = Math.round((31_000 * 10) / 28);
-    expect(contrib).toBe(jan + fev);
+  it('entra cheio no dia do mês em que foi cadastrado, todo mês', () => {
+    const claude = mensal('2026-11-02', 116.83);
+    expect(cobrancasNoPeriodo(claude, { inicio: '2026-11-02', fim: '2026-11-02' })).toEqual(['2026-11-02']);
+    expect(custoNoPeriodo(claude, { inicio: '2026-11-02', fim: '2026-11-02' })).toBe(11_683);
+    expect(custoNoPeriodo(claude, { inicio: '2026-11-03', fim: '2026-11-03' })).toBe(0); // não é o dia
+    expect(custoNoPeriodo(claude, { inicio: '2026-12-02', fim: '2026-12-02' })).toBe(11_683); // mês seguinte, mesmo dia
+  });
+
+  it('antes do cadastro não cobra; o mês inteiro dá o valor cheio', () => {
+    const data = mensal('2026-10-21', 807);
+    expect(custoNoPeriodo(data, { inicio: '2026-10-01', fim: '2026-10-20' })).toBe(0);
+    expect(custoNoPeriodo(data, { inicio: '2026-10-01', fim: '2026-10-31' })).toBe(80_700);
+    expect(custoNoPeriodo(data, { inicio: '2026-11-01', fim: '2026-11-30' })).toBe(80_700);
+  });
+
+  it('dia 31 em mês de 30 dias (e fevereiro) cobra no último dia', () => {
+    const c = mensal('2026-01-31', 100);
+    expect(cobrancasNoPeriodo(c, { inicio: '2026-02-01', fim: '2026-02-28' })).toEqual(['2026-02-28']);
+    expect(cobrancasNoPeriodo(c, { inicio: '2026-04-01', fim: '2026-04-30' })).toEqual(['2026-04-30']);
+  });
+
+  it('período de dois meses cobra duas vezes', () => {
+    const c = mensal('2025-01-20', 310);
+    expect(custoNoPeriodo(c, { inicio: '2025-01-17', fim: '2025-02-10' })).toBe(31_000); // só 20/01
+    expect(custoNoPeriodo(c, { inicio: '2025-01-17', fim: '2025-02-25' })).toBe(62_000); // 20/01 e 20/02
   });
 
   it('recorrência respeita data de início e fim', () => {
-    const custo: CustoVariavel = {
-      id: 'm4',
-      data: '2025-06-01',
-      categoria_id: null,
-      descricao: 'temporária',
-      valor: 100,
-      recorrencia: 'mensal',
-      recorrencia_fim: '2025-06-30',
-      ratear_por_dias: false,
-    };
-    // fora da janela de recorrência → 0
-    expect(custoNoPeriodo(custo, { inicio: '2025-08-01', fim: '2025-08-31' })).toBe(0);
-    // dentro → integral
-    expect(custoNoPeriodo(custo, { inicio: '2025-06-01', fim: '2025-06-30' })).toBe(10_000);
+    const c = mensal('2025-06-01', 100, '2025-06-30');
+    expect(custoNoPeriodo(c, { inicio: '2025-08-01', fim: '2025-08-31' })).toBe(0);
+    expect(custoNoPeriodo(c, { inicio: '2025-06-01', fim: '2025-06-30' })).toBe(10_000);
   });
 });

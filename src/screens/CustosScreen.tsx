@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { FolderCog, Pencil, Plus, Search, Trash2, Upload, Wallet } from 'lucide-react';
 import type { CustoVariavel, Periodo } from '@/types';
-import { diasInclusivos } from '@/lib/dates';
+import { mesKey, parseYmd } from '@/lib/dates';
 import { type Cents, formatBRL } from '@/lib/money';
-import { custoNoPeriodo } from '@/lib/pnl';
+import { cobrancasNoPeriodo } from '@/lib/pnl';
 import { useData } from '@/store/DataProvider';
 import { CustoModal } from '@/components/CustoModal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -23,19 +23,26 @@ export function CustosScreen({ periodo }: { periodo: Periodo }) {
   const [filtroCat, setFiltroCat] = useState('');
   const [busca, setBusca] = useState('');
 
-  // Custos que contribuem para o período, com o valor rateado no período.
+  // Custos COBRADOS no período: o mensal entra cheio no dia dele, todo mês
+  // (programado — 03/11/2026). `dia` é a última cobrança dentro do período.
   const doPeriodo = useMemo(
     () =>
       custos
-        .map((c) => ({ c, valor: custoNoPeriodo(c, periodo) as Cents }))
+        .map((c) => {
+          const cobrancas = cobrancasNoPeriodo(c, periodo);
+          return { c, cobrancas, dia: cobrancas[cobrancas.length - 1] ?? c.data, valor: (cobrancas.length * Math.round(c.valor * 100)) as Cents };
+        })
         .filter((x) => x.valor > 0)
-        .sort((a, b) => b.c.data.localeCompare(a.c.data)),
+        .sort((a, b) => b.dia.localeCompare(a.dia)),
     [custos, periodo],
   );
 
   const total = doPeriodo.reduce((a, x) => a + x.valor, 0);
-  const dias = diasInclusivos(periodo.inicio, periodo.fim) || 1;
-  const mediaMensal = Math.round((total / dias) * 30);
+  // Programado por mês: os custos mensais ativos no fim do período.
+  const mensaisAtivos = custos.filter(
+    (c) => c.recorrencia === 'mensal' && c.data <= periodo.fim && (!c.recorrencia_fim || mesKey(c.recorrencia_fim) >= mesKey(periodo.fim)),
+  );
+  const programado = mensaisAtivos.reduce((s, c) => s + Math.round(c.valor * 100), 0);
 
   const porCategoria = new Map<string | null, Cents>();
   for (const { c, valor } of doPeriodo) porCategoria.set(c.categoria_id, (porCategoria.get(c.categoria_id) ?? 0) + valor);
@@ -63,7 +70,12 @@ export function CustosScreen({ periodo }: { periodo: Periodo }) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-[14px]">
         <ResumoCard cor={COR.ouro} label="Total do período" valor={formatBRL(total)} sub={`${doPeriodo.length} lançamentos`} />
         <ResumoCard cor={COR.ouroClaro} label="Maior categoria" valor={maiorNome} sub={maior ? formatBRL(maior[1]) : '—'} texto />
-        <ResumoCard cor="#34d399" label="Média mensal (estimada)" valor={formatBRL(mediaMensal)} sub="projeção de 30 dias" />
+        <ResumoCard
+          cor="#34d399"
+          label="Programado por mês"
+          valor={formatBRL(programado)}
+          sub={`${mensaisAtivos.length} custo${mensaisAtivos.length === 1 ? '' : 's'} mensa${mensaisAtivos.length === 1 ? 'l' : 'is'}, cada um no seu dia`}
+        />
       </div>
 
       {/* Toolbar */}
@@ -133,11 +145,11 @@ export function CustosScreen({ periodo }: { periodo: Periodo }) {
                 </tr>
               </thead>
               <tbody>
-                {filtrados.map(({ c, valor }) => {
+                {filtrados.map(({ c, valor, dia, cobrancas }) => {
                   const cat = catMap.get(c.categoria_id ?? '');
                   return (
                     <tr key={c.id} className="hover:bg-card2 group">
-                      <td className="px-4 py-3 border-b border-trilha mono text-dim whitespace-nowrap">{fmtData(c.data)}</td>
+                      <td className="px-4 py-3 border-b border-trilha mono text-dim whitespace-nowrap">{fmtData(dia)}</td>
                       <td className="px-4 py-3 border-b border-trilha whitespace-nowrap">
                         <span className="inline-flex items-center gap-2">
                           <span className="w-[8px] h-[8px] rounded-full" style={{ background: cat?.cor ?? '#6b7280' }} />
@@ -147,11 +159,15 @@ export function CustosScreen({ periodo }: { periodo: Periodo }) {
                       <td className="px-4 py-3 border-b border-trilha text-tx2">{c.descricao}</td>
                       <td className="px-4 py-3 border-b border-trilha text-right mono font-semibold text-red whitespace-nowrap">
                         {formatBRL(valor)}
-                        {c.recorrencia === 'mensal' && <div className="text-[10px] text-dim2 font-normal">de {formatBRL(Math.round(c.valor * 100))}/mês</div>}
+                        {cobrancas.length > 1 && (
+                          <div className="text-[10px] text-dim2 font-normal">
+                            {cobrancas.length}× {formatBRL(Math.round(c.valor * 100))}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 border-b border-trilha">
                         {c.recorrencia === 'mensal' ? (
-                          <span className="text-[10px] font-semibold rounded-md px-2 py-[3px] bg-gold/15 text-gold2">Mensal</span>
+                          <span className="text-[10px] font-semibold rounded-md px-2 py-[3px] bg-gold/15 text-gold2 whitespace-nowrap">Mensal · dia {parseYmd(c.data).d}</span>
                         ) : (
                           <span className="text-[10px] font-semibold rounded-md px-2 py-[3px] bg-[#26262f] text-dim">Único</span>
                         )}
@@ -172,7 +188,7 @@ export function CustosScreen({ periodo }: { periodo: Periodo }) {
 
             {/* Mobile: cards empilhados */}
             <div className="md:hidden divide-y divide-line">
-              {filtrados.map(({ c, valor }) => {
+              {filtrados.map(({ c, valor, dia }) => {
                 const cat = catMap.get(c.categoria_id ?? '');
                 return (
                   <div key={c.id} className="p-4">
@@ -181,12 +197,12 @@ export function CustosScreen({ periodo }: { periodo: Periodo }) {
                         <div className="text-[14px] text-tx font-medium truncate">{c.descricao}</div>
                         <div className="flex items-center gap-2 mt-1 text-[11.5px] text-dim2">
                           <span className="w-[8px] h-[8px] rounded-full" style={{ background: cat?.cor ?? '#6b7280' }} />
-                          {cat?.nome ?? 'Sem categoria'} · {fmtData(c.data)}
+                          {cat?.nome ?? 'Sem categoria'} · {fmtData(dia)}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
                         <div className="mono font-semibold text-red">{formatBRL(valor)}</div>
-                        {c.recorrencia === 'mensal' && <div className="text-[10px] text-gold2 mt-0.5">Mensal</div>}
+                        {c.recorrencia === 'mensal' && <div className="text-[10px] text-gold2 mt-0.5">Mensal · dia {parseYmd(c.data).d}</div>}
                       </div>
                     </div>
                     <div className="flex gap-2 mt-3">
