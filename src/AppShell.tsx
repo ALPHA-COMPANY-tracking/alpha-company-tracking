@@ -58,7 +58,7 @@ const TABS: { id: Tab; label: string; curto: string; Icon: LucideIcon }[] = [
  * Tela nova entra aqui — solta ou dentro do grupo certo.
  */
 type ItemMenu = { aba: Tab } | { grupo: string; label: string; Icon: LucideIcon; abas: Tab[] };
-const MENU: ItemMenu[] = [
+const MENU_COMPLETO: ItemMenu[] = [
   {
     grupo: 'vendas',
     label: 'Dashboard | Vendas',
@@ -74,6 +74,16 @@ const MENU: ItemMenu[] = [
   },
   { aba: 'export' },
 ];
+
+/** Telas ocultas a pedido do Jonas (02/11/2026). O código continua aqui:
+ *  para voltar uma delas, é só tirá-la desta lista. */
+const OCULTAS: Tab[] = ['previsao', 'instagram', 'export'];
+
+const MENU: ItemMenu[] = MENU_COMPLETO.flatMap((m): ItemMenu[] => {
+  if ('aba' in m) return OCULTAS.includes(m.aba) ? [] : [m];
+  const abas = m.abas.filter((a) => !OCULTAS.includes(a));
+  return abas.length ? [{ ...m, abas }] : [];
+});
 
 /** A mesma ordem do menu, sem os grupos — a barra de baixo do celular. */
 const ORDEM_ABAS: Tab[] = MENU.flatMap((m) => ('aba' in m ? [m.aba] : m.abas));
@@ -108,7 +118,8 @@ function gruposIniciais(): string[] {
 function abaInicial(): Tab {
   try {
     const salva = localStorage.getItem(KEY_ABA);
-    if (salva && TABS.some((t) => t.id === salva)) return salva as Tab;
+    // Só volta para uma tela que ainda está no menu (não para uma oculta).
+    if (salva && ORDEM_ABAS.includes(salva as Tab)) return salva as Tab;
   } catch {
     /* ignora */
   }
