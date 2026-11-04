@@ -146,3 +146,16 @@ describe('tratamento de 2 meses (21/10/2026)', () => {
     expect(app.custoProdutoDoPlano('DERMAX PREMIUM - 6 POTE + 1 GOTA + 1 SÉRUM + 1 CREME')).toBe(83);
   });
 });
+
+describe('promo de 6 meses sem creme e sérum (11/2026)', () => {
+  it('custa R$ 58,00: 6 cápsulas × R$ 8,50 + gotas R$ 7,00', () => {
+    expect(app.custoProdutoDoPlano('(PROMO) - 6 MESES (Sem Creme e Sérum)')).toBe(58);
+    expect(app.planoTemCusto('(PROMO) - 6 MESES (Sem Creme e Sérum)')).toBe(true);
+    expect(servidor.custoProdutoDoPlano('(PROMO) - 6 MESES (Sem Creme e Sérum)')).toBe(58);
+  });
+
+  it('o 6 potes completo continua R$ 83,00 e 16 meses não casa', () => {
+    expect(app.custoProdutoDoPlano('DERMAX PREMIUM - 6 POTE + 1 GOTA + 1 SÉRUM + 1 CREME')).toBe(83);
+    expect(app.custoProdutoDoPlano('PLANO 16 MESES')).toBe(0);
+  });
+});
