@@ -120,3 +120,28 @@ describe('recusado não é venda (como o "Vendas" do BlueSales, 02/11/2026)', ()
     expect(agregarPedidos([valido, recusado], P).qtd_frustrados).toBe(0);
   });
 });
+
+describe('antecipado aguardando pagamento não é venda (como o "Vendas" do BlueSales, 04/11/2026)', () => {
+  const aguardando = ped('g', 'aguardando_pagamento', 685);
+  it('fica fora do agendado, no app e no resumo do celular', () => {
+    expect(['aguardando_pagamento', 'Aguard. Pagamento'].every((s) => foraDoAgendado({ status: s }))).toBe(true);
+    const agg = agregarPedidos([valido, aguardando], P);
+    expect(agg.valor_agendado).toBe(735);
+    expect(agg.qtd_agendados).toBe(1);
+    expect(agendadoPorDia([valido, aguardando], P)).toEqual([{ data: '2026-10-07', qtd: 1, valor: 735 }]);
+    const linha = (p: Pedido) => ({ ...p, data_aprovacao: null, valor_agendado: p.valor_agendado ?? null, produto_plano: null, vendedor: p.vendedor ?? null });
+    const r = montarResumo('2026-10-07', [linha(valido), linha(aguardando)], 0, null);
+    expect(r.valor_agendado).toBe(735);
+    expect(r.qtd_agendados).toBe(1);
+  });
+
+  it('quando é pago, conta', () => {
+    expect(foraDoAgendado({ status: 'pagos' })).toBe(false);
+    expect(agregarPedidos([valido, ped('g', 'pagos', 685)], P).valor_agendado).toBe(735 + 685);
+  });
+
+  it('aguardando coleta e aguardando devolução continuam como antes', () => {
+    expect(foraDoAgendado({ status: 'aguardando_coleta' })).toBe(false);
+    expect(foraDoAgendado({ status: 'aguardando_devolucao' })).toBe(false);
+  });
+});

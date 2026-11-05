@@ -78,12 +78,23 @@ export function ehRecusado(p: Pick<Pedido, 'status'>): boolean {
 }
 
 /**
- * O pedido fica fora do saldo agendado? O RECUSADO sempre — o "Vendas" do
- * BlueSales não conta (02/11/2026: 31 pedidos, 1 recusado, card com 30 e
- * R$ 17.850). O cancelado só se a chave mandar.
+ * Venda ANTECIPADA ainda não paga (etapa "Aguard. Pagamento"). O "Vendas"
+ * do BlueSales não conta: em 04/11/2026 o export tinha 26 pedidos e o card
+ * 25 · R$ 12.925 — o de fora era um antecipado de R$ 685 nessa etapa.
+ * Quando é pago vira "pagos" e passa a contar.
+ */
+export function aguardaPagamento(p: Pick<Pedido, 'status'>): boolean {
+  return /aguard.*pag/.test(norm(p.status));
+}
+
+/**
+ * O pedido fica fora do saldo agendado? O RECUSADO e o antecipado que ainda
+ * aguarda pagamento sempre — o "Vendas" do BlueSales não conta nenhum dos
+ * dois (02/11/2026: 31 pedidos, 1 recusado, card com 30 e R$ 17.850). O
+ * cancelado só se a chave mandar.
  */
 export function foraDoAgendado(p: Pick<Pedido, 'status'>, canceladoConta = CANCELADO_NO_AGENDADO): boolean {
-  return ehRecusado(p) || (!canceladoConta && ehCancelado(p));
+  return ehRecusado(p) || aguardaPagamento(p) || (!canceladoConta && ehCancelado(p));
 }
 
 /**

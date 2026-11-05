@@ -7,7 +7,7 @@
 import type { IsoDate, Pedido, Periodo } from '@/types';
 import { type Cents, reaisToCents } from '@/lib/money';
 import { diaSP, isDentro } from '@/lib/dates';
-import { dataAprovacaoPedido, pedidosAtivos, statusBucket } from '@/lib/pedidos';
+import { dataAprovacaoPedido, foraDoAgendado, pedidosAtivos, statusBucket } from '@/lib/pedidos';
 
 /** Custo do produto (COGS) por plano — detectado pelo texto do plano.
  *  Valores conferidos contra o P&L real do BlueSales.
@@ -211,7 +211,7 @@ export function custosDeAgendados(
   periodo: Periodo,
 ): { custo_produtos: Cents; frete: Cents; qtd: number; comissao_vendedor: Cents } {
   const agendados = pedidosAtivos(pedidos).filter(
-    (p) => statusBucket(p.status) !== 'frustrado' && isDentro(p.data, periodo.inicio, periodo.fim),
+    (p) => statusBucket(p.status) !== 'frustrado' && !foraDoAgendado(p) && isDentro(p.data, periodo.inicio, periodo.fim),
   );
   let custo_produtos = 0;
   let comissao_vendedor = 0;

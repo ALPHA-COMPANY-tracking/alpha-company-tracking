@@ -94,8 +94,13 @@ export function montarResumo(
   const boletosPorVendedor = new Map<string, number>();
 
   for (const p of pedidos) {
-    // O mesmo agendado da dashboard: recusado nunca conta; cancelado, se a chave mandar.
-    if (p.data === dia && !/recus/i.test(p.status ?? '') && (CANCELADO_NO_AGENDADO || !/cancel/i.test(p.status ?? ''))) {
+    // O mesmo agendado da dashboard: recusado e antecipado aguardando pagamento
+    // nunca contam; cancelado, se a chave mandar.
+    if (
+      p.data === dia &&
+      !/recus|aguard.*pag/i.test(p.status ?? '') &&
+      (CANCELADO_NO_AGENDADO || !/cancel/i.test(p.status ?? ''))
+    ) {
       valor_agendado += Number(p.valor_agendado ?? p.valor ?? 0);
       qtd_agendados++;
     }
