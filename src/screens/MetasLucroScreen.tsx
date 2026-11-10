@@ -15,12 +15,15 @@ import { COR } from '@/lib/cores';
 import { hojeIso } from '@/lib/dates';
 import {
   FAIXAS_PADRAO,
+  type CustoDaDash,
   type Faixa,
   type Faixas,
   type MetaMensal,
   type Premissas,
   type Resultado,
+  comCustosDaDash,
   curvaPorTaxa,
+  custosDaDashNoMes,
   faixaAtingida,
   mesAntes,
   nomeDoMes,
@@ -100,8 +103,11 @@ export function MetasLucroScreen() {
     };
   }, [mesAtual, carregarMetaMensal]);
 
-  const res = useMemo(() => simular(premissas, faixas), [premissas, faixas]);
-  const curva = useMemo(() => curvaPorTaxa(premissas, faixas), [premissas, faixas]);
+  // Custos fixos: os da tela Custos que caem no mês (ao vivo) + os manuais daqui.
+  const daDash = useMemo(() => custosDaDashNoMes(custos, mes), [custos, mes]);
+  const pSim = useMemo(() => comCustosDaDash(premissas, daDash), [premissas, daDash]);
+  const res = useMemo(() => simular(pSim, faixas), [pSim, faixas]);
+  const curva = useMemo(() => curvaPorTaxa(pSim, faixas), [pSim, faixas]);
   const set = (patch: Partial<Premissas>) => setPremissas((p) => ({ ...p, ...patch }));
 
   async function salvar() {
@@ -166,7 +172,7 @@ export function MetasLucroScreen() {
       <Resumo res={res} p={premissas} />
 
       {/* 2. Premissas */}
-      <FormPremissas p={premissas} res={res} refAnterior={refAnterior} set={set} />
+      <FormPremissas p={premissas} res={res} refAnterior={refAnterior} daDash={daDash} mes={mes} set={set} />
       <FormFaixas faixas={faixas} setFaixas={setFaixas} />
 
       {/* 3. Cards */}
@@ -345,13 +351,18 @@ function FormPremissas({
   p,
   res,
   refAnterior,
+  daDash,
+  mes,
   set,
 }: {
   p: Premissas;
   res: Resultado | null;
   refAnterior: ReturnType<typeof referenciasDe>;
+  daDash: CustoDaDash[];
+  mes: string;
   set: (patch: Partial<Premissas>) => void;
 }) {
+  const totalFixos = daDash.reduce((s, c) => s + c.valor, 0) + p.fixos.reduce((s, f) => s + (Number(f.valor) || 0), 0);
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-5">
       <Panel title="Meta, verba e funil">
@@ -389,7 +400,28 @@ function FormPremissas({
             <Reais valor={p.custo_frustrado} onChange={(v) => set({ custo_frustrado: v })} />
           </Campo>
           <div className="sm:col-span-2 flex flex-col gap-2">
-            <span className="text-[11px] text-dim">Custos fixos do mês</span>
+            <span className="flex items-baseline justify-between gap-2 text-[11px] text-dim">
+              Custos fixos do mês
+              <span className="mono text-tx2 text-[12px]">{r2(totalFixos)}</span>
+            </span>
+            {daDash.map((c) => (
+              <div
+                key={c.id}
+                title="Vem da tela Custos — para mudar, edite lá"
+                className="flex items-center justify-between gap-3 bg-card border border-line rounded-[10px] px-3 py-[7px]"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-[13px] text-tx2">{c.nome}</div>
+                  <div className="text-[10px] text-dim2">
+                    <span className="text-gold2 font-semibold">da dash</span> · {c.mensal ? `mensal, dia ${c.dia}` : `avulso, dia ${c.dia}`}
+                  </div>
+                </div>
+                <span className="mono text-[13.5px] text-tx2 shrink-0">{r2(c.valor)}</span>
+              </div>
+            ))}
+            {daDash.length === 0 && (
+              <div className="text-[11.5px] text-dim2">Nenhum custo cadastrado na tela Custos cai em {nomeDoMes(mes)}.</div>
+            )}
             {p.fixos.map((f, i) => (
               <div key={i} className="flex items-center gap-2">
                 <input
@@ -416,8 +448,12 @@ function FormPremissas({
               onClick={() => set({ fixos: [...p.fixos, { nome: 'Novo custo', valor: 0 }] })}
               className="self-start inline-flex items-center gap-1.5 px-2.5 py-[6px] rounded-lg text-[12px] font-semibold text-gold2 border border-gold/40 hover:bg-gold/10"
             >
-              <Plus size={13} /> Adicionar custo fixo
+              <Plus size={13} /> Adicionar custo manual
             </button>
+            <span className="text-[10px] text-dim2">
+              Os marcados “da dash” vêm da tela Custos (mensais cheios no dia deles e avulsos com data no mês) e se
+              atualizam sozinhos. Os manuais valem só aqui.
+            </span>
           </div>
         </div>
       </Panel>

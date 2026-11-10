@@ -1,11 +1,14 @@
 // Metas & Lucro — testes de aceite da especificação do Jonas (02/11/2026),
 // tolerância de ±R$ 1.
 import { describe, expect, it } from 'vitest';
+import type { CustoVariavel } from '@/types';
 import {
   FAIXAS_PADRAO,
   type Premissas,
   bonusDaFaixa,
+  comCustosDaDash,
   curvaPorTaxa,
+  custosDaDashNoMes,
   mesAntes,
   nomeDoMes,
   premissasIniciais,
@@ -144,11 +147,49 @@ describe('regras', () => {
     expect([p.meta_agendado, p.taxa_recebimento, p.imposto_pct, p.frustracao_pct, p.custo_frustrado, p.lucro_desejado]).toEqual([
       350_000, 0.5, 0.1143, 0.25, 33.26, 30_000,
     ]);
-    expect(p.fixos).toEqual([
-      { nome: 'Despesas', valor: 10_000 },
-      { nome: 'Cezar', valor: 10_000 },
-    ]);
+    expect(p.fixos).toEqual([]); // os fixos vêm da tela Custos; manuais começam vazios
     expect(ref.taxa_recebimento_real).toBeCloseTo(101_588.19 / 209_415, 6);
     expect(ref.taxa_frustracao_real).toBeCloseTo(32 / 355, 6);
+  });
+});
+
+describe('custos fixos da tela Custos (10/11/2026)', () => {
+  const custo = (id: string, data: string, valor: number, recorrencia: 'mensal' | 'unico', extra: Partial<CustoVariavel> = {}): CustoVariavel => ({
+    id,
+    data,
+    categoria_id: null,
+    descricao: id.toUpperCase(),
+    valor,
+    recorrencia,
+    recorrencia_fim: null,
+    ratear_por_dias: true,
+    ...extra,
+  });
+  const custos = [
+    custo('lautch', '2026-10-09', 297, 'mensal'),
+    custo('claude', '2026-11-02', 110, 'mensal'),
+    custo('chip', '2026-11-15', 40, 'unico'),
+    custo('chip-outubro', '2026-10-20', 40, 'unico'),
+    custo('encerrado', '2026-08-05', 50, 'mensal', { recorrencia_fim: '2026-10-31' }),
+  ];
+
+  it('mensais cheios no dia deles e avulsos com data no mês', () => {
+    expect(custosDaDashNoMes(custos, '2026-11')).toEqual([
+      { id: 'lautch', nome: 'LAUTCH', valor: 297, mensal: true, dia: 9 },
+      { id: 'claude', nome: 'CLAUDE', valor: 110, mensal: true, dia: 2 },
+      { id: 'chip', nome: 'CHIP', valor: 40, mensal: false, dia: 15 },
+    ]);
+  });
+
+  it('mês futuro: só os mensais; mês antes do cadastro: nada dele', () => {
+    expect(custosDaDashNoMes(custos, '2026-12').map((c) => c.id)).toEqual(['lautch', 'claude']);
+    expect(custosDaDashNoMes(custos, '2026-10').map((c) => c.id)).toEqual(['lautch', 'encerrado', 'chip-outubro']);
+  });
+
+  it('entram na conta junto com os manuais', () => {
+    const daDash = custosDaDashNoMes(custos, '2026-11');
+    const p = comCustosDaDash({ ...TESTE1, fixos: [{ nome: 'Pró-labore', valor: 5_000 }] }, daDash);
+    expect(p.fixos.map((f) => f.valor)).toEqual([297, 110, 40, 5_000]);
+    expect(simular(p, FAIXAS_PADRAO)!.FX).toBe(297 + 110 + 40 + 5_000);
   });
 });

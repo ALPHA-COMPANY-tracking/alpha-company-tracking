@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { AfterpayDaily, CustoVariavel, Pedido, Periodo } from '@/types';
-import { calcularPnl } from '@/lib/pnl';
+import { calcularPnl, cobrancasNoPeriodo, custoNoPeriodo } from '@/lib/pnl';
 import { agregarPedidos } from '@/lib/pedidos';
 import { diasNoMes, parseYmd, primeiroDiaMes, ultimoDiaMes } from '@/lib/dates';
 
@@ -35,6 +35,8 @@ export interface Premissas {
   /** Produto, frete, taxas e comissões, sobre o recebido. */
   outros_pct: number;
   imposto_pct: number;
+  /** Só os lançados À MÃO nesta página. Os da tela Custos entram por
+   *  comCustosDaDash, ao vivo — não ficam guardados aqui. */
   fixos: CustoFixo[];
   /** Pedidos frustrados, sobre os agendados. */
   frustracao_pct: number;
@@ -98,10 +100,9 @@ export function premissasIniciais(ref: Referencias | null): Premissas {
     cpa: ref?.cpa ?? 0,
     outros_pct: ref?.outros_pct ?? 0,
     imposto_pct: 0.1143,
-    fixos: [
-      { nome: 'Despesas', valor: 10_000 },
-      { nome: 'Cezar', valor: 10_000 },
-    ],
+    // Os custos fixos vêm da tela Custos (custosDaDashNoMes); aqui só os
+    // manuais, que começam vazios (Jonas, 10/11/2026).
+    fixos: [],
     frustracao_pct: 0.25,
     custo_frustrado: 33.26,
     lucro_desejado: 30_000,
@@ -212,6 +213,43 @@ export function simular(p: Premissas, f: Faixas): Resultado | null {
 
   const status: Status = LF >= L ? 'liberado' : LF >= 0 ? 'abaixo' : 'prejuizo';
   return { M, N, A, R, O, I, NF, FR, FX, LB, indV, indC, faixaV, faixaC, faixaE, bV, bC, bE, B, LF, mg, taxa_necessaria, cpa_max, sobra_pct, status };
+}
+
+// ── Custos fixos vindos da tela Custos ──────────────────────
+
+/** Um custo cadastrado na tela Custos que cai no mês. */
+export interface CustoDaDash extends CustoFixo {
+  id: string;
+  mensal: boolean;
+  /** Dia do mês em que é cobrado. */
+  dia: number;
+}
+
+/**
+ * Os custos cadastrados na tela Custos que caem no mês: os mensais cheios
+ * (programados no dia deles) e os avulsos com data no mês — a mesma conta
+ * da Demonstração. Cadastrou, editou ou apagou lá, muda aqui.
+ */
+export function custosDaDashNoMes(custos: CustoVariavel[], mes: string): CustoDaDash[] {
+  const periodo = periodoDoMesInteiro(mes);
+  const lista: CustoDaDash[] = [];
+  for (const c of custos) {
+    const datas = cobrancasNoPeriodo(c, periodo);
+    if (datas.length === 0) continue;
+    lista.push({
+      id: c.id,
+      nome: c.descricao,
+      valor: custoNoPeriodo(c, periodo) / 100,
+      mensal: c.recorrencia === 'mensal',
+      dia: parseYmd(datas[0]).d,
+    });
+  }
+  return lista.sort((a, b) => b.valor - a.valor || a.nome.localeCompare(b.nome));
+}
+
+/** As premissas que vão para simular(): os custos da tela Custos + os manuais. */
+export function comCustosDaDash(p: Premissas, daDash: CustoFixo[]): Premissas {
+  return { ...p, fixos: [...daDash.map(({ nome, valor }) => ({ nome, valor })), ...p.fixos] };
 }
 
 /** O lucro projetado com a taxa de recebimento de 30% a 90%, de 1 em 1. */
