@@ -25,6 +25,8 @@ export const CUSTO_PRODUTO: { match: RegExp; custo: number }[] = [
   // Tratamento de 2 meses, desde 21/10/2026: 2 cápsulas × 8,50 + gotas 7,00.
   { match: /(^|\D)2\s*pote/i, custo: 24.0 },
   { match: /(^|\D)2\s*mes/i, custo: 24.0 },
+  // "2 CREMES E 2 SERUNS", desde 11/2026: creme 12,50 + sérum 12,50, dois de cada.
+  { match: /(^|\D)2\s*crem.*\D2\s*s[eé]r/i, custo: 50.0 },
 ];
 
 /** Frete por pacote com a data em que passou a valer — IGUAL a FRETES do

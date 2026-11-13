@@ -147,6 +147,20 @@ describe('tratamento de 2 meses (21/10/2026)', () => {
   });
 });
 
+describe('2 cremes e 2 séruns (11/2026)', () => {
+  it('custa R$ 50,00: 2 cremes × R$ 12,50 + 2 séruns × R$ 12,50', () => {
+    expect(app.custoProdutoDoPlano('2 CREMES E 2 SERUNS')).toBe(50);
+    expect(app.custoProdutoDoPlano('DERMAX - 2 Cremes e 2 Séruns')).toBe(50);
+    expect(app.planoTemCusto('2 CREMES E 2 SERUNS')).toBe(true);
+    expect(servidor.custoProdutoDoPlano('2 CREMES E 2 SERUNS')).toBe(50);
+  });
+
+  it('o 6 potes completo (que também tem creme e sérum) continua R$ 83,00', () => {
+    expect(app.custoProdutoDoPlano('DERMAX PREMIUM - 6 POTE + 1 GOTA + 1 SÉRUM + 1 CREME')).toBe(83);
+    expect(app.custoProdutoDoPlano('12 CREMES E 12 SERUNS')).toBe(0);
+  });
+});
+
 describe('promo de 6 meses sem creme e sérum (11/2026)', () => {
   it('custa R$ 58,00: 6 cápsulas × R$ 8,50 + gotas R$ 7,00', () => {
     expect(app.custoProdutoDoPlano('(PROMO) - 6 MESES (Sem Creme e Sérum)')).toBe(58);
