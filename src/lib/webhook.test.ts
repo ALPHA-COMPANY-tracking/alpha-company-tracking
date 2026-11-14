@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapearPedido, semDadosPessoais, voltariaDoPago } from '../../api/bluesales-webhook';
+import { dataDaVenda, mapearPedido, mudaDataDaVenda, semDadosPessoais, voltariaDoPago } from '../../api/bluesales-webhook';
 
 const USER = 'fabbf23a-e34b-4445-b563-222c18642189';
 
@@ -23,6 +23,39 @@ const ORDER_CREATE = {
   customer: { name: 'YOLANDA DE GOIS', email: 'x@y.com', document: '000.000.000-00' },
   shipping: { tracking_code: null },
 };
+
+describe('dia da venda: o da confirmação, quando o BlueSales confirma depois (#4605, 14/11/2026)', () => {
+  // Cadastrado 12/11 14:56 (SP), confirmado — ORDER_CREATE — 14/11 12:08.
+  const confirmadoDepois = {
+    event: 'ORDER_CREATE',
+    occurred_at: '2026-11-14T12:08:44-03:00',
+    order: { id: 'BLV-N35NYC9S2S', status: 'cadastrados', created_at: 'Thu Nov 12 2026 17:56:10 GMT+0000 (Coordinated Universal Time)', internal_id: 4605 },
+    payment: { amount: 735 },
+  };
+
+  it('o pedido criado que chega dias depois conta no dia da confirmação', () => {
+    expect(dataDaVenda(confirmadoDepois)).toBe('2026-11-14');
+    expect(mapearPedido(confirmadoDepois, USER)!.data).toBe('2026-11-14');
+  });
+
+  it('o pedido criado normal (segundos depois) fica no dia do cadastro, mesmo virando a meia-noite', () => {
+    expect(dataDaVenda({ ...ORDER_CREATE, occurred_at: '2026-08-28T09:39:46-03:00' })).toBe('2026-08-28');
+    const meiaNoite = {
+      event: 'ORDER_CREATE',
+      occurred_at: '2026-11-15T00:00:02-03:00',
+      order: { id: 'X', created_at: 'Sat Nov 14 2026 23:59:58 GMT-0300' },
+    };
+    expect(dataDaVenda(meiaNoite)).toBe('2026-11-14');
+  });
+
+  it('os outros avisos não mudam o dia de um pedido que já tem dia', () => {
+    const enviado = { ...confirmadoDepois, event: 'ORDER_SHIPPED', occurred_at: '2026-11-14T12:09:03-03:00' };
+    expect(dataDaVenda(enviado)).toBe('2026-11-12'); // o do cadastro…
+    expect(mudaDataDaVenda(enviado, '2026-11-14')).toBe(false); // …mas não sobrescreve o da confirmação
+    expect(mudaDataDaVenda(enviado, null)).toBe(true); // pedido novo: grava
+    expect(mudaDataDaVenda(confirmadoDepois, '2026-11-12')).toBe(true); // o pedido criado manda
+  });
+});
 
 describe('mapearPedido (payload do BlueSales)', () => {
   it('lê o payload real em inglês (era o bug: valor vinha 0)', () => {

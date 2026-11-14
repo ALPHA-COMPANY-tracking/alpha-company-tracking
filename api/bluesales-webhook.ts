@@ -229,6 +229,35 @@ export function voltariaDoPago(statusAtual: unknown, statusNovo: unknown): boole
   return /^pagos?$/.test(atual) && !/^pagos?$/.test(novo) && ANTES_DO_PAGAMENTO.test(novo);
 }
 
+const ehCriacao = (body: Record<string, unknown>) => String(body.event ?? '').toUpperCase() === 'ORDER_CREATE';
+
+/**
+ * Dia em que a venda conta. É o do cadastro (order.created_at), MENOS quando
+ * o BlueSales só confirma o pedido depois: o "pedido criado" (ORDER_CREATE)
+ * chega com occurred_at horas ou dias depois do created_at, e o "Vendas" dele
+ * conta a venda no dia da CONFIRMAÇÃO (14/11/2026: #4605 cadastrado 12/11
+ * 14:56, confirmado 14/11 12:08, contado em 14/11 — o único de 849 em 60
+ * dias). A folga de 1 h evita mudar o dia de um aviso que sai segundos depois
+ * da meia-noite.
+ */
+export function dataDaVenda(body: Record<string, unknown>): string | undefined {
+  const order = (body.order ?? body.pedido ?? {}) as Record<string, unknown>;
+  if (!order.created_at) return undefined;
+  const cadastro = dataSP(order.created_at);
+  if (!ehCriacao(body) || !body.occurred_at) return cadastro;
+  const tCadastro = new Date(String(order.created_at).replace(/\s*\(.*\)\s*$/, '')).getTime();
+  const tConfirmacao = new Date(String(body.occurred_at)).getTime();
+  if (!Number.isFinite(tCadastro) || !Number.isFinite(tConfirmacao)) return cadastro;
+  return tConfirmacao - tCadastro > 3_600_000 ? dataSP(body.occurred_at) : cadastro;
+}
+
+/** O aviso pode mudar o dia da venda de um pedido que já tem dia? Só o
+ *  "pedido criado": os outros trazem o created_at do cadastro e desfariam a
+ *  confirmação. */
+export function mudaDataDaVenda(body: Record<string, unknown>, dataAtual: unknown): boolean {
+  return !dataAtual || ehCriacao(body);
+}
+
 export function mapearPedido(
   body: Record<string, unknown>,
   userId: string,
@@ -252,7 +281,8 @@ export function mapearPedido(
   // "saiu_para_entrega" e nunca manda "pagos" depois (20/10/2026, #2913).
   if (String(body.event ?? '').toUpperCase() === 'ORDER_PAID') pedido.status = 'pagos';
   if (order.internal_id != null) pedido.internal_id = order.internal_id;
-  if (order.created_at) pedido.data = dataSP(order.created_at);
+  const dia = dataDaVenda(body);
+  if (dia) pedido.data = dia;
 
   // valor = líquido (cobrado); valor_bruto = cheio (antes do desconto)
   const v = num(pick(pagamento, 'amount', 'valor', 'value') ?? pick(produto, 'price', 'preço', 'preco'));
@@ -392,16 +422,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Pago não volta atrás: aviso de entrega atrasado mantém o resto (rastreio,
-  // valor…), mas não a etapa.
-  if (pedido.status != null) {
-    const { data: atual } = await supabase()
-      .from('bluesales_pedidos')
-      .select('status')
-      .eq('user_id', userId)
-      .eq('id', pedido.id as string)
-      .maybeSingle();
-    if (atual && voltariaDoPago(atual.status, pedido.status)) delete pedido.status;
-  }
+  // valor…), mas não a etapa. E o dia da venda só muda no "pedido criado"
+  // (ver dataDaVenda).
+  const { data: atual } = await supabase()
+    .from('bluesales_pedidos')
+    .select('status,data')
+    .eq('user_id', userId)
+    .eq('id', pedido.id as string)
+    .maybeSingle();
+  if (atual && pedido.status != null && voltariaDoPago(atual.status, pedido.status)) delete pedido.status;
+  if (atual && !mudaDataDaVenda(body as Record<string, unknown>, atual.data)) delete pedido.data;
 
   let { error } = await supabase()
     .from('bluesales_pedidos')
