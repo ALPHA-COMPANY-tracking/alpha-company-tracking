@@ -11,6 +11,7 @@ import type { AfterpayDaily, AtendenteStat, CategoriaCusto, CustoVariavel, Pedid
 import { type Dataset, novoId } from '@/data/db';
 import { type Backend, type RegiaoPedido, ETAPA_SEM_PAGAMENTO, LocalBackend, aplicarRegioes } from '@/data/backend';
 import type { MetaMensal } from '@/lib/metasLucro';
+import { type Mudanca, aplicarMudancas, correcoesPorPedido } from '@/lib/conferenciaExport';
 
 interface DataContextValue {
   categorias: CategoriaCusto[];
@@ -43,6 +44,10 @@ interface DataContextValue {
   desfazerPagamento: (id: string) => void;
   /** Preenche o nome do cliente de uma venda antiga, à mão. */
   definirClientePedido: (id: string, nome: string | null) => void;
+  /** Conferência com o export do BlueSales: quando cada pedido chegou. */
+  chegadaDosPedidos: (ids: string[]) => Promise<Record<string, string>>;
+  /** Grava as correções da conferência (lixeira, volta, valor, etapa). */
+  aplicarConferencia: (mudancas: Mudanca[]) => Promise<void>;
   /** Estado e cidade dos pedidos (CSV do BlueSales). Devolve quantos achou. */
   importarRegioes: (itens: RegiaoPedido[]) => Promise<number>;
   lancarDaily: (daily: AfterpayDaily) => void;
@@ -250,6 +255,29 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
     [aplicar],
   );
 
+  const chegadaDosPedidos = useCallback<DataContextValue['chegadaDosPedidos']>((ids) => backendRef.current.chegadaDosPedidos(ids), []);
+
+  // Não é otimista: a tela só diz "pronto" depois que o banco gravou tudo.
+  const aplicarConferencia = useCallback<DataContextValue['aplicarConferencia']>(
+    async (mudancas) => {
+      const b = backendRef.current;
+      try {
+        for (const [id, c] of correcoesPorPedido(mudancas)) {
+          if (c.removido !== undefined) await b.removerPedido(id, c.removido);
+          if (c.status !== undefined || c.valor_agendado !== undefined) {
+            await b.corrigirPedido(id, { ...(c.status !== undefined && { status: c.status }), ...(c.valor_agendado !== undefined && { valor_agendado: c.valor_agendado }) });
+          }
+        }
+      } catch (e) {
+        resync(); // gravou parte: a tela volta ao que está no banco
+        throw e;
+      }
+      const agora = new Date().toISOString();
+      setData((d) => (d ? { ...d, pedidos: aplicarMudancas(d.pedidos, mudancas, agora) } : d));
+    },
+    [resync],
+  );
+
   // Não é otimista: a tela precisa saber quantos pedidos o banco achou.
   const importarRegioes = useCallback<DataContextValue['importarRegioes']>(async (itens) => {
     const achados = await backendRef.current.definirRegioes(itens);
@@ -324,6 +352,8 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
       definirValorPago,
       desfazerPagamento,
       definirClientePedido,
+      chegadaDosPedidos,
+      aplicarConferencia,
       importarRegioes,
       lancarDaily,
       lancarDailies,
@@ -332,7 +362,7 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
       carregarMetaMensal,
       salvarMetaMensal,
     };
-  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, definirPerdaPedido, definirTaxaPedido, removerPedido, definirValorPago, desfazerPagamento, definirClientePedido, importarRegioes, lancarDaily, lancarDailies, marcarSync, recarregar, carregarMetaMensal, salvarMetaMensal]);
+  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, definirPerdaPedido, definirTaxaPedido, removerPedido, definirValorPago, desfazerPagamento, definirClientePedido, chegadaDosPedidos, aplicarConferencia, importarRegioes, lancarDaily, lancarDailies, marcarSync, recarregar, carregarMetaMensal, salvarMetaMensal]);
 
   if (!value) {
     return (

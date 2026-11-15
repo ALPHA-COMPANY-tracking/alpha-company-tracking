@@ -9,6 +9,7 @@ import type { RegistroAlertas } from '@/store/useRegistroAlertas';
 import { SeloAlerta } from '@/components/alertas/SeloAlerta';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
+import { ConferenciaExport } from '@/components/vendas/ConferenciaExport';
 
 /** 'YYYY-MM-DD' → 'DD/MM'. */
 function diaMes(iso: string): string {
@@ -276,6 +277,8 @@ export function VendasScreen({ periodo, registro }: { periodo: Periodo; registro
           hint={duplicados.length > 0 ? `${duplicados.length} cliente${duplicados.length === 1 ? '' : 's'} com mais de um pedido` : 'nenhum cliente repetido'}
         >
           <div className="p-4 lg:p-5 flex flex-col gap-4">
+            {/* O jeito certo: o export mostra o que foi apagado lá sem aviso. */}
+            <ConferenciaExport />
             {duplicados.length > 0 ? (
               <div className="flex flex-col gap-3">
                 <p className="m-0 text-[12.5px] text-dim leading-relaxed">
@@ -396,8 +399,9 @@ export function VendasScreen({ periodo, registro }: { periodo: Periodo; registro
         <TriangleAlert size={16} className="text-yel shrink-0 mt-[2px]" />
         <p className="m-0 text-[12.5px] text-dim leading-relaxed">
           Use a lixeira quando a venda foi <b className="text-dim">cancelada e excluída no BlueSales</b>. Nesse caso ele
-          não manda evento nenhum — o pedido some de lá e ficaria preso aqui, inflando o Faturamento Agendado. Nada é
-          apagado do banco: a venda vai para a lista de baixo e pode voltar.
+          não manda evento nenhum — o pedido some de lá e ficaria preso aqui, inflando o Faturamento Agendado. O jeito
+          mais rápido de achar todas é soltar o export do BlueSales em <b className="text-dim">Conferir com o BlueSales</b>,
+          lá em cima. Nada é apagado do banco: a venda vai para a lista de baixo e pode voltar.
         </p>
       </div>
 

@@ -42,6 +42,10 @@ export interface Backend {
   definirTaxaPedido(id: string, taxa: number | null): Promise<void>;
   /** Tira (ou devolve) uma venda da plataforma, sem apagar do banco. */
   removerPedido(id: string, removido: boolean): Promise<void>;
+  /** Conferência com o export do BlueSales: etapa e/ou valor agendado de lá. */
+  corrigirPedido(id: string, patch: { status?: string; valor_agendado?: number }): Promise<void>;
+  /** Quando cada pedido chegou pelo primeiro aviso do BlueSales (ISO). */
+  chegadaDosPedidos(ids: string[]): Promise<Record<string, string>>;
   /** Meta salva de Metas & Lucro para o mês ('YYYY-MM-01'); null = nenhuma. */
   carregarMetaMensal(mes: string): Promise<MetaMensal | null>;
   /** Salva a meta do mês (sobrescreve a que existir). */
@@ -129,6 +133,15 @@ export class LocalBackend implements Backend {
       ...ds,
       pedidos: ds.pedidos.map((p) => (p.id === id ? { ...p, removido_em: quando } : p)),
     }));
+  }
+  async corrigirPedido(id: string, patch: { status?: string; valor_agendado?: number }) {
+    this.mut((ds) => ({
+      ...ds,
+      pedidos: ds.pedidos.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    }));
+  }
+  async chegadaDosPedidos() {
+    return {}; // sem avisos no modo local
   }
   async carregarMetaMensal(mes: string) {
     return lerMetasLocais()[mes] ?? null;

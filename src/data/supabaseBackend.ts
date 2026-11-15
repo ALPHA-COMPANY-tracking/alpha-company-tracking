@@ -238,6 +238,31 @@ export class SupabaseBackend implements Backend {
       .eq('user_id', this.userId);
     if (error) throw error;
   }
+  async corrigirPedido(id: string, patch: { status?: string; valor_agendado?: number }) {
+    const { error } = await this.db.from('bluesales_pedidos').update(patch).eq('id', id).eq('user_id', this.userId);
+    if (error) throw error;
+  }
+  async chegadaDosPedidos(ids: string[]) {
+    const chegou: Record<string, string> = {};
+    for (let i = 0; i < ids.length; i += 50) {
+      const lote = ids.slice(i, i + 50);
+      const { data, error } = await todasAsLinhas((de, ate) =>
+        this.db
+          .from('webhook_logs')
+          .select('recebido_em, pedido:payload->order->>id')
+          .eq('user_id', this.userId)
+          .in('payload->order->>id', lote)
+          .order('recebido_em')
+          .order('id')
+          .range(de, ate),
+      );
+      if (error) throw new Error(error.message);
+      for (const r of data as { recebido_em: string; pedido: string | null }[]) {
+        if (r.pedido && !chegou[r.pedido]) chegou[r.pedido] = r.recebido_em;
+      }
+    }
+    return chegou;
+  }
   async carregarMetaMensal(mes: string) {
     const { data, error } = await this.db
       .from('metas_mensais')
