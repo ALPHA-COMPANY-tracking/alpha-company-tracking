@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BadgeCheck, CalendarCheck, Check, HandCoins, Loader2, LogOut, Pencil, Percent, RefreshCw, Search, ShieldAlert, Target, TriangleAlert } from 'lucide-react';
 import type { Pedido } from '@/types';
 import { supabase } from '@/lib/supabase';
-import { pedidoDaLinha } from '@/data/supabaseBackend';
+import { pedidoDaLinha, todasAsLinhas } from '@/data/supabaseBackend';
 import { usePeriodo } from '@/store/usePeriodo';
 import { PeriodSelector } from '@/components/pnl/PeriodSelector';
 import { LogoMark, Wordmark } from '@/components/Logo';
@@ -77,8 +77,12 @@ export function PainelVendedor({
   const carregar = useCallback(async () => {
     if (!supabase) return;
     setCarregando(true);
-    // O banco só devolve os pedidos em que este login é o vendedor.
-    const buscar = (campos: string) => supabase!.from('bluesales_pedidos').select(campos).eq('user_id', donoId);
+    // O banco só devolve os pedidos em que este login é o vendedor — todos,
+    // de 1000 em 1000 (o Supabase corta calado no milésimo).
+    const buscar = (campos: string) =>
+      todasAsLinhas((de, ate) =>
+        supabase!.from('bluesales_pedidos').select(campos).eq('user_id', donoId).order('data', { ascending: false }).order('id').range(de, ate),
+      );
     let [{ data, error }, meusAlertas] = await Promise.all([buscar(`${CAMPOS},parcelas`), alertasDoVendedor()]);
     // Migração 0029 (pagamento em partes) ainda não rodada: segue sem parcelas.
     if (error && /parcelas/.test(error.message)) ({ data, error } = await buscar(CAMPOS));

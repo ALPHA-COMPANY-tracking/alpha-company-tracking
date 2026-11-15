@@ -12,6 +12,24 @@ import type { MetaMensal } from '@/lib/metasLucro';
 
 const N = (v: unknown) => Number(v ?? 0);
 
+/** O Supabase devolve no máximo 1000 linhas por chamada e corta o resto
+ *  CALADO — os pedidos mais antigos sumiam da conta (15/11/2026). */
+const PAGINA = 1000;
+
+/** Todas as linhas de uma consulta, de página em página. A consulta precisa
+ *  de ordem estável (com desempate) para nenhuma linha pular de página. */
+export async function todasAsLinhas<T>(
+  pagina: (de: number, ate: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  const tudo: T[] = [];
+  for (let de = 0; ; de += PAGINA) {
+    const { data, error } = await pagina(de, de + PAGINA - 1);
+    if (error) return { data: tudo, error };
+    tudo.push(...(data ?? []));
+    if (!data || data.length < PAGINA) return { data: tudo, error: null };
+  }
+}
+
 /** Linha de bluesales_pedidos → Pedido. Usada também pelo Painel do Vendedor. */
 export function pedidoDaLinha(r: Record<string, unknown>): Pedido {
   const S = (v: unknown) => (v == null ? null : String(v));
@@ -95,9 +113,15 @@ export class SupabaseBackend implements Backend {
       // Sempre filtrado pela conta: um sócio também enxerga as linhas do
       // próprio login (ex.: categorias-padrão), que não são desta dashboard.
       this.db.from('categorias_custo').select('*').eq('user_id', this.userId).order('ordem'),
-      this.db.from('custos_variaveis').select('*').eq('user_id', this.userId).order('data', { ascending: false }),
-      this.db.from('afterpay_daily').select('*').eq('user_id', this.userId).order('data'),
-      this.db.from('bluesales_pedidos').select('*').eq('user_id', this.userId).order('data', { ascending: false }),
+      todasAsLinhas((de, ate) =>
+        this.db.from('custos_variaveis').select('*').eq('user_id', this.userId).order('data', { ascending: false }).order('id').range(de, ate),
+      ),
+      todasAsLinhas((de, ate) =>
+        this.db.from('afterpay_daily').select('*').eq('user_id', this.userId).order('data').range(de, ate),
+      ),
+      todasAsLinhas((de, ate) =>
+        this.db.from('bluesales_pedidos').select('*').eq('user_id', this.userId).order('data', { ascending: false }).order('id').range(de, ate),
+      ),
     ]);
     if (cats.error) throw cats.error;
     if (custos.error) throw custos.error;
