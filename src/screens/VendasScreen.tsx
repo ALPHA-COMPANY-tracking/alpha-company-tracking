@@ -285,7 +285,8 @@ export function VendasScreen({ periodo, registro }: { periodo: Periodo; registro
                 <p className="m-0 text-[12.5px] text-dim leading-relaxed">
                   <b className="text-tx">Possíveis duplicados.</b> O mesmo cliente com mais de um pedido costuma ser venda
                   refeita: o vendedor criou de novo e excluiu a antiga no BlueSales — que continua aqui. Procure o
-                  #número no BlueSales e só tire o que <b className="text-tx">não existir mais lá</b>.
+                  #número no BlueSales e só tire o que <b className="text-tx">não existir mais lá</b>. Pedido{' '}
+                  <b className="text-tx">cancelado</b> não aparece aqui: ele continua no BlueSales e conta nas vendas de lá.
                 </p>
                 {duplicados.map((g) => (
                   <div key={g[0].id} className="rounded-[12px] border border-yel/30 bg-yel/[0.04] overflow-hidden">

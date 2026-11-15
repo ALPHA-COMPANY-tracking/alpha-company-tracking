@@ -326,11 +326,16 @@ export function casaComBusca(p: Pedido, busca: string): boolean {
  * setembro) aparecia como duplicado — foi o caso da Adelia em 18/09/2026,
  * apagado por engano. Recompra dentro do período ainda aparece; a tela
  * avisa quando o grupo tem frustrado.
+ *
+ * CANCELADO não entra: pedido repetido que o time CANCELOU (em vez de apagar)
+ * continua no BlueSales e no "Vendas" dele — tirar daqui desencontra. Foi o
+ * #3871 (cancelado, mesma cliente do #3863): apontado aqui, foi para a
+ * lixeira e 02/11 ficou R$ 435 abaixo do BlueSales (15/11/2026).
  */
 export function possiveisDuplicados(todos: Pedido[], periodo: Periodo): Pedido[][] {
   const grupos = new Map<string, Pedido[]>();
   for (const p of pedidosAtivos(todos)) {
-    if (!isDentro(p.data, periodo.inicio, periodo.fim) || foraDoAgendado(p)) continue;
+    if (!isDentro(p.data, periodo.inicio, periodo.fim) || foraDoAgendado(p) || ehCancelado(p)) continue;
     const chave = nomeComparavel(p.cliente);
     if (chave.length < 4) continue; // sem nome não dá para casar
     const g = grupos.get(chave);

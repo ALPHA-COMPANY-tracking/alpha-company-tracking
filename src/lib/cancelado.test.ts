@@ -89,9 +89,13 @@ describe('cancelado conta no agendado, como no BlueSales', () => {
     expect(s.frustracao.qtd).toBe(0);
   });
 
-  it('pedido refeito com a mesma cliente aparece como possível duplicado', () => {
+  it('pedido refeito com a mesma cliente aparece como possível duplicado — mas não o que foi CANCELADO', () => {
     const refeito = ped('d', 'enviados', 735, { cliente: 'Cliente b' });
-    expect(possiveisDuplicados([cancelado, refeito], P)).toHaveLength(1);
+    const antigo = ped('e2', 'aguard_coleta', 535, { cliente: 'Cliente b' });
+    expect(possiveisDuplicados([antigo, refeito], P)).toHaveLength(1);
+    // Cancelado continua no BlueSales e no "Vendas" dele: não é para a
+    // lixeira (#3871 × #3863, 15/11/2026).
+    expect(possiveisDuplicados([cancelado, refeito], P)).toHaveLength(0);
   });
 
   it('resumo do dia no celular: o mesmo agendado', () => {
