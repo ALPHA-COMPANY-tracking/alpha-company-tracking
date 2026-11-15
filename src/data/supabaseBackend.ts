@@ -62,6 +62,7 @@ export function pedidoDaLinha(r: Record<string, unknown>): Pedido {
           .filter((x) => x && x.data && N(x.valor) > 0)
           .map((x) => ({ data: String(x.data).slice(0, 10), valor: N(x.valor) }))
       : null,
+    tipo_venda: S(r.tipo_venda),
     uf: S(r.uf),
     cidade: S(r.cidade),
     cpf_hash: S(r.cpf_hash),

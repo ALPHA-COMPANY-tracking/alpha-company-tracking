@@ -88,13 +88,27 @@ export function aguardaPagamento(p: Pick<Pedido, 'status'>): boolean {
 }
 
 /**
- * O pedido fica fora do saldo agendado? O RECUSADO e o antecipado que ainda
- * aguarda pagamento sempre — o "Vendas" do BlueSales não conta nenhum dos
- * dois (02/11/2026: 31 pedidos, 1 recusado, card com 30 e R$ 17.850). O
- * cancelado só se a chave mandar.
+ * Venda ANTECIPADA já paga. O BlueSales não conta no agendado — está no
+ * próprio card: "A venda Antecipado não entra: ela já nasce paga e conta só
+ * no Aprovado" (15/11/2026: 07/11 lá 20 · R$ 10.765, o export 21 · R$ 11.200;
+ * o de fora era o #4190, antecipado pago). A que ainda não foi paga conta
+ * (#4481, 11/11, bate com o card).
  */
-export function foraDoAgendado(p: Pick<Pedido, 'status'>, canceladoConta = CANCELADO_NO_AGENDADO): boolean {
-  return ehRecusado(p) || aguardaPagamento(p) || (!canceladoConta && ehCancelado(p));
+export function antecipadoPago(p: Pick<Pedido, 'status'> & { tipo_venda?: string | null }): boolean {
+  return /antecip/.test(norm(p.tipo_venda)) && statusBucket(p.status) === 'aprovado';
+}
+
+/**
+ * O pedido fica fora do saldo agendado? O RECUSADO, o antecipado que ainda
+ * aguarda pagamento e o antecipado já pago sempre — o "Vendas" do BlueSales
+ * não conta nenhum deles (02/11/2026: 31 pedidos, 1 recusado, card com 30 e
+ * R$ 17.850). O cancelado só se a chave mandar.
+ */
+export function foraDoAgendado(
+  p: Pick<Pedido, 'status'> & { tipo_venda?: string | null },
+  canceladoConta = CANCELADO_NO_AGENDADO,
+): boolean {
+  return ehRecusado(p) || aguardaPagamento(p) || antecipadoPago(p) || (!canceladoConta && ehCancelado(p));
 }
 
 /**

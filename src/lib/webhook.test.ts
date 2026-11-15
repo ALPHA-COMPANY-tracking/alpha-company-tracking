@@ -92,6 +92,20 @@ describe('mapearPedido (payload do BlueSales)', () => {
     expect('valor_agendado' in mapearPedido({ event: 'SHIPPING_UPDATE', order: { id: 'BLV-X', status: 'enviados' } }, USER)!).toBe(false);
   });
 
+  it('desconto na hora do pagamento baixa o recebido, não a venda (#3992, 15/11/2026)', () => {
+    const pago = mapearPedido(
+      { ...ORDER_CREATE, event: 'ORDER_PAID', payment: { amount: 400, gross_amount: 435, discount: 35, method: 'pix' } },
+      USER,
+    )!;
+    expect(pago.valor).toBe(400);
+    expect('valor_agendado' in pago).toBe(false);
+  });
+
+  it('guarda o tipo de venda (antecipado pago não entra no agendado)', () => {
+    expect(mapearPedido({ ...ORDER_CREATE, order: { ...ORDER_CREATE.order, type_sales: 'antecipado' } }, USER)!.tipo_venda).toBe('antecipado');
+    expect('tipo_venda' in mapearPedido(ORDER_CREATE, USER)!).toBe(false);
+  });
+
   it('ainda aceita as chaves em português', () => {
     const p = mapearPedido(
       {

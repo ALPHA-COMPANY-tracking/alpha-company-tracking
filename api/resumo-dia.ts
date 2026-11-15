@@ -40,10 +40,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Pedidos que podem entrar no dia: criados hoje, pagos hoje, ou pagos
     // em partes (uma parcela pode cair hoje — migração 0029).
-    const CAMPOS = 'id,status,data,data_aprovacao,valor,valor_agendado,produto_plano,vendedor,metodo_pagamento,enviado_em';
+    let CAMPOS = 'id,status,data,data_aprovacao,valor,valor_agendado,produto_plano,vendedor,metodo_pagamento,enviado_em,tipo_venda';
     const doDia = (campos: string) =>
       db.from('bluesales_pedidos').select(campos).eq('user_id', userId).or(`data.eq.${dia},data_aprovacao.eq.${dia}`);
     let r = await doDia(`${CAMPOS},parcelas`);
+    // Migração 0032 ainda não rodada: segue sem o tipo de venda.
+    if (r.error && /tipo_venda/.test(r.error.message)) {
+      CAMPOS = CAMPOS.replace(',tipo_venda', '');
+      r = await doDia(`${CAMPOS},parcelas`);
+    }
     // Migração 0029 ainda não rodada: segue sem parcelas.
     if (r.error && /parcelas/.test(r.error.message)) r = await doDia(CAMPOS);
     if (r.error) return res.status(200).json({ ok: false, aviso: 'Banco: ' + r.error.message });

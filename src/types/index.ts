@@ -144,6 +144,9 @@ export interface Pedido {
   /** Pagamento em partes (planilha de pagamentos): cada parcela conta na
    *  receita do dia dela. null = pagamento único (migração 0029). */
   parcelas?: { data: IsoDate; valor: number }[] | null;
+  /** Tipo de venda do BlueSales: "afterpay" ou "antecipado" (migração 0032).
+   *  Antecipado pago não entra no agendado. */
+  tipo_venda?: string | null;
   /** Estado (UF) e cidade da entrega — só isso do endereço (migração 0021). */
   uf?: string | null;
   cidade?: string | null;

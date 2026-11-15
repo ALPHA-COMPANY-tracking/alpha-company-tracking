@@ -28,6 +28,8 @@ interface LinhaPedido {
   enviado_em?: string | null;
   /** Pagamento em partes (migração 0029): cada parcela no dia dela. */
   parcelas?: { data?: string; valor?: number | string }[] | null;
+  /** "afterpay" ou "antecipado" (migração 0032). */
+  tipo_venda?: string | null;
 }
 
 /** Data de hoje no fuso de São Paulo, no formato YYYY-MM-DD. */
@@ -94,11 +96,12 @@ export function montarResumo(
   const boletosPorVendedor = new Map<string, number>();
 
   for (const p of pedidos) {
-    // O mesmo agendado da dashboard: recusado e antecipado aguardando pagamento
-    // nunca contam; cancelado, se a chave mandar.
+    // O mesmo agendado da dashboard: recusado, antecipado aguardando pagamento
+    // e antecipado já pago nunca contam; cancelado, se a chave mandar.
     if (
       p.data === dia &&
       !/recus|aguard.*pag/i.test(p.status ?? '') &&
+      !(/antecip/i.test(p.tipo_venda ?? '') && ehPago(p.status)) &&
       (CANCELADO_NO_AGENDADO || !/cancel/i.test(p.status ?? ''))
     ) {
       valor_agendado += Number(p.valor_agendado ?? p.valor ?? 0);

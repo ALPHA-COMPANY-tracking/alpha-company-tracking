@@ -290,8 +290,14 @@ export function mapearPedido(
   // Agendado = o valor ATUAL do pedido (valor − desconto), como o "Vendas" do
   // BlueSales desde meados de out/2026: trocou o plano (6 → 3 meses) ou deu
   // desconto, o agendado acompanha. Antes ficava congelado no 1º aviso
-  // (0008) e em 02/11/2026 sobrou R$ 300 aqui (735 → 435).
-  if (v > 0) pedido.valor_agendado = v;
+  // (0008) e em 02/11/2026 sobrou R$ 300 aqui (735 → 435). MENOS no
+  // pagamento: desconto dado na hora de pagar baixa o recebido, não a venda
+  // (15/11/2026: #3992 pago com R$ 35 de desconto, o card de 04/11 segue com
+  // R$ 435).
+  if (v > 0 && String(body.event ?? '').toUpperCase() !== 'ORDER_PAID') pedido.valor_agendado = v;
+  // "afterpay" ou "antecipado": antecipado pago não entra no agendado.
+  const tipoVenda = txt(pick(order, 'type_sales', 'tipo_venda'));
+  if (tipoVenda) pedido.tipo_venda = tipoVenda;
   const vb = num(
     pick(pagamento, 'gross_amount', 'valor_bruto', 'amount', 'valor') ?? pick(produto, 'price', 'preço', 'preco'),
   );
@@ -436,9 +442,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let { error } = await supabase()
     .from('bluesales_pedidos')
     .upsert(pedido, { onConflict: 'user_id,id' });
-  if (error && /\b(uf|cidade|cpf_hash|tel_hash)\b/.test(error.message)) {
-    // Migração 0021/0022 ainda não rodada: grava o pedido sem esses campos.
-    const { uf: _uf, cidade: _cidade, cpf_hash: _cpf, tel_hash: _tel, ...basico } = pedido;
+  if (error && /\b(uf|cidade|cpf_hash|tel_hash|tipo_venda)\b/.test(error.message)) {
+    // Migração 0021/0022/0032 ainda não rodada: grava o pedido sem esses campos.
+    const { uf: _uf, cidade: _cidade, cpf_hash: _cpf, tel_hash: _tel, tipo_venda: _tipo, ...basico } = pedido;
     ({ error } = await supabase().from('bluesales_pedidos').upsert(basico, { onConflict: 'user_id,id' }));
   }
 

@@ -84,9 +84,10 @@ export function VendasScreen({ periodo, registro }: { periodo: Periodo; registro
   const listaAtivos = buscando ? achados.filter((p) => !p.removido_em) : ativos;
   const listaRemovidos = buscando ? achados.filter((p) => p.removido_em) : removidos;
 
-  // Cancelado continua na lista, mas não é mais venda: fora do saldo agendado.
+  // Recusado, aguardando pagamento e antecipado já pago continuam na lista,
+  // mas não são venda: fora do saldo agendado (como no BlueSales).
   const validos = ativos.filter((p) => !foraDoAgendado(p));
-  const cancelados = ativos.length - validos.length;
+  const foraDoSaldo = ativos.length - validos.length;
   const totalAtivo = validos.reduce((s, p) => s + (Number(p.valor_agendado ?? p.valor) || 0), 0);
   const pagos = ativos.filter((p) => statusBucket(p.status) === 'aprovado').length;
 
@@ -235,7 +236,7 @@ export function VendasScreen({ periodo, registro }: { periodo: Periodo; registro
           <div className="text-[10px] lg:text-[11px] text-dim font-medium mb-[3px] leading-tight">Agendadas</div>
           <div className="mono text-[16px] lg:text-[21px] font-extrabold text-gold2">{validos.length}</div>
           <div className="text-[9.5px] lg:text-[10.5px] text-dim2 mt-[3px]">
-            {cancelados > 0 ? `${cancelados} cancelada${cancelados === 1 ? '' : 's'} fora do saldo` : 'no período'}
+            {foraDoSaldo > 0 ? `+ ${foraDoSaldo} fora do saldo (recusada, aguardando pagamento ou antecipada paga)` : 'no período'}
           </div>
         </div>
         <div className="bg-card border border-line rounded-kpi px-2.5 lg:px-4 py-3 lg:py-[15px]">

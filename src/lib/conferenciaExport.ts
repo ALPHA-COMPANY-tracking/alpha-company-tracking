@@ -31,6 +31,8 @@ export interface PedidoDoExport {
   valor: number;
   data: IsoDate;
   pago_em: IsoDate | null;
+  /** "Afterpay" / "Antecipado" ('' se o export não tiver a coluna). */
+  tipo: string;
 }
 
 const reais = (s: unknown) => Number(String(s ?? '').replace(/\./g, '').replace(',', '.')) || 0;
@@ -53,9 +55,10 @@ export function lerExportBlueSales(texto: string): PedidoDoExport[] {
     desconto: coluna('desconto'),
     data: coluna('data pedido'),
     pago: coluna('pago em'),
+    tipo: coluna('tipo de venda'),
   };
   const faltam = Object.entries(i)
-    .filter(([k, v]) => v < 0 && k !== 'desconto' && k !== 'pago')
+    .filter(([k, v]) => v < 0 && k !== 'desconto' && k !== 'pago' && k !== 'tipo')
     .map(([k]) => k);
   if (faltam.length) {
     throw new Error('Este arquivo não é o export "todas as etapas" do BlueSales (faltam as colunas ID, Codigo, Etapa, Valor ou Data Pedido).');
@@ -72,6 +75,7 @@ export function lerExportBlueSales(texto: string): PedidoDoExport[] {
       valor: centavos(reais(l[i.valor]) - (i.desconto >= 0 ? reais(l[i.desconto]) : 0)) / 100,
       data,
       pago_em: i.pago >= 0 ? dataDe(l[i.pago]) : null,
+      tipo: i.tipo >= 0 ? String(l[i.tipo] ?? '').trim() : '',
     });
   }
   return out;
@@ -155,7 +159,7 @@ export interface Conferencia {
   /** Agendado da dashboard no período, como está e como fica. */
   antes: Totais;
   depois: Totais;
-  /** Agendado do export (sem recusado nem aguardando pagamento). */
+  /** Agendado do export (sem recusado, aguardando pagamento e antecipado pago). */
   blueSales: Totais;
 }
 
@@ -220,7 +224,8 @@ export function conferirComExport(
   const antes = somar(pedidos.filter(conta).map((p) => ({ valor: valorAgendado(p) })));
   const corrigidos = aplicarMudancas(pedidos, mudancas, new Date(0).toISOString());
   const depois = somar(corrigidos.filter(conta).map((p) => ({ valor: valorAgendado(p) })));
-  const blueSales = somar(doExport.filter((l) => !/recus|aguard.*pag/i.test(norm(l.etapa))));
+  // Como o card: sem recusado, aguardando pagamento e antecipado já pago.
+  const blueSales = somar(doExport.filter((l) => !/recus|aguard.*pag/i.test(norm(l.etapa)) && !(/antecip/i.test(l.tipo) && l.pago_em)));
 
   return { periodo, mudancas, avisos, antes, depois, blueSales };
 }

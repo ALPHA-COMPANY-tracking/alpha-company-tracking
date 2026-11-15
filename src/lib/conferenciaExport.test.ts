@@ -35,7 +35,7 @@ describe('lerExportBlueSales', () => {
   it('lê só número, código, etapa, valor − desconto e datas', () => {
     const l = lerExportBlueSales(CSV);
     expect(l).toHaveLength(6);
-    expect(l[1]).toEqual({ numero: 11, codigo: 'BLV-BBB', etapa: 'Enviados', valor: 700, data: '2026-11-02', pago_em: null });
+    expect(l[1]).toEqual({ numero: 11, codigo: 'BLV-BBB', etapa: 'Enviados', valor: 700, data: '2026-11-02', pago_em: null, tipo: 'Afterpay' });
     expect(l[4].pago_em).toBe('2026-11-05');
     expect(Object.keys(l[0])).not.toContain('cpf');
   });
@@ -109,6 +109,15 @@ describe('conferirComExport', () => {
   it('tudo igual: nada a corrigir', () => {
     const iguais = conferirComExport(linhas, aplicarMudancas(pedidos, conf.mudancas, 'x'), P, EXPORTADO, chegadas);
     expect(iguais.mudancas).toEqual([]);
+  });
+
+  it('antecipado já pago não entra no total do BlueSales (como o card) nem no daqui', () => {
+    const comAntecipado = CSV + '\n' + linha(16, 'BLV-ANT', 'Entregues', '435,00', '0,00', '04/11/2026', '04/11/2026').replace(',Afterpay', ',Antecipado');
+    const l2 = lerExportBlueSales(comAntecipado);
+    const aqui = [...aplicarMudancas(pedidos, conf.mudancas, 'x'), ped('BLV-ANT', 'pagos', 435, { data: '2026-11-04', tipo_venda: 'antecipado', data_aprovacao: '2026-11-04' })];
+    const r = conferirComExport(l2, aqui, P, EXPORTADO, chegadas);
+    expect(r.blueSales).toEqual(conf.blueSales);
+    expect(r.depois.valor).toBe(conf.depois.valor);
   });
 
   it('pagamento: pago lá e não aqui vira aviso, sem mexer', () => {

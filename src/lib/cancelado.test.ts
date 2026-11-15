@@ -140,6 +140,21 @@ describe('antecipado aguardando pagamento não é venda (como o "Vendas" do Blue
     expect(agregarPedidos([valido, ped('g', 'pagos', 685)], P).valor_agendado).toBe(735 + 685);
   });
 
+  it('antecipado já pago também fica fora ("já nasce paga e conta só no Aprovado"); o não pago conta', () => {
+    const antecipadoPago = ped('ap', 'pagos', 435, { tipo_venda: 'antecipado', data_aprovacao: '2026-10-07' });
+    const antecipadoAberto = ped('aa', 'aguard_coleta', 335, { tipo_venda: 'antecipado' });
+    expect(foraDoAgendado(antecipadoPago)).toBe(true);
+    expect(foraDoAgendado(antecipadoAberto)).toBe(false);
+    expect(foraDoAgendado({ status: 'pagos', tipo_venda: 'afterpay' })).toBe(false);
+    expect(agregarPedidos([valido, antecipadoPago, antecipadoAberto], P).valor_agendado).toBe(735 + 335);
+    // …mas o pagamento entra no aprovado normalmente.
+    expect(agregarPedidos([antecipadoPago], P).receita_aprovada).toBe(435);
+    const linha = (p: Pedido) => ({ ...p, data_aprovacao: p.data_aprovacao ?? null, valor_agendado: p.valor_agendado ?? null, produto_plano: null, vendedor: p.vendedor ?? null });
+    const r = montarResumo('2026-10-07', [linha(valido), linha(antecipadoPago), linha(antecipadoAberto)], 0, null);
+    expect(r.valor_agendado).toBe(735 + 335);
+    expect(r.receita).toBe(435);
+  });
+
   it('aguardando coleta e aguardando devolução continuam como antes', () => {
     expect(foraDoAgendado({ status: 'aguardando_coleta' })).toBe(false);
     expect(foraDoAgendado({ status: 'aguardando_devolucao' })).toBe(false);
