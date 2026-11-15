@@ -12,7 +12,11 @@
 
 alter table public.bluesales_pedidos add column if not exists tipo_venda text;
 
--- 1. Tipo de venda dos pedidos que já estão aqui, pelo último aviso de cada um.
+-- 1. Tipo de venda dos pedidos que já estão aqui, pelo PRIMEIRO aviso de cada
+--    um: o BlueSales vira para "antecipado" quem paga antes da entrega (#4481),
+--    mas o card só tira a venda que já NASCE antecipada (#4190). Com o último
+--    aviso, 01–15/11 dava 232 · R$ 128.645; com o primeiro, 233 · R$ 128.980 =
+--    card (rodado em 15/11/2026).
 update public.bluesales_pedidos p
 set tipo_venda = x.tipo
 from (
@@ -20,7 +24,7 @@ from (
          w.user_id, w.payload -> 'order' ->> 'id' as id, w.payload -> 'order' ->> 'type_sales' as tipo
   from public.webhook_logs w
   where w.payload -> 'order' ->> 'type_sales' is not null
-  order by w.user_id, w.payload -> 'order' ->> 'id', w.recebido_em desc
+  order by w.user_id, w.payload -> 'order' ->> 'id', w.recebido_em
 ) x
 where p.user_id = x.user_id and p.id = x.id and p.tipo_venda is distinct from x.tipo;
 

@@ -430,14 +430,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Pago não volta atrás: aviso de entrega atrasado mantém o resto (rastreio,
   // valor…), mas não a etapa. E o dia da venda só muda no "pedido criado"
   // (ver dataDaVenda).
-  const { data: atual } = await supabase()
+  let { data: atual, error: erroAtual } = await supabase()
     .from('bluesales_pedidos')
-    .select('status,data')
+    .select('status,data,tipo_venda')
     .eq('user_id', userId)
     .eq('id', pedido.id as string)
     .maybeSingle();
+  if (erroAtual && /tipo_venda/.test(erroAtual.message)) {
+    // Migração 0032 ainda não rodada.
+    ({ data: atual } = await supabase().from('bluesales_pedidos').select('status,data').eq('user_id', userId).eq('id', pedido.id as string).maybeSingle());
+  }
   if (atual && pedido.status != null && voltariaDoPago(atual.status, pedido.status)) delete pedido.status;
   if (atual && !mudaDataDaVenda(body as Record<string, unknown>, atual.data)) delete pedido.data;
+  // O tipo de venda é o de quando o pedido NASCEU: o BlueSales vira para
+  // "antecipado" quem paga antes da entrega (#4481), mas o card só tira o que
+  // já nasce antecipado (#4190) — 15/11/2026.
+  if (atual && (atual as { tipo_venda?: unknown }).tipo_venda) delete pedido.tipo_venda;
 
   let { error } = await supabase()
     .from('bluesales_pedidos')

@@ -91,8 +91,9 @@ export function aguardaPagamento(p: Pick<Pedido, 'status'>): boolean {
  * Venda ANTECIPADA já paga. O BlueSales não conta no agendado — está no
  * próprio card: "A venda Antecipado não entra: ela já nasce paga e conta só
  * no Aprovado" (15/11/2026: 07/11 lá 20 · R$ 10.765, o export 21 · R$ 11.200;
- * o de fora era o #4190, antecipado pago). A que ainda não foi paga conta
- * (#4481, 11/11, bate com o card).
+ * o de fora era o #4190, antecipado pago). O tipo é o de quando o pedido
+ * NASCEU (primeiro aviso): quem vira antecipado por pagar antes da entrega
+ * continua contando (#4481, 11/11, bate com o card).
  */
 export function antecipadoPago(p: Pick<Pedido, 'status'> & { tipo_venda?: string | null }): boolean {
   return /antecip/.test(norm(p.tipo_venda)) && statusBucket(p.status) === 'aprovado';
