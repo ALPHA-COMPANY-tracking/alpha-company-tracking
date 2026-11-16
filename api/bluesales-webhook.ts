@@ -441,7 +441,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ({ data: atual } = await supabase().from('bluesales_pedidos').select('status,data').eq('user_id', userId).eq('id', pedido.id as string).maybeSingle());
   }
   if (atual && pedido.status != null && voltariaDoPago(atual.status, pedido.status)) delete pedido.status;
-  if (atual && !mudaDataDaVenda(body as Record<string, unknown>, atual.data)) delete pedido.data;
+  // Mantém o dia que já está gravado — REPETIDO no upsert, nunca omitido: o
+  // Postgres confere o NOT NULL da linha proposta antes de cair no update, e
+  // sem `data` todo aviso de pedido existente falhava (14/11 16:42 a 15/11:
+  // 41 avisos perdidos, 5 deles pagamentos).
+  if (atual && !mudaDataDaVenda(body as Record<string, unknown>, atual.data)) pedido.data = atual.data;
   // O tipo de venda é o de quando o pedido NASCEU: o BlueSales vira para
   // "antecipado" quem paga antes da entrega (#4481), mas o card só tira o que
   // já nasce antecipado (#4190) — 15/11/2026.

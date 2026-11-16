@@ -48,6 +48,12 @@ describe('dia da venda: o da confirmação, quando o BlueSales confirma depois (
     expect(dataDaVenda(meiaNoite)).toBe('2026-11-14');
   });
 
+  it('o upsert SEMPRE leva o dia (NOT NULL): sem ele, todo aviso de pedido existente falhava (14–15/11/2026)', async () => {
+    const fonte = await import('node:fs').then((fs) => fs.readFileSync('api/bluesales-webhook.ts', 'utf8'));
+    expect(fonte).not.toMatch(/delete pedido\.data\b/);
+    expect(fonte).toMatch(/pedido\.data = atual\.data/);
+  });
+
   it('os outros avisos não mudam o dia de um pedido que já tem dia', () => {
     const enviado = { ...confirmadoDepois, event: 'ORDER_SHIPPED', occurred_at: '2026-11-14T12:09:03-03:00' };
     expect(dataDaVenda(enviado)).toBe('2026-11-12'); // o do cadastro…
