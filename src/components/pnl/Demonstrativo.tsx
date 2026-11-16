@@ -17,7 +17,7 @@ import type { Cents } from '@/lib/money';
 import { formatBRL, formatPercent, safeDiv } from '@/lib/money';
 import { type PnlResult, custoNoPeriodo } from '@/lib/pnl';
 import { COMISSAO_COBRANCA, RESPONSAVEL_COBRANCA } from '@/lib/custosConfig';
-import { COR_GRUPO, type DegrauCascata, type GrupoDRE, degrausCascata, montarDRE, porReal } from '@/lib/dre';
+import { COR_GRUPO, type DegrauCascata, type GrupoDRE, degrausCascata, montarDRE } from '@/lib/dre';
 import { alfa, corDaCategoria } from '@/lib/cores';
 import { hojeIso } from '@/lib/dates';
 import { seloPeriodo } from '@/lib/tendencia';
@@ -552,10 +552,11 @@ export function Demonstrativo({
 
       {/* 3 · Resultado */}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] border-t border-line">
-        {/* Para onde foi cada real */}
+        {/* Para onde foi o dinheiro: o valor do período de cada grupo (o Jonas
+            não quer os centavos por real — 16/11/2026) e o % do recebido. */}
         <div className="px-4 lg:px-6 py-5">
-          <div className="text-[11px] font-bold tracking-[0.13em] uppercase text-tx2">Para onde foi cada R$ 1,00</div>
-          <div className="text-[11.5px] text-dim2 mt-0.5">Quanto de cada real recebido foi para cada grupo</div>
+          <div className="text-[11px] font-bold tracking-[0.13em] uppercase text-tx2">Para onde foi o dinheiro</div>
+          <div className="text-[11.5px] text-dim2 mt-0.5">Quanto do recebido no período foi para cada grupo</div>
           <div className="flex h-[12px] rounded-full overflow-hidden gap-[2px] mt-4 bg-trilha">
             {destinos.map((d) => (
               <div
@@ -574,12 +575,10 @@ export function Demonstrativo({
                   <div className="text-[11.5px] text-dim truncate">{d.nome}</div>
                   <div className="flex items-baseline gap-1.5">
                     <span className={`mono text-[13px] font-bold ${d.id === 'lucro' ? 'text-grn' : 'text-tx'}`}>
-                      {porReal(d.total, receita)}
+                      {formatBRL(d.total)}
                     </span>
                     <span className="mono text-[10px] text-dim2">{formatPercent(safeDiv(d.total, receita))}</span>
                   </div>
-                  {/* O valor do período ao lado dos centavos: "R$ 0,00" sozinho parecia vazio. */}
-                  <div className="mono text-[10.5px] text-dim2">{formatBRL(d.total)} no período</div>
                 </div>
               </div>
             ))}
