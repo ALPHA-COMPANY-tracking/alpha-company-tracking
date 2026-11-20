@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Loader2, Plug, RefreshCw, Save, Scale, Search, Trash2, TriangleAlert } from 'lucide-react';
+import { Check, Loader2, Plug, RefreshCw, Save, Scale, Search, Trash2, TriangleAlert, X } from 'lucide-react';
 import { formatBRL, reaisToCents } from '@/lib/money';
 import { addDias, hojeIso } from '@/lib/dates';
 import { haQuanto } from '@/lib/saudacao';
@@ -14,8 +14,10 @@ import { Panel } from '@/components/ui';
 import {
   type ContaCadastro,
   type ContaMeta,
+  type CotacaoDesde,
   type ResultadoBusca,
   type RespostaMeta,
+  sincronizarPeriodoMeta,
   buscarNomesMeta,
   cadastrarContasMeta,
   cadastrarManualMeta,
@@ -36,6 +38,11 @@ function formatData(iso: string): string {
 /** 5.4 → "5,40"; aceita de volta "5,4" ou "5.40". */
 const numBR = (n: number, casas = 2) => n.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: 4 });
 const lerNum = (s: string) => Number(s.replace(/\s/g, '').replace(',', '.'));
+
+/** "desde" da taxa que já valia antes de qualquer troca. */
+const SEMPRE = '0001-01-01';
+/** Primeiro dia puxado do Meta (antes disso o gasto foi lançado à mão). */
+const INICIO_INTEGRACAO = '2026-09-15';
 
 function SeloMoeda({ moeda }: { moeda: string }) {
   const dolar = moeda === 'USD';
@@ -60,9 +67,10 @@ export function FacebookScreen() {
   const [cadastro, setCadastro] = useState<ContaCadastro[] | null>(null);
   const [salvas, setSalvas] = useState<string[]>([]);
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
-  const [cotacao, setCotacao] = useState('');
   const [imposto, setImposto] = useState('');
   const [cfg, setCfg] = useState<{ cotacao: number | null; imposto: number } | null>(null);
+  const [historico, setHistorico] = useState<{ aPartir: CotacaoDesde[]; dias: Record<string, number> }>({ aPartir: [], dias: {} });
+  const [temCotacoes, setTemCotacoes] = useState(true);
   const [migracao, setMigracao] = useState(true);
   const [salvando, setSalvando] = useState<'contas' | 'cotacao' | 'imposto' | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -77,7 +85,8 @@ export function FacebookScreen() {
       setSalvas(r.config.contas);
       setMarcadas(new Set(r.config.contas));
       setCfg({ cotacao: r.config.cotacao_usd, imposto: r.config.imposto_brl_pct });
-      setCotacao(r.config.cotacao_usd != null ? numBR(r.config.cotacao_usd) : '');
+      setHistorico({ aPartir: r.config.cotacoes_usd ?? [], dias: r.config.cotacoes_dia ?? {} });
+      setTemCotacoes(Boolean(r.cotacoes));
       setImposto(numBR(r.config.imposto_brl_pct, 1));
       setMigracao(r.migracao);
     });
@@ -109,14 +118,41 @@ export function FacebookScreen() {
     }
   }
 
-  async function salvar(qual: 'contas' | 'cotacao' | 'imposto') {
+  /**
+   * Taxa do dólar: grava (a partir de um dia, ou o dólar de um dia só) e
+   * refaz o gasto SÓ dos dias que ela muda — os de antes ficam como estão.
+   */
+  async function salvarTaxa(
+    patch: Parameters<typeof salvarConfigMeta>[0],
+    periodo: { desde: string; ate: string },
+    feito: string,
+  ) {
     setAviso(null);
-    const patch =
-      qual === 'contas'
-        ? { contas: [...marcadas] }
-        : qual === 'cotacao'
-          ? { cotacao_usd: lerNum(cotacao) }
-          : { imposto_brl_pct: lerNum(imposto) };
+    setSalvando('cotacao');
+    const r = await salvarConfigMeta(patch);
+    if (!r.ok) {
+      setSalvando(null);
+      return setAviso(r.aviso);
+    }
+    setCfg({ cotacao: r.config.cotacao_usd, imposto: r.config.imposto_brl_pct });
+    setHistorico({ aPartir: r.config.cotacoes_usd ?? [], dias: r.config.cotacoes_dia ?? {} });
+    const desde = periodo.desde < INICIO_INTEGRACAO ? INICIO_INTEGRACAO : periodo.desde;
+    const sync = desde <= periodo.ate ? await sincronizarPeriodoMeta(desde, periodo.ate) : null;
+    if (sync?.ok) await recarregar();
+    setSalvando(null);
+    const dias = desde === periodo.ate ? formatData(desde) : `${formatData(desde)} a ${formatData(periodo.ate)}`;
+    setAviso(
+      !sync
+        ? `${feito} Nenhum dia sincronizado mudou.`
+        : sync.ok
+          ? `${feito} Refiz o gasto de ${dias}; os outros dias não mudaram.`
+          : `${feito} Mas a sincronização falhou (${sync.aviso}) — toque em Sincronizar agora.`,
+    );
+  }
+
+  async function salvar(qual: 'contas' | 'imposto') {
+    setAviso(null);
+    const patch = qual === 'contas' ? { contas: [...marcadas] } : { imposto_brl_pct: lerNum(imposto) };
     setSalvando(qual);
     const r = await salvarConfigMeta(patch);
     setSalvando(null);
@@ -350,17 +386,26 @@ export function FacebookScreen() {
 
       {/* Conversão e imposto */}
       <Panel title="Conversão de moeda e imposto">
+        {!temCotacoes && migracao && (
+          <div className="mx-3.5 lg:mx-5 mt-4 flex items-start gap-2.5 rounded-[10px] border border-yel/40 bg-yel/[0.07] px-3.5 py-2.5 text-[12px] text-dim">
+            <TriangleAlert size={14} className="text-yel shrink-0 mt-[2px]" />
+            Falta rodar a migração 0033 no Supabase para a taxa do dólar valer a partir de uma data (sem ela, trocar a
+            taxa mudaria também os dias de antes).
+          </div>
+        )}
         <div className="p-3.5 lg:p-5 grid gap-4 lg:grid-cols-2">
-          <CampoNumero
-            rotulo="Taxa USD → BRL"
-            ajuda="Contas em dólar: gasto × esta taxa. O BlueSales usa R$ 5,40."
-            valor={cotacao}
-            onChange={setCotacao}
-            salvo={cfg?.cotacao != null && lerNum(cotacao) === cfg.cotacao}
-            carregando={salvando === 'cotacao'}
-            desabilitado={!migracao || !(lerNum(cotacao) > 0)}
-            onSalvar={() => salvar('cotacao')}
-            botao="Salvar taxa"
+          <TaxaDolar
+            hoje={hojeIso()}
+            atual={cfg?.cotacao ?? null}
+            historico={historico.aPartir}
+            ocupado={salvando === 'cotacao'}
+            desabilitado={!migracao || !temCotacoes}
+            onSalvar={(valor, desde) =>
+              salvarTaxa({ cotacao_usd: valor, cotacao_desde: desde }, { desde, ate: hojeIso() }, `Taxa de R$ ${numBR(valor)} salva a partir de ${formatData(desde)}.`)
+            }
+            onRemover={(desde) =>
+              salvarTaxa({ remover_cotacao_desde: desde }, { desde, ate: hojeIso() }, `Taxa de ${formatData(desde)} removida.`)
+            }
           />
           <CampoNumero
             rotulo="Imposto do Meta nas contas em real (%)"
@@ -374,9 +419,22 @@ export function FacebookScreen() {
             botao="Salvar imposto"
           />
         </div>
+        <DolarDoDia
+          hoje={hojeIso()}
+          dias={historico.dias}
+          ocupado={salvando === 'cotacao'}
+          desabilitado={!migracao || !temCotacoes}
+          onSalvar={(dia, valor) =>
+            salvarTaxa(
+              { cotacao_dia: { dia, valor } },
+              { desde: dia, ate: dia },
+              valor == null ? `Dólar de ${formatData(dia)} removido.` : `Dólar de R$ ${numBR(valor)} salvo para ${formatData(dia)}.`,
+            )
+          }
+        />
         <div className="px-3.5 lg:px-5 pb-4 text-[11.5px] text-dim2 leading-relaxed">
-          A taxa e o imposto valem a partir da próxima sincronização: a automática refaz os últimos 3 dias, e o botão
-          Sincronizar agora refaz desde 15/09.
+          A taxa do dólar refaz sozinha só os dias que ela muda. O imposto vale a partir da próxima sincronização: a
+          automática refaz os últimos 3 dias, e o botão Sincronizar agora, os últimos 30.
         </div>
         {aviso && (
           <div className="mx-3.5 lg:mx-5 mb-4 rounded-[10px] border border-line2 bg-card2 px-3.5 py-2.5 text-[12px] text-dim">
@@ -918,6 +976,176 @@ function CampoNumero(p: {
         </button>
       </div>
       <div className="text-[11px] text-dim2 mt-2 leading-snug">{p.ajuda}</div>
+    </div>
+  );
+}
+
+const CAMPO_TAXA =
+  'bg-card border border-line2 rounded-[10px] px-3 py-[9px] text-[14px] text-tx mono outline-none focus:border-gold/50 disabled:opacity-50';
+
+function BotaoSalvar({ onClick, desabilitado, ocupado, texto }: { onClick: () => void; desabilitado: boolean; ocupado: boolean; texto: string }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={desabilitado || ocupado}
+      className="inline-flex items-center gap-1.5 px-3.5 py-[9px] rounded-[10px] text-[12.5px] font-semibold bg-white text-bg disabled:bg-chip disabled:text-dim2 disabled:cursor-default"
+    >
+      {ocupado && <Loader2 size={14} className="animate-spin" />}
+      {texto}
+    </button>
+  );
+}
+
+/**
+ * Taxa USD → BRL com data: vale a partir do dia escolhido e não muda os
+ * dias de antes (Jonas, 20/11/2026). Mostra o histórico.
+ */
+function TaxaDolar(p: {
+  hoje: string;
+  atual: number | null;
+  historico: CotacaoDesde[];
+  ocupado: boolean;
+  desabilitado: boolean;
+  onSalvar: (valor: number, desde: string) => void;
+  onRemover: (desde: string) => void;
+}) {
+  const [valor, setValor] = useState('');
+  const [desde, setDesde] = useState(p.hoje);
+  const v = lerNum(valor);
+  return (
+    <div className="rounded-[12px] border border-line bg-card2 px-4 py-3.5">
+      <div className="text-[10.5px] uppercase tracking-[0.1em] font-bold text-dim2">Taxa USD → BRL</div>
+      <div className="flex flex-wrap items-center gap-2 mt-2">
+        <input
+          value={valor}
+          onChange={(e) => setValor(e.target.value)}
+          inputMode="decimal"
+          placeholder={p.atual != null ? numBR(p.atual) : '6,15'}
+          aria-label="Nova taxa do dólar"
+          disabled={p.desabilitado}
+          className={`w-[100px] ${CAMPO_TAXA}`}
+        />
+        <span className="text-[12px] text-dim">a partir de</span>
+        <input
+          type="date"
+          value={desde}
+          max={p.hoje}
+          min={INICIO_INTEGRACAO}
+          onChange={(e) => e.target.value && setDesde(e.target.value)}
+          aria-label="A taxa vale a partir de"
+          disabled={p.desabilitado}
+          className={`text-[13px] ${CAMPO_TAXA}`}
+        />
+        <BotaoSalvar
+          onClick={() => {
+            p.onSalvar(v, desde);
+            setValor('');
+          }}
+          desabilitado={p.desabilitado || !(v > 0 && v <= 50)}
+          ocupado={p.ocupado}
+          texto="Salvar taxa"
+        />
+      </div>
+      <div className="text-[11px] text-dim2 mt-2 leading-snug">
+        Contas em dólar: gasto × a taxa do dia. A taxa nova vale <b className="text-dim">a partir do dia escolhido</b> — os dias
+        de antes não mudam. O BlueSales usa R$ 5,40.
+      </div>
+      {p.historico.length > 0 && (
+        <div className="mt-3 rounded-[10px] border border-line bg-card divide-y divide-line/70">
+          {p.historico.map((c) => (
+            <div key={c.desde} className="flex items-center justify-between gap-3 px-3 py-[7px] text-[12.5px]">
+              <span className="text-dim">{c.desde === SEMPRE ? 'antes disso' : `a partir de ${formatData(c.desde)}`}</span>
+              <span className="flex items-center gap-2">
+                <span className="mono font-semibold text-tx">R$ {numBR(c.valor)}</span>
+                {c.desde !== SEMPRE ? (
+                  <button
+                    onClick={() => p.onRemover(c.desde)}
+                    disabled={p.ocupado || p.desabilitado}
+                    title="Tirar esta taxa (os dias voltam para a taxa de antes)"
+                    className="grid place-items-center w-6 h-6 rounded-md text-dim2 hover:text-red hover:bg-red/10 disabled:opacity-40"
+                  >
+                    <X size={13} />
+                  </button>
+                ) : (
+                  <span className="w-6" />
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** O dólar exato que o cartão cobrou num dia — vale só para esse dia. */
+function DolarDoDia(p: {
+  hoje: string;
+  dias: Record<string, number>;
+  ocupado: boolean;
+  desabilitado: boolean;
+  onSalvar: (dia: string, valor: number | null) => void;
+}) {
+  const [dia, setDia] = useState(p.hoje);
+  const [valor, setValor] = useState('');
+  const v = lerNum(valor);
+  const lista = Object.entries(p.dias).sort((a, b) => b[0].localeCompare(a[0]));
+  return (
+    <div className="mx-3.5 lg:mx-5 mb-4 rounded-[12px] border border-line bg-card2 px-4 py-3.5">
+      <div className="text-[10.5px] uppercase tracking-[0.1em] font-bold text-dim2">Dólar de um dia (valor exato do cartão)</div>
+      <div className="flex flex-wrap items-center gap-2 mt-2">
+        <input
+          type="date"
+          value={dia}
+          max={p.hoje}
+          min={INICIO_INTEGRACAO}
+          onChange={(e) => e.target.value && setDia(e.target.value)}
+          aria-label="Dia"
+          disabled={p.desabilitado}
+          className={`text-[13px] ${CAMPO_TAXA}`}
+        />
+        <input
+          value={valor}
+          onChange={(e) => setValor(e.target.value)}
+          inputMode="decimal"
+          placeholder={p.dias[dia] ? numBR(p.dias[dia]) : '6,12'}
+          aria-label="Dólar do dia"
+          disabled={p.desabilitado}
+          className={`w-[100px] ${CAMPO_TAXA}`}
+        />
+        <BotaoSalvar
+          onClick={() => {
+            p.onSalvar(dia, v);
+            setValor('');
+          }}
+          desabilitado={p.desabilitado || !(v > 0 && v <= 50)}
+          ocupado={p.ocupado}
+          texto="Salvar dia"
+        />
+      </div>
+      <div className="text-[11px] text-dim2 mt-2 leading-snug">
+        Vale só para esse dia e passa na frente da taxa acima — use para o dólar que o cartão cobrou de verdade.
+      </div>
+      {lista.length > 0 && (
+        <div className="mt-3 rounded-[10px] border border-line bg-card divide-y divide-line/70">
+          {lista.map(([d, valorDia]) => (
+            <div key={d} className="flex items-center justify-between gap-3 px-3 py-[7px] text-[12.5px]">
+              <span className="text-dim">{formatData(d)}</span>
+              <span className="flex items-center gap-2">
+                <span className="mono font-semibold text-tx">R$ {numBR(valorDia)}</span>
+                <button
+                  onClick={() => p.onSalvar(d, null)}
+                  disabled={p.ocupado || p.desabilitado}
+                  title="Tirar (o dia volta para a taxa de cima)"
+                  className="grid place-items-center w-6 h-6 rounded-md text-dim2 hover:text-red hover:bg-red/10 disabled:opacity-40"
+                >
+                  <X size={13} />
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

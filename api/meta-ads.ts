@@ -7,7 +7,12 @@
 //        só mostra, não grava (para comparar com o BlueSales)
 //   POST /api/meta-ads?acao=contas        o cadastro de contas + a configuração
 //   POST /api/meta-ads?acao=salvar        grava a configuração (corpo JSON:
-//        { contas?: string[], cotacao_usd?: number, imposto_brl_pct?: number })
+//        { contas?: string[], cotacao_usd?: number, cotacao_desde?: 'AAAA-MM-DD',
+//          remover_cotacao_desde?: 'AAAA-MM-DD', cotacao_dia?: { dia, valor|null },
+//          imposto_brl_pct?: number })
+//        A taxa do dólar vale A PARTIR de `cotacao_desde` (padrão: hoje) e não
+//        muda os dias de antes; `cotacao_dia` é o dólar exato de um dia só
+//        (migração 0033). Depois de salvar, a tela sincroniza o período afetado.
 //
 // Cadastro de contas, como no BlueSales (corpo JSON):
 //   acao=buscar      { bm_id, token?, ids }  nome/moeda/status de cada conta
@@ -34,7 +39,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ContaCadastrada, ResultadoConta } from './lib-meta.js';
+import type { ContaCadastrada, CotacaoDesde, ResultadoConta } from './lib-meta.js';
 
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -46,40 +51,51 @@ function numeroOuNulo(v: unknown): number | null {
 
 interface ConfigSalva {
   contas: string[];
+  /** A taxa que vale hoje (a da tela). */
   cotacao_usd: number;
   imposto_brl_pct: number;
+  /** Taxa a partir de um dia (migração 0033); vazio = `cotacao_usd` em todos. */
+  cotacoes_usd: CotacaoDesde[];
+  /** Dólar exato de um dia só (migração 0033). */
+  cotacoes_dia: Record<string, number>;
 }
 
 /**
  * Configuração da tela. config null = ainda não salva; cadastro null =
- * migração 0020 não rodada; 'sem-tabela' = nem a 0019.
+ * migração 0020 não rodada; cotacoes false = 0033 não rodada; 'sem-tabela'
+ * = nem a 0019.
  */
 async function lerConfig(
   db: SupabaseClient,
   userId: string,
-): Promise<{ config: ConfigSalva | null; cadastro: unknown[] | null } | 'sem-tabela'> {
-  const com = await db
-    .from('meta_integracao')
-    .select('contas,cotacao_usd,imposto_brl_pct,cadastro')
-    .eq('user_id', userId)
-    .maybeSingle();
-  let data = com.data as Record<string, unknown> | null;
-  const temCadastro = !com.error;
-  if (com.error) {
-    const sem = await db.from('meta_integracao').select('contas,cotacao_usd,imposto_brl_pct').eq('user_id', userId).maybeSingle();
-    if (sem.error) return 'sem-tabela';
-    data = sem.data as Record<string, unknown> | null;
+): Promise<{ config: ConfigSalva | null; cadastro: unknown[] | null; cotacoes: boolean } | 'sem-tabela'> {
+  const meta = await import('./lib-meta.js');
+  const tentativas = [
+    'contas,cotacao_usd,imposto_brl_pct,cadastro,cotacoes_usd,cotacoes_dia',
+    'contas,cotacao_usd,imposto_brl_pct,cadastro',
+    'contas,cotacao_usd,imposto_brl_pct',
+  ];
+  for (const campos of tentativas) {
+    const r = await db.from('meta_integracao').select(campos).eq('user_id', userId).maybeSingle();
+    if (r.error) continue;
+    const data = r.data as unknown as Record<string, unknown> | null;
+    const cotacoes = campos.includes('cotacoes_usd');
+    const cadastro = campos.includes('cadastro') ? (Array.isArray(data?.cadastro) ? (data.cadastro as unknown[]) : []) : null;
+    if (!data) return { config: null, cadastro, cotacoes };
+    const hist = meta.lerCotacoes(data.cotacoes_usd, data.cotacoes_dia);
+    return {
+      config: {
+        contas: Array.isArray(data.contas) ? data.contas.map(String) : [],
+        cotacao_usd: Number(data.cotacao_usd),
+        imposto_brl_pct: Number(data.imposto_brl_pct),
+        cotacoes_usd: hist.aPartir,
+        cotacoes_dia: hist.dias,
+      },
+      cadastro,
+      cotacoes,
+    };
   }
-  const cadastro = temCadastro ? (Array.isArray(data?.cadastro) ? (data.cadastro as unknown[]) : []) : null;
-  if (!data) return { config: null, cadastro };
-  return {
-    config: {
-      contas: Array.isArray(data.contas) ? data.contas.map(String) : [],
-      cotacao_usd: Number(data.cotacao_usd),
-      imposto_brl_pct: Number(data.imposto_brl_pct),
-    },
-    cadastro,
-  };
+  return 'sem-tabela';
 }
 
 /** Token de cada BM importada. Só o servidor lê esta tabela. */
@@ -137,7 +153,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : (process.env.META_AD_ACCOUNT_IDS ?? '').split(/[\s,;]+/).map(meta.normalizarConta).filter(Boolean),
       cotacao_usd: config ? config.cotacao_usd : cotacaoEnv === 'ptax' ? null : (numeroOuNulo(cotacaoEnv) ?? meta.COTACAO_BLUESALES),
       imposto_brl_pct: config ? config.imposto_brl_pct : meta.IMPOSTO_BRL_PADRAO,
+      cotacoes_usd: config?.cotacoes_usd ?? [],
+      cotacoes_dia: config?.cotacoes_dia ?? {},
     };
+    const temCotacoes = !semTabela && lido.cotacoes;
+    /** Taxa do dólar de cada dia: a do próprio dia, a que valia a partir de… ou a fixa. */
+    const taxaDoDia = (dia: string) =>
+      meta.cotacaoDoDia(dia, { aPartir: efetiva.cotacoes_usd, dias: efetiva.cotacoes_dia, fixa: efetiva.cotacao_usd });
     const versao = process.env.META_API_VERSION || undefined;
     const buscar = (url: string) => fetch(url);
 
@@ -173,23 +195,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         contas: config?.contas ?? [],
         cotacao_usd: config?.cotacao_usd ?? meta.COTACAO_BLUESALES,
         imposto_brl_pct: config?.imposto_brl_pct ?? meta.IMPOSTO_BRL_PADRAO,
+        cotacoes_usd: config?.cotacoes_usd ?? [],
+        cotacoes_dia: { ...(config?.cotacoes_dia ?? {}) },
       };
+      const mexeNaTaxa = corpo.cotacao_usd !== undefined || corpo.remover_cotacao_desde !== undefined || corpo.cotacao_dia !== undefined;
+      // Sem a 0033, salvar a taxa trocaria TODOS os dias para trás — é o que
+      // não pode acontecer.
+      if (mexeNaTaxa && !temCotacoes) return aviso('Rode a migração 0033 no Supabase: sem ela a taxa nova mudaria também os dias de antes.');
+      const hoje = meta.hojeSP();
       if (Array.isArray(corpo.contas)) nova.contas = meta.lerIds(corpo.contas);
       if (corpo.cotacao_usd !== undefined) {
         const c = numeroOuNulo(corpo.cotacao_usd);
         if (!c || c > 50) return aviso('Taxa do dólar inválida.');
-        nova.cotacao_usd = c;
+        const desde = typeof corpo.cotacao_desde === 'string' && DATA.test(corpo.cotacao_desde) ? corpo.cotacao_desde : hoje;
+        nova.cotacoes_usd = meta.novaCotacaoDesde(nova.cotacoes_usd, config?.cotacao_usd ?? meta.COTACAO_BLUESALES, desde, c);
       }
+      if (typeof corpo.remover_cotacao_desde === 'string' && corpo.remover_cotacao_desde !== meta.SEMPRE) {
+        nova.cotacoes_usd = nova.cotacoes_usd.filter((x) => x.desde !== corpo.remover_cotacao_desde);
+      }
+      if (corpo.cotacao_dia !== undefined) {
+        const cd = (corpo.cotacao_dia ?? {}) as { dia?: unknown; valor?: unknown };
+        const dia = String(cd.dia ?? '');
+        if (!DATA.test(dia)) return aviso('Escolha o dia.');
+        if (cd.valor == null || cd.valor === '' || Number(cd.valor) === 0) delete nova.cotacoes_dia[dia];
+        else {
+          const v = numeroOuNulo(cd.valor);
+          if (!v || v > 50) return aviso('Valor do dólar inválido.');
+          nova.cotacoes_dia[dia] = v;
+        }
+      }
+      // A taxa da tela é a que vale hoje.
+      if (mexeNaTaxa) nova.cotacao_usd = meta.cotacaoDoDia(hoje, { aPartir: nova.cotacoes_usd, dias: {}, fixa: nova.cotacao_usd }) ?? nova.cotacao_usd;
       if (corpo.imposto_brl_pct !== undefined) {
         const i = Number(String(corpo.imposto_brl_pct).replace(',', '.'));
         if (!Number.isFinite(i) || i < 0 || i > 100) return aviso('Imposto inválido.');
         nova.imposto_brl_pct = i;
       }
+      const { cotacoes_usd, cotacoes_dia, ...basica } = nova;
       const { error } = await db
         .from('meta_integracao')
-        .upsert({ user_id: userId, ...nova, atualizado_em: new Date().toISOString() }, { onConflict: 'user_id' });
+        .upsert(
+          { user_id: userId, ...basica, ...(temCotacoes ? { cotacoes_usd, cotacoes_dia } : {}), atualizado_em: new Date().toISOString() },
+          { onConflict: 'user_id' },
+        );
       if (error) return aviso('Banco: ' + error.message);
-      return res.status(200).json({ ok: true, config: nova });
+      return res.status(200).json({ ok: true, config: nova, cotacoes: temCotacoes });
     }
 
     // ── Cadastro de contas ──
@@ -310,7 +360,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ── Cadastro + configuração, para a tela ──
     if (acao === 'contas') {
       if (cadastro) {
-        return res.status(200).json({ ok: true, cadastro: vista(cadastro), contas: [], config: efetiva, salva: Boolean(config), migracao: true });
+        return res
+          .status(200)
+          .json({ ok: true, cadastro: vista(cadastro), contas: [], config: efetiva, salva: Boolean(config), migracao: true, cotacoes: temCotacoes });
       }
       // Antes da migração 0020: as contas que o token da Vercel enxerga.
       if (!tokenVercel) return res.status(200).json({ ok: false, configurado: false, aviso: avisoVercel });
@@ -354,6 +406,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ate,
       versao,
       cotacaoFixa: efetiva.cotacao_usd,
+      cotacaoDoDia: taxaDoDia,
       acrescimoPct: numeroOuNulo(process.env.META_ACRESCIMO_PCT) ?? 0,
       impostoBrlPct: efetiva.imposto_brl_pct,
     });

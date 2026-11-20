@@ -33,11 +33,21 @@ export interface ContaMeta {
   business: string | null;
 }
 
+/** Taxa do dólar que vale a partir de um dia ('0001-01-01' = antes de tudo). */
+export interface CotacaoDesde {
+  desde: string;
+  valor: number;
+}
+
 export interface ConfigMeta {
   contas: string[];
-  /** null = cotação do Banco Central (só pela variável da Vercel). */
+  /** A taxa de hoje. null = cotação do Banco Central (só pela variável da Vercel). */
   cotacao_usd: number | null;
   imposto_brl_pct: number;
+  /** Histórico da taxa (migração 0033): cada uma vale a partir do seu dia. */
+  cotacoes_usd?: CotacaoDesde[];
+  /** Dólar exato de um dia só (migração 0033). */
+  cotacoes_dia?: Record<string, number>;
 }
 
 /** Conta do cadastro (Importar BM ou Manual). O token nunca vem para a tela. */
@@ -57,6 +67,8 @@ export type RespostaContas =
       config: ConfigMeta;
       salva: boolean;
       migracao: boolean;
+      /** A migração 0033 (taxa com data) já rodou. */
+      cotacoes?: boolean;
     }
   | { ok: false; aviso: string; configurado?: boolean };
 
@@ -139,7 +151,39 @@ export function redetectarContasMeta() {
   return chamar<RespostaCadastro>(new URLSearchParams({ acao: 'redetectar' }), {}) as Promise<RespostaCadastro>;
 }
 
-/** Grava contas marcadas, taxa do dólar e/ou imposto das contas em real. */
-export function salvarConfigMeta(patch: Partial<{ contas: string[]; cotacao_usd: number; imposto_brl_pct: number }>) {
+/**
+ * Grava contas marcadas, taxa do dólar e/ou imposto das contas em real. A
+ * taxa vale a partir de `cotacao_desde` (padrão: hoje); `cotacao_dia` é o
+ * dólar de um dia só (valor null tira).
+ */
+export function salvarConfigMeta(
+  patch: Partial<{
+    contas: string[];
+    cotacao_usd: number;
+    cotacao_desde: string;
+    remover_cotacao_desde: string;
+    cotacao_dia: { dia: string; valor: number | null };
+    imposto_brl_pct: number;
+  }>,
+) {
   return chamar<RespostaSalvar>(new URLSearchParams({ acao: 'salvar' }), patch) as Promise<RespostaSalvar>;
+}
+
+/** Sincroniza um período de qualquer tamanho, de 62 em 62 dias (o limite do servidor). */
+export async function sincronizarPeriodoMeta(desde: string, ate: string): Promise<RespostaMeta> {
+  let ultimo: RespostaMeta = { ok: true, simulado: false, desde, ate, dias: [] };
+  for (let ini = desde; ini <= ate; ) {
+    const fim = (() => {
+      const d = new Date(`${ini}T12:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + 61);
+      const iso = d.toISOString().slice(0, 10);
+      return iso < ate ? iso : ate;
+    })();
+    ultimo = await sincronizarMeta({ desde: ini, ate: fim });
+    if (!ultimo.ok) return ultimo;
+    const d = new Date(`${fim}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + 1);
+    ini = d.toISOString().slice(0, 10);
+  }
+  return ultimo;
 }

@@ -8,14 +8,18 @@ import {
   type ContaCadastrada,
   buscarPtax,
   consolidar,
+  cotacaoDoDia,
   cotacaoNaData,
   diasEntre,
   gastoMetaPorDia,
   lerCadastro,
+  lerCotacoes,
   lerIds,
   limparToken,
   mesclarCadastro,
   normalizarConta,
+  novaCotacaoDesde,
+  SEMPRE,
   tokensDasContas,
 } from '../../api/lib-meta';
 
@@ -318,6 +322,67 @@ describe('soma por dia em reais', () => {
       acrescimoPct: 3.5,
     });
     expect(dias[0].reais).toBe(517.5); // 100 × 5 × 1,035
+    expect(chamadas.some((u) => u.includes('bcb.gov.br'))).toBe(false);
+  });
+});
+
+describe('taxa do dólar com data (20/11/2026: 5,40 → 6,15 só a partir do dia)', () => {
+  const historico = [
+    { desde: '2026-11-20', valor: 6.15 },
+    { desde: SEMPRE, valor: 5.4 },
+  ];
+
+  it('cada dia usa a taxa que valia nele; o dólar de um dia passa na frente', () => {
+    const opts = { aPartir: historico, dias: { '2026-11-21': 6.12 }, fixa: 6.15 };
+    expect(cotacaoDoDia('2026-11-19', opts)).toBe(5.4);
+    expect(cotacaoDoDia('2026-10-22', opts)).toBe(5.4);
+    expect(cotacaoDoDia('2026-11-20', opts)).toBe(6.15);
+    expect(cotacaoDoDia('2026-11-21', opts)).toBe(6.12);
+    expect(cotacaoDoDia('2026-11-22', opts)).toBe(6.15);
+    // Sem histórico: a fixa (null = PTAX).
+    expect(cotacaoDoDia('2026-11-19', { aPartir: [], dias: {}, fixa: 5.4 })).toBe(5.4);
+    expect(cotacaoDoDia('2026-11-19', { aPartir: [], dias: {}, fixa: null })).toBeNull();
+  });
+
+  it('a primeira troca guarda a taxa de antes para trás; trocar no mesmo dia substitui', () => {
+    expect(novaCotacaoDesde([], 5.4, '2026-11-20', 6.15)).toEqual(historico);
+    expect(novaCotacaoDesde(historico, 6.15, '2026-11-20', 6.2)).toEqual([
+      { desde: '2026-11-20', valor: 6.2 },
+      { desde: SEMPRE, valor: 5.4 },
+    ]);
+    expect(novaCotacaoDesde(historico, 6.15, '2026-12-01', 6.3).map((c) => c.desde)).toEqual(['2026-12-01', '2026-11-20', SEMPRE]);
+  });
+
+  it('lê o histórico do banco e descarta o que não serve', () => {
+    expect(lerCotacoes([{ desde: SEMPRE, valor: '5.4' }, { desde: 'ontem', valor: 6 }, { desde: '2026-11-20', valor: 6.15 }], { '2026-11-21': 6.12, x: 1, '2026-11-22': 0 })).toEqual({
+      aPartir: historico,
+      dias: { '2026-11-21': 6.12 },
+    });
+    expect(lerCotacoes(null, null)).toEqual({ aPartir: [], dias: {} });
+  });
+
+  it('a sincronização converte cada dia pela sua taxa, sem buscar o Banco Central', async () => {
+    const { f, chamadas } = fetchFalso([
+      [
+        /insights/,
+        {
+          data: [
+            { spend: '100', account_currency: 'USD', date_start: '2026-11-19' },
+            { spend: '100', account_currency: 'USD', date_start: '2026-11-20' },
+          ],
+        },
+      ],
+    ]);
+    const dias = await gastoMetaPorDia({
+      fetch: f,
+      token: 't',
+      contas: ['1'],
+      desde: '2026-11-19',
+      ate: '2026-11-20',
+      cotacaoFixa: 6.15,
+      cotacaoDoDia: (d) => cotacaoDoDia(d, { aPartir: historico, dias: {}, fixa: 6.15 }),
+    });
+    expect(dias.map((d) => d.reais)).toEqual([540, 615]);
     expect(chamadas.some((u) => u.includes('bcb.gov.br'))).toBe(false);
   });
 });

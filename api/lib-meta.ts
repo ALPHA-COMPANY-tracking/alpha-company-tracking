@@ -419,6 +419,59 @@ export function consolidar(opts: {
  */
 export const COTACAO_BLUESALES = 5.4;
 
+/** Taxa do dólar que passa a valer a partir de um dia. */
+export interface CotacaoDesde {
+  desde: string;
+  valor: number;
+}
+
+/** Primeiro "desde" do histórico: a taxa que já valia antes de qualquer troca. */
+export const SEMPRE = '0001-01-01';
+
+/**
+ * Taxa do dólar de um dia: a digitada para o próprio dia (o valor exato que
+ * o cartão cobrou) ou, sem ela, a última que passou a valer até esse dia.
+ * Taxa nova vale a partir do dia escolhido e NÃO muda os dias de antes
+ * (Jonas, 20/11/2026: trocar 5,40 por 6,15 tinha refeito o mês inteiro).
+ * Sem histórico, vale `fixa` (null = PTAX do Banco Central).
+ */
+export function cotacaoDoDia(
+  dia: string,
+  opts: { aPartir: CotacaoDesde[]; dias: Record<string, number>; fixa: number | null },
+): number | null {
+  const doDia = Number(opts.dias[dia]);
+  if (doDia > 0) return doDia;
+  let achada: CotacaoDesde | null = null;
+  for (const c of opts.aPartir) if (c.desde <= dia && (!achada || c.desde > achada.desde)) achada = c;
+  return achada ? achada.valor : opts.fixa;
+}
+
+/** Histórico vindo do banco (jsonb), só com o que é válido. */
+export function lerCotacoes(aPartir: unknown, dias: unknown): { aPartir: CotacaoDesde[]; dias: Record<string, number> } {
+  const data = /^\d{4}-\d{2}-\d{2}$/;
+  const lista = Array.isArray(aPartir)
+    ? (aPartir as Record<string, unknown>[])
+        .map((c) => ({ desde: String(c?.desde ?? ''), valor: Number(c?.valor) }))
+        .filter((c) => data.test(c.desde) && c.valor > 0)
+        .sort((a, b) => b.desde.localeCompare(a.desde))
+    : [];
+  const porDia: Record<string, number> = {};
+  if (dias && typeof dias === 'object' && !Array.isArray(dias)) {
+    for (const [d, v] of Object.entries(dias as Record<string, unknown>)) if (data.test(d) && Number(v) > 0) porDia[d] = Number(v);
+  }
+  return { aPartir: lista, dias: porDia };
+}
+
+/**
+ * Grava uma taxa a partir de um dia (substitui a do mesmo dia). Na primeira
+ * troca, a taxa que valia até então fica para trás (SEMPRE), para os dias
+ * antigos não mudarem.
+ */
+export function novaCotacaoDesde(lista: CotacaoDesde[], anterior: number | null, desde: string, valor: number): CotacaoDesde[] {
+  const base = lista.length || anterior == null || desde === SEMPRE ? lista : [{ desde: SEMPRE, valor: anterior }];
+  return [...base.filter((c) => c.desde !== desde), { desde, valor }].sort((a, b) => b.desde.localeCompare(a.desde));
+}
+
 export interface ConfigMeta {
   fetch: Fetch;
   token: string;
@@ -430,6 +483,8 @@ export interface ConfigMeta {
   versao?: string;
   /** Cotação fixa (R$ por US$). Sem ela, vale a PTAX de venda do dia. */
   cotacaoFixa?: number | null;
+  /** Taxa de cada dia (histórico da tela); null no dia = cai na fixa/PTAX. */
+  cotacaoDoDia?: (dia: string) => number | null;
   /** Acréscimo sobre a cotação, em % (ex.: 3,5 de IOF do cartão). */
   acrescimoPct?: number;
   /** Imposto do Meta sobre as contas em real, em % (padrão da tela: 12,5). */
@@ -458,17 +513,19 @@ export async function gastoMetaPorDia(cfg: ConfigMeta): Promise<GastoDoDia[]> {
     gastos.push(...r.dias);
   }
 
+  const dias = diasEntre(cfg.desde, cfg.ate);
   const precisaDolar = gastos.some((g) => g.moeda.toUpperCase() === 'USD' && g.valor > 0);
-  const ptax = precisaDolar && !cfg.cotacaoFixa ? await buscarPtax({ fetch: cfg.fetch, desde: cfg.desde, ate: cfg.ate }) : [];
+  const faltaTaxa = !cfg.cotacaoFixa && dias.some((d) => (cfg.cotacaoDoDia?.(d) ?? null) == null);
+  const ptax = precisaDolar && faltaTaxa ? await buscarPtax({ fetch: cfg.fetch, desde: cfg.desde, ate: cfg.ate }) : [];
   const fator = 1 + (cfg.acrescimoPct ?? 0) / 100;
 
   return consolidar({
     gastos,
-    dias: diasEntre(cfg.desde, cfg.ate),
+    dias,
     impostoBrlPct: cfg.impostoBrlPct,
     cotacao: (moeda, dia) => {
       if (moeda !== 'USD') return null;
-      const base = cfg.cotacaoFixa ?? cotacaoNaData(ptax, dia);
+      const base = cfg.cotacaoDoDia?.(dia) ?? cfg.cotacaoFixa ?? cotacaoNaData(ptax, dia);
       return base == null ? null : Math.round(base * fator * 10_000) / 10_000;
     },
   });
