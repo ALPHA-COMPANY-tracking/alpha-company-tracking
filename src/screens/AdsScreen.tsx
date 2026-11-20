@@ -1,11 +1,20 @@
-import { useMemo, useState } from 'react';
-import { Check, Save, Trash2, Zap } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Check, Loader2, Pencil, Save, Trash2, X, Zap } from 'lucide-react';
 import type { AfterpayDaily, Periodo } from '@/types';
 import { formatBRL, reaisToCents } from '@/lib/money';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
 import { MoneyInput } from '@/components/MoneyInput';
-import { metaDisponivel } from '@/lib/metaAds';
+import { listarContasMeta, metaDisponivel, salvarConfigMeta, sincronizarMeta } from '@/lib/metaAds';
+
+/** 6.15 → "6,15". */
+const numBR = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+
+/** Dólar usado no dia (todas as contas em dólar do dia usam a mesma taxa). */
+function dolarDoDia(d: AfterpayDaily): number | null {
+  const usd = d.ads_detalhe?.find((p) => p.moeda === 'USD');
+  return usd ? usd.cotacao : null;
+}
 
 /** Data local (America/Sao_Paulo ~ horário do usuário) no formato YYYY-MM-DD. */
 function hojeLocal(): string {
@@ -31,8 +40,45 @@ function zeroDaily(data: string): AfterpayDaily {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function AdsScreen(_props: { periodo: Periodo }) {
-  const { dailies, lancarDaily } = useData();
+  const { dailies, lancarDaily, recarregar } = useData();
   const [data, setData] = useState(hojeLocal());
+
+  // ── Dólar de cada dia, editável aqui (Jonas, 20/11/2026) ──
+  // O valor exato que o cartão cobrou num dia: grava como "dólar do dia" na
+  // Integração Facebook e refaz o gasto só desse dia — o investimento e o
+  // total de anúncios mudam junto.
+  const [dolaresDoDia, setDolaresDoDia] = useState<Record<string, number>>({});
+  const [editandoDolar, setEditandoDolar] = useState<string | null>(null);
+  const [rascunhoDolar, setRascunhoDolar] = useState('');
+  const [gravandoDolar, setGravandoDolar] = useState<string | null>(null);
+  const [avisoDolar, setAvisoDolar] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!metaDisponivel) return;
+    listarContasMeta().then((r) => r.ok && setDolaresDoDia(r.config.cotacoes_dia ?? {}));
+  }, []);
+
+  async function aplicarDolar(dia: string, valor: number | null) {
+    setGravandoDolar(dia);
+    setAvisoDolar(null);
+    const r = await salvarConfigMeta({ cotacao_dia: { dia, valor } });
+    if (!r.ok) {
+      setGravandoDolar(null);
+      return setAvisoDolar(r.aviso);
+    }
+    setDolaresDoDia(r.config.cotacoes_dia ?? {});
+    const s = await sincronizarMeta({ desde: dia, ate: dia });
+    if (s.ok) await recarregar();
+    setGravandoDolar(null);
+    setEditandoDolar(null);
+    setAvisoDolar(
+      s.ok
+        ? valor == null
+          ? `${formatData(dia)} voltou para a taxa geral — investimento do dia e total recalculados.`
+          : `Dólar de ${formatData(dia)} agora é R$ ${numBR(valor)} — investimento do dia e total recalculados.`
+        : `Dólar salvo, mas a sincronização falhou (${s.aviso}). Toque em Atualizar.`,
+    );
+  }
   const [cents, setCents] = useState(0);
   const [leads, setLeads] = useState(0);
   const [salvo, setSalvo] = useState(false);
@@ -76,6 +122,10 @@ export function AdsScreen(_props: { periodo: Periodo }) {
         .sort((a, b) => b.data.localeCompare(a.data)),
     [dailies],
   );
+
+  // Total do mês corrente — o mesmo "Gastos em anúncios" da Demonstração.
+  const mesAtual = hojeLocal().slice(0, 7);
+  const totalMes = dailies.filter((d) => d.data.startsWith(mesAtual)).reduce((s, d) => s + (Number(d.investimento_ads) || 0), 0);
 
   return (
     <div className="flex flex-col gap-5 w-full">
@@ -134,7 +184,8 @@ export function AdsScreen(_props: { periodo: Periodo }) {
               <>
                 Desde 15/09 o gasto vem do <b className="text-dim">Meta automaticamente</b> — um valor digitado nesses dias é
                 trocado pelo do Meta na próxima sincronização. Use o formulário para <b className="text-dim">leads</b> e
-                para os dias antes de 15/09.
+                para os dias antes de 15/09. O <b className="text-dim">dólar de cada dia</b> se edita no lápis da coluna
+                Dólar, no histórico abaixo.
               </>
             ) : (
               'Lance o gasto geral de anúncios e os leads de cada dia.'
@@ -143,13 +194,17 @@ export function AdsScreen(_props: { periodo: Periodo }) {
         </div>
       </Panel>
 
-      <Panel title="Histórico de Métricas">
+      <Panel title="Histórico de Métricas" hint={`este mês: ${formatBRL(reaisToCents(totalMes))} em anúncios`}>
+        {avisoDolar && (
+          <div className="mx-3 lg:mx-5 mt-3 rounded-[10px] border border-line2 bg-card2 px-3.5 py-2.5 text-[12px] text-dim">{avisoDolar}</div>
+        )}
         <div className="overflow-x-auto">
-          <table className="w-full text-[13px] min-w-[560px]">
+          <table className="w-full text-[13px] min-w-[680px]">
             <thead>
               <tr className="text-dim2 text-[11px] uppercase tracking-wide">
                 <th className="text-left font-semibold px-3 lg:px-5 py-3">Data</th>
                 <th className="text-left font-semibold px-3 lg:px-5 py-3">Origem</th>
+                <th className="text-right font-semibold px-3 lg:px-5 py-3">Dólar</th>
                 <th className="text-right font-semibold px-3 lg:px-5 py-3">Investimento</th>
                 <th className="text-right font-semibold px-3 lg:px-5 py-3">Leads</th>
                 <th className="text-right font-semibold px-3 lg:px-5 py-3">Ações</th>
@@ -158,7 +213,7 @@ export function AdsScreen(_props: { periodo: Periodo }) {
             <tbody>
               {historico.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-10 text-center text-dim2">Nenhuma métrica lançada ainda.</td>
+                  <td colSpan={6} className="px-5 py-10 text-center text-dim2">Nenhuma métrica lançada ainda.</td>
                 </tr>
               ) : (
                 historico.map((d) => (
@@ -181,6 +236,24 @@ export function AdsScreen(_props: { periodo: Periodo }) {
                         <span className="text-dim">{d.ads_origem === 'manual' ? 'Manual' : 'Geral'}</span>
                       )}
                     </td>
+                    <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-right whitespace-nowrap">
+                      <CelulaDolar
+                        dia={d.data}
+                        dolar={d.ads_origem === 'meta' ? dolarDoDia(d) : null}
+                        doDia={dolaresDoDia[d.data] != null}
+                        editando={editandoDolar === d.data}
+                        gravando={gravandoDolar === d.data}
+                        livre={gravandoDolar === null}
+                        rascunho={rascunhoDolar}
+                        onRascunho={setRascunhoDolar}
+                        onEditar={(atual) => {
+                          setEditandoDolar(d.data);
+                          setRascunhoDolar(numBR(atual));
+                        }}
+                        onCancelar={() => setEditandoDolar(null)}
+                        onSalvar={(v) => aplicarDolar(d.data, v)}
+                      />
+                    </td>
                     <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-right text-tx mono">{formatBRL(reaisToCents(d.investimento_ads))}</td>
                     <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-right text-tx mono">{d.leads ?? 0}</td>
                     <td className="px-3 lg:px-5 py-3.5 lg:py-4 text-right">
@@ -200,5 +273,92 @@ export function AdsScreen(_props: { periodo: Periodo }) {
         </div>
       </Panel>
     </div>
+  );
+}
+
+/**
+ * Dólar do dia na tabela: o valor usado, um lápis para trocar e, quando é
+ * um dólar digitado para o dia, o × que volta para a taxa geral.
+ */
+function CelulaDolar(p: {
+  dia: string;
+  dolar: number | null;
+  doDia: boolean;
+  editando: boolean;
+  gravando: boolean;
+  livre: boolean;
+  rascunho: string;
+  onRascunho: (v: string) => void;
+  onEditar: (atual: number) => void;
+  onCancelar: () => void;
+  onSalvar: (valor: number | null) => void;
+}) {
+  if (p.dolar == null) return <span className="text-dim2">—</span>;
+  const v = Number(p.rascunho.replace(/\s/g, '').replace(',', '.'));
+  const valido = v > 0 && v <= 50;
+  if (p.gravando) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-dim text-[12px]">
+        <Loader2 size={13} className="animate-spin" /> refazendo o dia…
+      </span>
+    );
+  }
+  if (p.editando) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <span className="text-dim2 text-[12px]">R$</span>
+        <input
+          autoFocus
+          value={p.rascunho}
+          onChange={(e) => p.onRascunho(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && valido) p.onSalvar(v);
+            if (e.key === 'Escape') p.onCancelar();
+          }}
+          inputMode="decimal"
+          aria-label={`Dólar de ${p.dia}`}
+          className="w-[72px] bg-card2 border border-gold/50 rounded-[8px] px-2 py-[5px] text-[12.5px] text-tx mono text-right outline-none"
+        />
+        <button
+          onClick={() => valido && p.onSalvar(v)}
+          disabled={!valido}
+          title="Salvar o dólar deste dia"
+          className="grid place-items-center w-7 h-7 rounded-md text-grn hover:bg-grn/10 disabled:opacity-40"
+        >
+          <Check size={14} />
+        </button>
+        <button onClick={p.onCancelar} title="Cancelar" className="grid place-items-center w-7 h-7 rounded-md text-dim2 hover:text-tx">
+          <X size={14} />
+        </button>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1">
+      {p.doDia && (
+        <span className="text-[9.5px] uppercase tracking-wide font-bold text-gold2 border border-gold/40 bg-gold/10 rounded-full px-[6px] py-[1px]">
+          do dia
+        </span>
+      )}
+      <span className="mono text-tx2 text-[12.5px]">R$ {numBR(p.dolar)}</span>
+      <button
+        onClick={() => p.onEditar(p.dolar!)}
+        disabled={!p.livre}
+        title="Trocar o dólar deste dia (o valor exato do cartão)"
+        className="grid place-items-center w-7 h-7 rounded-md text-dim2 hover:text-gold hover:bg-gold/10 disabled:opacity-40"
+      >
+        <Pencil size={13} />
+      </button>
+      {p.doDia && (
+        <button
+          onClick={() => p.onSalvar(null)}
+          disabled={!p.livre}
+          title="Voltar para a taxa geral"
+          className="grid place-items-center w-7 h-7 rounded-md text-dim2 hover:text-red hover:bg-red/10 disabled:opacity-40"
+        >
+          <X size={13} />
+        </button>
+      )}
+    </span>
   );
 }
