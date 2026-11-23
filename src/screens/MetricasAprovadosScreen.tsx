@@ -10,7 +10,8 @@
 // Contas em src/lib/metricasAprovados.ts (testes ao lado).
 // ─────────────────────────────────────────────────────────────
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { MoneyInput } from '@/components/MoneyInput';
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { CircleCheck, Clock, HandCoins, Hourglass, Percent, Truck, Wallet, Zap } from 'lucide-react';
 import type { Periodo } from '@/types';
@@ -28,8 +29,10 @@ import {
   conversaoDaSafra,
   conversaoDoPeriodo,
   conversaoPorGrupo,
+  type EquilibrioMes,
   equilibrioDoMes,
   origemDosPagamentos,
+  quantoPrecisaEntrar,
 } from '@/lib/metricasAprovados';
 
 const ok = (v: number | null | undefined): v is number => v != null && Number.isFinite(v);
@@ -79,6 +82,8 @@ export function MetricasAprovadosScreen({ periodo }: { periodo: Periodo }) {
       </div>
 
       <BlocoEquilibrio eq={eq} />
+
+      <SairDoNegativo eq={eq} />
 
       <Panel
         title={`Recebido por dia · ${nomeDoMes(eq.mes)}`}
@@ -371,6 +376,122 @@ function Numero({ rotulo, valor, nota, cor }: { rotulo: string; valor: string; n
       <div className="text-[11px] text-dim font-medium">{rotulo}</div>
       <div className={`mono text-[20px] lg:text-[24px] font-extrabold tracking-tight truncate ${cor ?? 'text-tx'}`}>{valor}</div>
       <div className="text-[10.5px] text-dim2 mt-0.5 leading-snug">{nota}</div>
+    </div>
+  );
+}
+
+// ── 1b. Sair do negativo: quanto precisa entrar ──────────────
+
+const KEY_LUCRO_ALVO = 'afterpay-pnl:lucro-alvo';
+const LUCRO_ALVO_PADRAO = 10_000_00;
+
+function lerLucroAlvo(): number {
+  try {
+    const v = Number(localStorage.getItem(KEY_LUCRO_ALVO));
+    return v > 0 ? v : LUCRO_ALVO_PADRAO;
+  } catch {
+    return LUCRO_ALVO_PADRAO;
+  }
+}
+
+/**
+ * Parte do Lucro Real da Demonstração (Jonas, 23/11/2026: "quanto eu preciso
+ * receber para sair desse negativo e para um certo valor positivo?").
+ */
+function SairDoNegativo({ eq }: { eq: EquilibrioMes }) {
+  const [alvo, setAlvo] = useState(lerLucroAlvo);
+  useEffect(() => {
+    try {
+      localStorage.setItem(KEY_LUCRO_ALVO, String(alvo));
+    } catch {
+      /* sem armazenamento: vale só enquanto a página estiver aberta */
+    }
+  }, [alvo]);
+  const zero = quantoPrecisaEntrar(eq, 0);
+  const meta = quantoPrecisaEntrar(eq, alvo);
+  const corLucro = (v: number | null) => (v == null ? 'text-tx' : v < 0 ? 'text-red' : 'text-grn');
+  const sobra = eq.margem != null ? eq.margem * 100 : null;
+
+  return (
+    <Panel title="Sair do negativo · quanto precisa entrar" hint={`${nomeDoMes(eq.mes)} · a partir do Lucro Real da Demonstração`}>
+      <div className="p-3.5 lg:p-5 flex flex-col gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 lg:gap-4">
+          <Numero
+            rotulo="Lucro real até hoje"
+            valor={formatBRL(eq.lucroHoje)}
+            nota="o mesmo da Demonstração em 'Este mês'"
+            cor={corLucro(eq.lucroHoje)}
+          />
+          <Numero
+            rotulo="De cada R$ 100 que entram, sobram"
+            valor={sobra != null ? `R$ ${sobra.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+            nota="depois de produto, frete, taxa de boleto e comissões"
+          />
+          <Numero
+            rotulo="No ritmo atual, o mês fecha em"
+            valor={eq.lucroProjetado != null ? formatBRL(eq.lucroProjetado) : '—'}
+            nota={`recebido do mês ≈ ${formatBRL(eq.projecao)}, menos anúncio, custos variáveis e frustração`}
+            cor={corLucro(eq.lucroProjetado)}
+          />
+        </div>
+
+        <label className="flex flex-wrap items-center gap-2.5">
+          <span className="text-[13px] text-tx font-semibold">Quero fechar o mês com lucro de</span>
+          <span className="w-[170px]">
+            <MoneyInput cents={alvo} onChange={(c) => setAlvo(c)} compacto ariaLabel="Lucro desejado no mês" />
+          </span>
+        </label>
+
+        {meta.mes == null ? (
+          <div className="text-[12.5px] text-dim2">Sem pagamento no mês nem no mês anterior: ainda não dá para calcular.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 lg:gap-4">
+            <ColunaMeta titulo="Para sair do negativo (lucro zero)" q={zero} eq={eq} destaque={eq.lucroHoje < 0} />
+            <ColunaMeta titulo={`Para lucro de ${formatBRL(alvo)}`} q={meta} eq={eq} />
+          </div>
+        )}
+
+        <p className="m-0 text-[11px] text-dim2 leading-relaxed">
+          <b className="text-dim">Com o que já foi gasto até hoje</b>: quanto ainda tem de entrar para o Lucro Real da
+          Demonstração chegar lá, se nenhum custo novo acontecer. <b className="text-dim">Fechando o mês</b>: conta também o
+          anúncio dos dias que faltam (no ritmo) e os custos variáveis do mês inteiro — é o número para acompanhar dia a dia.
+        </p>
+      </div>
+    </Panel>
+  );
+}
+
+function ColunaMeta({ titulo, q, eq, destaque }: { titulo: string; q: ReturnType<typeof quantoPrecisaEntrar>; eq: EquilibrioMes; destaque?: boolean }) {
+  return (
+    <div className={`min-w-0 rounded-[12px] border px-4 py-3.5 ${destaque ? 'border-gold/40 bg-gold/[0.06]' : 'border-line bg-card/70'}`}>
+      <div className="text-[13px] font-bold text-tx">{titulo}</div>
+      <div className="mt-2.5 flex flex-col gap-2.5">
+        <div>
+          <div className="text-[11px] text-dim">Com o que já foi gasto até hoje</div>
+          {q.agora === 0 ? (
+            <div className="mono text-[17px] font-extrabold text-grn">Já chegou</div>
+          ) : (
+            <div className="mono text-[17px] font-extrabold text-tx">
+              faltam entrar {q.agora != null ? formatBRL(q.agora) : '—'}
+            </div>
+          )}
+        </div>
+        <div className="border-t border-line pt-2.5">
+          <div className="text-[11px] text-dim">Fechando o mês (com o anúncio dos dias que faltam)</div>
+          <div className="mono text-[17px] font-extrabold text-tx">o mês precisa receber {q.mes != null ? formatBRL(q.mes) : '—'}</div>
+          <div className="text-[12px] text-dim mt-0.5">
+            {q.faltaMes === 0 ? (
+              <span className="text-grn">Já entrou o suficiente.</span>
+            ) : (
+              <>
+                faltam <b className="text-tx">{q.faltaMes != null ? formatBRL(q.faltaMes) : '—'}</b> —{' '}
+                <b className="text-tx">{q.porDia != null ? formatBRL(q.porDia) : '—'} por dia</b> nos{' '}
+                {plural(eq.diasRestantes, 'dia que falta', 'dias que faltam')}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

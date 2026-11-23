@@ -4,7 +4,15 @@ import { describe, expect, it } from 'vitest';
 import type { AfterpayDaily, Pedido, Periodo } from '@/types';
 import { calcularPnl } from '@/lib/pnl';
 import { agregarPedidos } from '@/lib/pedidos';
-import { conversaoDaSafra, conversaoDoPeriodo, conversaoPorGrupo, equilibrioDoMes, mediana, origemDosPagamentos } from '@/lib/metricasAprovados';
+import {
+  conversaoDaSafra,
+  conversaoDoPeriodo,
+  conversaoPorGrupo,
+  equilibrioDoMes,
+  mediana,
+  origemDosPagamentos,
+  quantoPrecisaEntrar,
+} from '@/lib/metricasAprovados';
 
 const P: Periodo = { inicio: '2026-11-01', fim: '2026-11-30' };
 
@@ -201,6 +209,45 @@ describe('ponto de equilíbrio do mês', () => {
     expect(semNov.minimo).not.toBeNull();
     const nada = equilibrioDoMes(dailies, [], [], '2026-11-10');
     expect([nada.margem, nada.minimo, nada.cobre]).toEqual([null, null, null]);
+  });
+
+  describe('sair do negativo (Jonas, 23/11/2026)', () => {
+    it('o lucro de hoje é o Lucro Real da Demonstração do mês até hoje', () => {
+      const pnl = calcularPnl(dailies, [], { inicio: '2026-11-01', fim: '2026-11-10' }, {}, pedidos);
+      expect(eq.lucroHoje).toBe(pnl.lucro_real);
+      expect(eq.lucroHoje).toBeLessThan(0); // R$ 10 mil de anúncio, R$ 7.350 recebidos
+    });
+
+    it('lucro zero no mês = o mínimo; a meta soma alvo ÷ margem', () => {
+      const zero = quantoPrecisaEntrar(eq, 0);
+      expect(zero.mes).toBe(eq.minimo);
+      expect(zero.faltaMes).toBe(eq.falta);
+      expect(zero.porDia).toBe(eq.faltaPorDia);
+      const dez = quantoPrecisaEntrar(eq, 10_000_00);
+      expect(dez.mes! - zero.mes!).toBeCloseTo(10_000_00 / eq.margem!, -1);
+      expect(dez.porDia).toBe(Math.round(dez.faltaMes! / eq.diasRestantes));
+    });
+
+    it('com o que já foi gasto: o que falta entrar × margem tira o lucro do negativo', () => {
+      const zero = quantoPrecisaEntrar(eq, 0);
+      expect(zero.agora! * eq.margem!).toBeCloseTo(-eq.lucroHoje, -1);
+      // Já no positivo, não falta nada para empatar.
+      const lucrativo = { ...eq, lucroHoje: 500_00 };
+      expect(quantoPrecisaEntrar(lucrativo, 0).agora).toBe(0);
+      expect(quantoPrecisaEntrar(lucrativo, 1_000_00).agora).toBe(Math.round(500_00 / eq.margem!));
+    });
+
+    it('fechando o mês no ritmo: lucro projetado = projeção × margem − custos que não dependem do recebido', () => {
+      expect(eq.lucroProjetado).toBe(Math.round(eq.projecao * eq.margem! - eq.fixos.total));
+      // A projeção vira o mínimo quando o lucro projetado é zero.
+      expect(eq.lucroProjetado! >= 0).toBe(eq.cobre);
+    });
+
+    it('sem margem: sem conta', () => {
+      const nada = equilibrioDoMes(dailies, [], [], '2026-11-10');
+      expect(quantoPrecisaEntrar(nada, 0)).toEqual({ agora: null, mes: null, faltaMes: null, porDia: null });
+      expect(nada.lucroProjetado).toBeNull();
+    });
   });
 });
 

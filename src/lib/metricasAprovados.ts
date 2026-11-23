@@ -243,6 +243,10 @@ export interface EquilibrioMes {
   diasRestantes: number;
   /** Já entrou no mês (= Pagamentos aprovados do mês até hoje). */
   recebido: Cents;
+  /** Lucro Real do mês até hoje — o mesmo da Demonstração em "Este mês". */
+  lucroHoje: Cents;
+  /** Lucro Real do mês inteiro se tudo seguir no ritmo: projeção × margem − custos que não dependem do recebido. */
+  lucroProjetado: Cents | null;
   /** Ritmo usado nas projeções: os dias já fechados do mês (hoje fica de fora, está pela metade) ou a média do mês anterior. */
   ritmoDe: BaseRitmo;
   /** Custos que NÃO dependem do recebido. */
@@ -342,6 +346,8 @@ export function equilibrioDoMes(dailies: AfterpayDaily[], custos: CustoVariavel[
     diaHoje: d,
     diasRestantes,
     recebido,
+    lucroHoje: ateHoje.lucro_real,
+    lucroProjetado: margem != null ? Math.round(projecao * margem - totalFixos) : null,
     ritmoDe,
     fixos: { anuncios, custosVariaveis, frustracao, total: totalFixos },
     margem,
@@ -358,4 +364,32 @@ export function equilibrioDoMes(dailies: AfterpayDaily[], custos: CustoVariavel[
     conversaoMesAnterior: div(anterior.receita_aprovada, anterior.valor_agendado),
     conversaoMes: div(recebido, ateHoje.valor_agendado),
   };
+}
+
+// ── 4. Sair do negativo: quanto precisa entrar ────────────────
+
+export interface QuantoPrecisa {
+  /** Com os custos que JÁ aconteceram (Lucro Real de hoje): quanto ainda tem de entrar. */
+  agora: Cents | null;
+  /** Fechando o mês (anúncio dos dias que faltam no ritmo): o recebido do mês inteiro. */
+  mes: Cents | null;
+  /** O que falta entrar no mês para isso. */
+  faltaMes: Cents | null;
+  /** A falta dividida pelos dias que restam (contando hoje). */
+  porDia: Cents | null;
+}
+
+/**
+ * Quanto precisa entrar para o Lucro Real chegar a `lucroAlvo` (0 = sair do
+ * negativo). Cada R$ que entra a mais deixa `margem` de lucro — o que sobra
+ * depois de produto, frete, taxa de boleto e comissões (Jonas, 23/11/2026:
+ * "quanto eu preciso receber para sair desse negativo e para um certo valor
+ * positivo?"). Com lucroAlvo = 0, `mes` é o mínimo do mês.
+ */
+export function quantoPrecisaEntrar(eq: EquilibrioMes, lucroAlvo: Cents): QuantoPrecisa {
+  if (eq.margem == null || eq.margem <= 0) return { agora: null, mes: null, faltaMes: null, porDia: null };
+  const agora = Math.max(0, Math.round((lucroAlvo - eq.lucroHoje) / eq.margem));
+  const mes = Math.round((eq.fixos.total + lucroAlvo) / eq.margem);
+  const faltaMes = Math.max(0, mes - eq.recebido);
+  return { agora, mes, faltaMes, porDia: Math.round(faltaMes / eq.diasRestantes) };
 }
