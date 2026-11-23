@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { AfterpayDaily, Pedido, Periodo } from '@/types';
 import { calcularPnl } from '@/lib/pnl';
 import { agregarPedidos } from '@/lib/pedidos';
-import { conversaoDaSafra, conversaoPorGrupo, equilibrioDoMes, mediana, origemDosPagamentos } from '@/lib/metricasAprovados';
+import { conversaoDaSafra, conversaoDoPeriodo, conversaoPorGrupo, equilibrioDoMes, mediana, origemDosPagamentos } from '@/lib/metricasAprovados';
 
 const P: Periodo = { inicio: '2026-11-01', fim: '2026-11-30' };
 
@@ -69,6 +69,41 @@ describe('conversão da safra', () => {
       ],
     });
     expect(conversaoDaSafra([emPartes], P).recebido).toBe(735);
+  });
+});
+
+describe('conversão do período, como o BlueSales (23/11/2026: 162 ÷ 376 = 43,1%)', () => {
+  const pedidos: Pedido[] = [
+    ped('pago', 'pagos', 435, { data_aprovacao: '2026-11-10' }),
+    ped('rota', 'enviados', 535),
+    ped('devolvido', 'devolvido', 435, { enviado_em: '2026-11-04T12:00:00Z' }),
+    ped('cancelado', 'cancelados', 235), // agendado conta o cancelado
+    ped('outubro', 'pagos', 735, { data: '2026-10-28', data_aprovacao: '2026-11-02' }), // pagamento de pedido de outubro CONTA
+    ped('antecipado', 'pagos', 335, { data_aprovacao: '2026-11-03', tipo_venda: 'antecipado' }), // fora: não foi agendado
+    ped('partes', 'pagos', 735, {
+      data_aprovacao: '2026-11-05',
+      parcelas: [
+        { data: '2026-11-05', valor: 400 },
+        { data: '2026-11-20', valor: 335 },
+      ],
+    }), // cada parcela é um pagamento
+  ];
+
+  it('pagamentos do período (sem antecipado) ÷ agendamentos do período', () => {
+    const c = conversaoDoPeriodo(pedidos, P);
+    expect(c.agendados).toEqual({ qtd: 5, valor: 435 + 535 + 435 + 235 + 735 });
+    expect(c.agendados.qtd).toBe(agregarPedidos(pedidos, P).qtd_agendados);
+    expect(c.pagos).toEqual({ qtd: 4, valor: 435 + 735 + 400 + 335 });
+    expect(c.antecipado).toEqual({ qtd: 1, valor: 335 });
+    expect(c.pct_qtd).toBeCloseTo(4 / 5, 9);
+    expect(c.pct_valor).toBeCloseTo(1905 / 2375, 9);
+    // Com o antecipado, bate com os Pagamentos aprovados do P&L.
+    expect(c.pagos.qtd + c.antecipado.qtd).toBe(agregarPedidos(pedidos, P).qtd_pagamentos);
+    expect(c.pagos.valor + c.antecipado.valor).toBe(reaisDoPnl(pedidos));
+  });
+
+  it('é maior que a da safra: conta o pagamento de pedido de outro mês', () => {
+    expect(conversaoDoPeriodo(pedidos, P).pct_qtd!).toBeGreaterThan(conversaoDaSafra(pedidos, P).pct_qtd!);
   });
 });
 

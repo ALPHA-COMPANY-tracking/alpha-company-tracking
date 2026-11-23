@@ -119,6 +119,41 @@ export function conversaoPorGrupo(pedidos: Pedido[], periodo: Periodo, grupoDe: 
   return [...grupos.entries()].map(([grupo, lista]) => ({ grupo, ...acumular(lista) })).sort((a, b) => b.valor - a.valor);
 }
 
+// ── 1b. Conversão do período, como o BlueSales ────────────────
+
+export interface ConversaoPeriodo {
+  /** Agendamentos do período (= os do Faturamento Agendado). */
+  agendados: Fatia;
+  /** Pagamentos do período SEM os de venda antecipada (pago na entrega + pela cobrança). */
+  pagos: Fatia;
+  /** Venda antecipada: fica de fora, porque não foi agendada. */
+  antecipado: Fatia;
+  /** Pagamentos ÷ agendamentos — a "Taxa de conversão" do BlueSales. */
+  pct_qtd: number | null;
+  /** O mesmo em R$: recebido (sem antecipado) ÷ agendado. */
+  pct_valor: number | null;
+}
+
+/**
+ * A "Taxa de conversão" do BlueSales: "Pagamentos aprovados (sem os de
+ * Antecipado) ÷ agendamentos" do mesmo período — o pagamento de agora vem
+ * de pedido de qualquer dia (23/11/2026: 162 ÷ 376 = 43,1% lá e aqui).
+ * Cada parcela conta como um pagamento, igual ao BlueSales.
+ */
+export function conversaoDoPeriodo(pedidos: Pedido[], periodo: Periodo): ConversaoPeriodo {
+  const agendados: Fatia = { qtd: 0, valor: 0 };
+  for (const p of safraDe(pedidos, periodo)) somar(agendados, Number(p.valor_agendado ?? p.valor) || 0);
+  const pagos: Fatia = { qtd: 0, valor: 0 };
+  const antecipado: Fatia = { qtd: 0, valor: 0 };
+  for (const p of pedidosAtivos(pedidos)) {
+    for (const pg of pagamentosDoPedido(p)) {
+      if (!isDentro(pg.data, periodo.inicio, periodo.fim)) continue;
+      somar(/antecip/i.test(p.tipo_venda ?? '') ? antecipado : pagos, pg.valor);
+    }
+  }
+  return { agendados, pagos, antecipado, pct_qtd: div(pagos.qtd, agendados.qtd), pct_valor: div(pagos.valor, agendados.valor) };
+}
+
 // ── 2. De onde veio o dinheiro do período ─────────────────────
 
 /**

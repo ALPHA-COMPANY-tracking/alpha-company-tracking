@@ -26,6 +26,7 @@ import {
   type Conversao,
   type ConversaoGrupo,
   conversaoDaSafra,
+  conversaoDoPeriodo,
   conversaoPorGrupo,
   equilibrioDoMes,
   origemDosPagamentos,
@@ -46,6 +47,7 @@ export function MetricasAprovadosScreen({ periodo }: { periodo: Periodo }) {
 
   const eq = useMemo(() => equilibrioDoMes(dailies, custos, pedidos, hoje), [dailies, custos, pedidos, hoje]);
   const safra = useMemo(() => conversaoDaSafra(pedidos, periodo), [pedidos, periodo]);
+  const conversao = useMemo(() => conversaoDoPeriodo(pedidos, periodo), [pedidos, periodo]);
   const origem = useMemo(() => origemDosPagamentos(pedidos, periodo), [pedidos, periodo]);
   const porMetodo = useMemo(() => conversaoPorGrupo(pedidos, periodo, (p) => rotuloMetodo(p.metodo_pagamento)), [pedidos, periodo]);
   const porVendedor = useMemo(
@@ -89,10 +91,58 @@ export function MetricasAprovadosScreen({ periodo }: { periodo: Periodo }) {
         </div>
       </Panel>
 
+      {/* Conversão do período — a mesma "Taxa de conversão" do BlueSales */}
+      <div>
+        <div className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-dim2 mb-2 px-1">
+          Conversão de {rotuloPeriodo} · tudo o que entrou ÷ o que foi agendado (igual ao BlueSales)
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-[14px]">
+          <KpiCard
+            Icon={Percent}
+            color={COR.ouro}
+            valueColor={COR.ouroClaro}
+            label="Taxa de conversão"
+            value={pct(conversao.pct_qtd)}
+            sub={`${plural(conversao.pagos.qtd, 'pagamento', 'pagamentos')} ÷ ${plural(conversao.agendados.qtd, 'agendamento', 'agendamentos')}`}
+          />
+          <KpiCard
+            Icon={Percent}
+            color={COR.ouro}
+            valueColor={COR.texto}
+            label="Conversão em R$"
+            value={pct(conversao.pct_valor)}
+            sub={`${brl(conversao.pagos.valor)} ÷ ${brl(conversao.agendados.valor)}`}
+          />
+          <KpiCard
+            Icon={Wallet}
+            color={COR.ouro}
+            valueColor={COR.texto}
+            label="Recebido (na entrega + cobrança)"
+            value={brl(conversao.pagos.valor)}
+            sub={plural(conversao.pagos.qtd, 'pagamento', 'pagamentos')}
+          />
+          <KpiCard
+            Icon={Zap}
+            color={COR.ouro}
+            valueColor={COR.texto}
+            label="Vendas antecipadas (à parte)"
+            value={brl(conversao.antecipado.valor)}
+            sub={`${plural(conversao.antecipado.qtd, 'pagamento', 'pagamentos')} · fora da conversão`}
+          />
+        </div>
+        <p className="text-[11px] text-dim2 mt-2 px-1 leading-relaxed">
+          É a "Taxa de conversão" do BlueSales: os pagamentos que entraram no período (de pedidos de qualquer dia,
+          pagos na entrega ou pela cobrança) divididos pelos agendamentos do mesmo período. A venda antecipada fica de fora
+          porque não foi agendada — ela aparece à parte. Recebido total do período:{' '}
+          <b className="text-dim">{brl(conversao.pagos.valor + conversao.antecipado.valor)}</b> (
+          {plural(conversao.pagos.qtd + conversao.antecipado.qtd, 'pagamento', 'pagamentos')}).
+        </p>
+      </div>
+
       {/* Conversão da safra (período escolhido) */}
       <div>
         <div className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-dim2 mb-2 px-1">
-          Conversão dos pedidos feitos de {rotuloPeriodo}
+          Conversão só dos pedidos feitos de {rotuloPeriodo} · quanto deles já pagou
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-[14px]">
           <KpiCard
@@ -129,9 +179,9 @@ export function MetricasAprovadosScreen({ periodo }: { periodo: Periodo }) {
           />
         </div>
         <p className="text-[11px] text-dim2 mt-2 px-1 leading-relaxed">
-          Conta só os pedidos feitos no período (a mesma regra do Faturamento Agendado) e tudo o que eles já pagaram, em
-          qualquer dia. Pedido recente ainda está em aberto — por isso a conversão de um período recente sobe com os dias.
-          "Dos resolvidos" compara só quem já pagou com quem já frustrou.
+          Aqui só entram os pedidos feitos no período e o que ELES já pagaram — não conta o pagamento de pedido do mês
+          anterior. Por isso é menor que a taxa de cima: pedido recente ainda não teve tempo de pagar, e a conversão de
+          um período recente sobe com os dias. "Dos resolvidos" compara só quem já pagou com quem já frustrou.
         </p>
       </div>
 
