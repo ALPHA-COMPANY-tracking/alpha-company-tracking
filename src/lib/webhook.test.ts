@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { dataDaVenda, mapearPedido, mudaDataDaVenda, semDadosPessoais, voltariaDoPago } from '../../api/bluesales-webhook';
+import {
+  agendadoParaGravar,
+  brutoDoAviso,
+  dataDaVenda,
+  mantemAgendado,
+  mapearPedido,
+  mudaDataDaVenda,
+  semDadosPessoais,
+  voltariaDoPago,
+} from '../../api/bluesales-webhook';
 
 const USER = 'fabbf23a-e34b-4445-b563-222c18642189';
 
@@ -245,5 +254,80 @@ describe('pagamento (caso do #2913, 20/10/2026)', () => {
     expect(voltariaDoPago('pagos', 'pagos')).toBe(false);
     expect(voltariaDoPago('entregues', 'enviados')).toBe(false);
     expect(voltariaDoPago(null, 'entregues')).toBe(false);
+  });
+});
+
+describe('valor agendado depois que o pedido saiu (#4180 e #3858, 23/11/2026)', () => {
+  it('pedido novo ou sem agendado gravado: o aviso grava o valor', () => {
+    expect(mantemAgendado(null)).toBe(false);
+    expect(mantemAgendado({ status: 'cobrados', valor_agendado: null })).toBe(false);
+  });
+
+  it('antes de sair, troca de plano e desconto do vendedor mudam a venda', () => {
+    for (const status of ['cadastrados', 'confirmados', 'aguard_coleta', 'Aguard. Coleta', 'aguard_pagamento', 'futuros', 'em_analise']) {
+      expect(mantemAgendado({ status, valor_agendado: 735 })).toBe(false);
+    }
+  });
+
+  it('depois de sair, entregue, em cobrança ou pago, desconto não muda a venda', () => {
+    for (const status of ['enviados', 'saiu_para_entrega', 'retirar_correios', 'entregues', 'cobrados', 'negociacao', 'atencao', 'pagos', 'devolvido', 'cancelados']) {
+      expect(mantemAgendado({ status, valor_agendado: 735 })).toBe(true);
+    }
+  });
+
+  it('a marca de envio/entrega vale mesmo se a etapa gravada voltou atrás', () => {
+    expect(mantemAgendado({ status: 'aguard_coleta', valor_agendado: 735, enviado_em: '2026-11-08T10:00:00Z' })).toBe(true);
+    expect(mantemAgendado({ status: 'confirmados', valor_agendado: 735, entregue_em: '2026-11-16T18:30:00Z' })).toBe(true);
+  });
+
+  it('etapa vazia não trava (não dá para saber se saiu)', () => {
+    expect(mantemAgendado({ status: null, valor_agendado: 735 })).toBe(false);
+  });
+});
+
+describe('que agendado gravar (agendadoParaGravar)', () => {
+  const saiu = { status: 'cobrados', valor_agendado: 735, entregue_em: '2026-11-16T18:30:00Z' };
+
+  it('#4180: desconto de R$ 35 na cobrança não muda a venda (o BlueSales segue com 735)', () => {
+    expect(agendadoParaGravar('CHARGE_UPDATE', 700, 735, saiu)).toBeUndefined();
+    expect(agendadoParaGravar('SHIPPING_UPDATE', 700, 735, saiu)).toBeUndefined();
+  });
+
+  it('#3858: pago com R$ 135 de desconto, avisos depois do pagamento não baixam a venda', () => {
+    const pago = { status: 'pagos', valor_agendado: 735 };
+    expect(agendadoParaGravar('ORDER_PAID', 600, 735, pago)).toBeUndefined();
+    expect(agendadoParaGravar('ORDER_DELIVERED_CARD', 600, 735, pago)).toBeUndefined();
+    // Aviso sem o preço cheio também não mexe (o amount pode ter desconto).
+    expect(agendadoParaGravar('SHIPPING_UPDATE', 600, null, pago)).toBeUndefined();
+  });
+
+  it('#3992: desconto na hora de pagar, antes de sair, também não muda a venda', () => {
+    expect(agendadoParaGravar('ORDER_PAID', 400, 435, { status: 'confirmados', valor_agendado: 435 })).toBeUndefined();
+  });
+
+  it('antes de sair, o valor do aviso vale (troca de plano 735 → 435 de 02/11, desconto do vendedor)', () => {
+    const antes = { status: 'aguard_coleta', valor_agendado: 735 };
+    expect(agendadoParaGravar('SHIPPING_UPDATE', 435, 435, antes)).toBe(435);
+    expect(agendadoParaGravar('SHIPPING_UPDATE', 700, 735, antes)).toBe(700);
+  });
+
+  it('troca para plano mais barato que só chega no pagamento ainda baixa a venda', () => {
+    // Confirmado a 735, vendedor troca para 3 meses e a cliente paga antes de sair.
+    expect(agendadoParaGravar('ORDER_PAID', 435, 435, { status: 'confirmados', valor_agendado: 735 })).toBe(435);
+    // Depois de um aviso de envio sem valor (pedido já marcado como saiu).
+    expect(agendadoParaGravar('SHIPPING_UPDATE', 435, 435, { status: 'enviados', valor_agendado: 735, enviado_em: '2026-11-08T10:00:00Z' })).toBe(435);
+  });
+
+  it('pedido novo: grava o valor do aviso, menos no pagamento', () => {
+    expect(agendadoParaGravar('ORDER_CREATE', 735, 735, null)).toBe(735);
+    expect(agendadoParaGravar('ORDER_PAID', 735, 735, null)).toBeUndefined();
+    expect(agendadoParaGravar('SHIPPING_UPDATE', 0, null, null)).toBeUndefined();
+    expect(agendadoParaGravar('SHIPPING_UPDATE', 535, 535, { status: 'cobrados', valor_agendado: null })).toBe(535);
+  });
+
+  it('o preço cheio vem só do gross_amount, nunca do amount', () => {
+    expect(brutoDoAviso({ payment: { amount: 700, gross_amount: 735, discount: 35 } })).toBe(735);
+    expect(brutoDoAviso({ payment: { amount: 700 } })).toBeNull();
+    expect(brutoDoAviso({ event: 'SHIPPING_UPDATE' })).toBeNull();
   });
 });

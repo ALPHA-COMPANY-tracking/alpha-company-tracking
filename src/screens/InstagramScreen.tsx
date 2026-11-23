@@ -5,7 +5,6 @@ import type { Periodo } from '@/types';
 import { formatBRL, formatBRLCompact } from '@/lib/money';
 import { hojeIso } from '@/lib/dates';
 import { calcularPnl } from '@/lib/pnl';
-import { rankingVendedores } from '@/lib/ranking';
 import { useData } from '@/store/DataProvider';
 import { LogoMark } from '@/components/Logo';
 import { Panel } from '@/components/ui';
@@ -80,16 +79,19 @@ export function InstagramScreen({ periodo }: { periodo: Periodo }) {
     () => calcularPnl(dailies, custos, periodo, { descontarFrustrados: 'real' }, pedidos),
     [dailies, custos, periodo, pedidos],
   );
-  const ranking = useMemo(() => rankingVendedores(pedidos, dailies, periodo), [pedidos, dailies, periodo]);
+  // Barras por atendente pela MESMA regra dos cards ao lado (Faturamento
+  // Agendado / Total de Pedidos): somam o que os cards mostram. O Ranking usa a
+  // regra do Ranking do BlueSales, que conta também o antecipado pago.
+  const porAtendente = pnl.comissoes_por_vendedor;
 
   const quando = rotuloPeriodo(periodo);
 
-  const porQtd = ranking
+  const porQtd = porAtendente
     .filter((l) => l.qtd_agendados > 0)
     .sort((a, b) => b.qtd_agendados - a.qtd_agendados)
     .map((l) => ({ label: l.nome, value: l.qtd_agendados, display: String(l.qtd_agendados) }));
 
-  const porValor = ranking
+  const porValor = porAtendente
     .filter((l) => l.agendado > 0)
     .sort((a, b) => b.agendado - a.agendado)
     .map((l) => ({ label: l.nome, value: l.agendado, display: formatBRLCompact(l.agendado) }));

@@ -9,6 +9,7 @@ import {
   type MetricaRanking,
   chaveVendedor,
   comparativoPorPeriodo,
+  deFora,
   ordenar,
   rankingVendedores,
   valorDaMetrica,
@@ -113,13 +114,17 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
   const { pedidos, dailies } = useData();
 
   const linhas = useMemo(() => rankingVendedores(pedidos, dailies, periodo), [pedidos, dailies, periodo]);
-  // O comparativo entre janelas segue o faturamento agendado — a mesma
-  // base do CPA e do ROAS, que é o que o anúncio entrega.
-  const colunas = useMemo(() => comparativoPorPeriodo(pedidos, dailies, 'agendado'), [pedidos, dailies]);
+  const foraDaDisputa = useMemo(() => deFora(pedidos, dailies, periodo), [pedidos, dailies, periodo]);
+  // O comparativo entre janelas é por agendamentos, como o Ranking do
+  // BlueSales ("classificado por agendamentos").
+  const colunas = useMemo(() => comparativoPorPeriodo(pedidos, dailies, 'qtd_agendados'), [pedidos, dailies]);
 
   const vendeu = linhas.filter((l) => l.agendado > 0 || l.aprovado > 0);
-  const totalAgendado = linhas.reduce((s, l) => s + l.agendado, 0);
-  const lider = ordenar(linhas, 'agendado')[0];
+  const totalAgendamentos = linhas.reduce((s, l) => s + l.qtd_agendados, 0);
+  const totalValor = linhas.reduce((s, l) => s + l.agendado, 0);
+  const qtdVendedores = linhas.filter((l) => l.qtd_agendados > 0).length;
+  const lider = ordenar(linhas, 'qtd_agendados')[0];
+  const liderValor = ordenar(linhas, 'agendado')[0];
 
   const barrasValor = ordenar(linhas, 'agendado')
     .filter((l) => l.agendado > 0)
@@ -134,14 +139,26 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
         <h1 className="text-[21px] lg:text-[26px] font-extrabold text-tx tracking-tight">Ranking de Vendas</h1>
         <p className="text-[13px] text-dim mt-0.5">
           Como cada vendedor está performando — {formatDiaMes(periodo.inicio)} a {formatDiaMes(periodo.fim)}
+          {totalAgendamentos > 0 && (
+            <>
+              {' '}· {qtdVendedores} vendedor{qtdVendedores === 1 ? '' : 'es'} · {totalAgendamentos} agendamento
+              {totalAgendamentos === 1 ? '' : 's'} · {formatBRL(totalValor)}
+            </>
+          )}
         </p>
       </div>
 
       {vendeu.length === 0 ? (
         <Panel>
           <div className="p-10 text-center">
-            <div className="text-[15px] font-semibold text-tx mb-2">Nenhuma venda neste período</div>
-            <div className="text-[13px] text-dim">Escolha outro período no topo para ver o ranking.</div>
+            <div className="text-[15px] font-semibold text-tx mb-2">
+              {foraDaDisputa.length > 0 ? 'Nenhuma venda de quem disputa o ranking neste período' : 'Nenhuma venda neste período'}
+            </div>
+            <div className="text-[13px] text-dim">
+              {foraDaDisputa.length > 0
+                ? 'As vendas do período estão logo abaixo, em "Fora do ranking".'
+                : 'Escolha outro período no topo para ver o ranking.'}
+            </div>
           </div>
         </Panel>
       ) : (
@@ -149,8 +166,16 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
           {/* Os três rankings, juntos */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-[14px]">
             <BlocoRanking
-              titulo="Faturamento Agendado"
-              hint="o que cada um fechou"
+              titulo="Agendamentos"
+              hint="quantidade de pedidos · como no BlueSales"
+              Icon={ShoppingCart}
+              cor={HEX.ouroPalido}
+              metrica="qtd_agendados"
+              linhas={linhas}
+            />
+            <BlocoRanking
+              titulo="Valor bruto"
+              hint="quanto cada um agendou · como no BlueSales"
               Icon={CalendarClock}
               cor={HEX.ouro}
               metrica="agendado"
@@ -164,25 +189,17 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
               metrica="aprovado"
               linhas={linhas}
             />
-            <BlocoRanking
-              titulo="Agendamentos"
-              hint="quantidade de pedidos"
-              Icon={ShoppingCart}
-              cor={HEX.ouroPalido}
-              metrica="qtd_agendados"
-              linhas={linhas}
-            />
           </div>
 
           {/* Tabela completa */}
-          <Panel title="Desempenho no período" hint="todos os números lado a lado">
+          <Panel title="Desempenho no período" hint="classificado por agendamentos, como no BlueSales">
             <div className="overflow-x-auto">
               <table className="w-full text-[13px] min-w-[340px] lg:min-w-[860px]">
                 <thead>
                   <tr className="text-dim2 text-[11px] uppercase tracking-wide">
                     <th className="text-left font-semibold px-2 sm:px-3 lg:px-5 py-3">#</th>
                     <th className="text-left font-semibold px-2 sm:px-3 lg:px-5 py-3">Vendedor</th>
-                    <th className="text-right font-semibold px-2 sm:px-3 lg:px-5 py-3">Agendado</th>
+                    <th className="text-right font-semibold px-2 sm:px-3 lg:px-5 py-3">Agendamentos</th>
                     <th className="hidden lg:table-cell text-right font-semibold px-3 lg:px-5 py-3">Aprovado</th>
                     <th className="hidden lg:table-cell text-right font-semibold px-3 lg:px-5 py-3">Conversão</th>
                     <th className="hidden lg:table-cell text-right font-semibold px-3 lg:px-5 py-3">Ticket médio</th>
@@ -191,7 +208,7 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {ordenar(linhas, 'agendado').map((l, i) => {
+                  {ordenar(linhas, 'qtd_agendados').map((l, i) => {
                     const ativo = l.agendado > 0 || l.aprovado > 0;
                     return (
                       <tr
@@ -206,10 +223,8 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
                           <div className="text-[10px] mono text-dim2 mt-[2px]">{formatPercent(l.pct)} de comissão</div>
                         </td>
                         <td className="px-2 sm:px-3 lg:px-5 py-3.5 lg:py-4 text-right">
-                          <div className="mono font-bold text-gold2">{formatBRL(l.agendado)}</div>
-                          <div className="text-[10px] text-dim2 mt-[2px]">
-                            {l.qtd_agendados} pedido{l.qtd_agendados === 1 ? '' : 's'}
-                          </div>
+                          <div className="mono font-bold text-gold2">{l.qtd_agendados}</div>
+                          <div className="text-[10px] mono text-dim2 mt-[2px]">{formatBRL(l.agendado)}</div>
                         </td>
                         <td className="hidden lg:table-cell px-3 lg:px-5 py-3.5 lg:py-4 text-right">
                           <div className="mono font-bold text-grn">{formatBRL(l.aprovado)}</div>
@@ -254,7 +269,7 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
           </Panel>
 
           {/* Posição em cada período */}
-          <Panel title="Posição em cada período" hint="por faturamento agendado">
+          <Panel title="Posição em cada período" hint="por agendamentos, como no BlueSales">
             <div className="overflow-x-auto">
               <table className="w-full text-[13px] min-w-[520px]">
                 <thead>
@@ -268,7 +283,7 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {ordenar(linhas, 'agendado').map((l) => {
+                  {ordenar(linhas, 'qtd_agendados').map((l) => {
                     const k = chaveVendedor(l.nome);
                     return (
                       <tr key={l.nome} className="border-t border-line/70 hover:bg-white/[0.015]">
@@ -277,7 +292,7 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
                         </td>
                         {colunas.map((c) => {
                           const pos = c.posicao.get(k);
-                          const val = c.valor.get(k) ?? 0;
+                          const dele = c.linha.get(k);
                           return (
                             <td key={c.label} className="px-2 sm:px-3 lg:px-5 py-3.5 text-right whitespace-nowrap">
                               {pos ? (
@@ -289,7 +304,10 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
                                   >
                                     {pos <= 3 ? MEDALHA[pos - 1] : `${pos}º`}
                                   </div>
-                                  <div className="text-[10px] text-dim2 mt-[2px]">{formatBRL(val)}</div>
+                                  <div className="text-[10.5px] text-tx2 mt-[2px]">
+                                    {dele?.qtd_agendados ?? 0} agend.
+                                  </div>
+                                  <div className="text-[10px] mono text-dim2">{formatBRL(dele?.agendado ?? 0)}</div>
                                 </>
                               ) : (
                                 <span className="text-dim2">—</span>
@@ -308,7 +326,7 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
           {/* Gráficos */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Panel
-              title="Faturamento Agendado por Vendedor"
+              title="Valor bruto por Vendedor"
               hint={`${formatDiaMes(periodo.inicio)} a ${formatDiaMes(periodo.fim)} · R$`}
             >
               <BarsVertical data={barrasValor} gradId="rank-valor" />
@@ -318,26 +336,53 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
             </Panel>
           </div>
 
-          {lider && lider.agendado > 0 && (
+          {lider && lider.qtd_agendados > 0 && (
             <div className="flex items-start gap-3 rounded-[12px] border border-gold/25 bg-card2 px-4 py-[13px]">
               <Trophy size={16} className="text-gold shrink-0 mt-[2px]" />
               <p className="m-0 text-[12.5px] text-dim leading-relaxed">
-                <b className="text-gold">{lider.nome}</b> lidera o faturamento agendado com{' '}
-                <b className="text-tx">{formatBRL(lider.agendado)}</b> —{' '}
-                {formatPercent(safeDiv(lider.agendado, totalAgendado))} de tudo que a equipe fechou no período.
+                <b className="text-gold">{lider.nome}</b> lidera em agendamentos com{' '}
+                <b className="text-tx">{lider.qtd_agendados}</b> —{' '}
+                {formatPercent(safeDiv(lider.qtd_agendados, totalAgendamentos))} de tudo que a equipe agendou no período.
+                {liderValor && liderValor.nome !== lider.nome && liderValor.agendado > 0 && (
+                  <>
+                    {' '}No valor bruto, quem lidera é <b className="text-tx">{liderValor.nome}</b>, com{' '}
+                    <b className="text-tx">{formatBRL(liderValor.agendado)}</b>.
+                  </>
+                )}
               </p>
             </div>
           )}
         </>
       )}
 
+      {foraDaDisputa.length > 0 && (
+        <div className="flex items-start gap-3 rounded-[12px] border border-line2 bg-card2 px-4 py-[13px]">
+          <Info size={16} className="text-dim2 shrink-0 mt-[2px]" />
+          <p className="m-0 text-[12.5px] text-dim leading-relaxed">
+            <b className="text-dim">Fora do ranking</b>, como no BlueSales (lá não aparecem como vendedores):{' '}
+            {foraDaDisputa.map((l, i) => (
+              <span key={l.nome}>
+                {i > 0 && '; '}
+                <b className="text-tx2">{l.nome}</b> — {l.qtd_agendados} agendamento{l.qtd_agendados === 1 ? '' : 's'} ·{' '}
+                {formatBRL(l.agendado)}
+                {l.qtd_aprovados > 0 && <> · {formatBRL(l.aprovado)} aprovado</>}
+              </span>
+            ))}
+            . Essas vendas continuam no P&L e nas comissões.
+          </p>
+        </div>
+      )}
+
       <div className="flex items-start gap-3 rounded-[12px] border border-line2 bg-card2 px-4 py-[13px]">
         <Info size={16} className="text-gold shrink-0 mt-[2px]" />
         <p className="m-0 text-[12.5px] text-dim leading-relaxed">
-          <b className="text-dim">Agendado</b> conta pela data em que o vendedor fechou a venda;{' '}
-          <b className="text-dim">Aprovado</b>, pela data em que o cliente pagou — por isso os dois não batem no mesmo
-          dia. A <b className="text-dim">conversão</b> olha só o que ele agendou no período: de tudo que vendeu, quanto
-          já foi pago. Vendas excluídas na tela de Vendas Agendadas ficam de fora de tudo aqui.
+          <b className="text-dim">Agendamentos</b> e <b className="text-dim">Valor bruto</b> contam como o Ranking do
+          BlueSales: todo pedido que o vendedor fez no período, inclusive o que depois cancelou, voltou ou foi roubado e o
+          antecipado já pago. Ficam fora só o recusado, o que ainda aguarda pagamento e o excluído em Vendas Agendadas.
+          Por isso o total aqui pode passar do Faturamento Agendado da Demonstração de Resultados, que tira o
+          antecipado pago (o card &quot;Vendas&quot; do BlueSales também tira). <b className="text-dim">Aprovado</b> conta pela data em que o
+          cliente pagou. A <b className="text-dim">conversão</b> olha só o que ele agendou no período: de tudo que
+          vendeu, quanto já foi pago.
         </p>
       </div>
     </div>

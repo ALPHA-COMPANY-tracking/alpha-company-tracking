@@ -231,6 +231,69 @@ export function voltariaDoPago(statusAtual: unknown, statusNovo: unknown): boole
 
 const ehCriacao = (body: Record<string, unknown>) => String(body.event ?? '').toUpperCase() === 'ORDER_CREATE';
 
+/** Etapas em que o pedido AINDA NÃO SAIU: troca de plano e desconto do
+ *  vendedor ainda mudam a venda. */
+const AINDA_NAO_SAIU = /cadastr|confirm|coleta|analise|agendad|aguard.*pag|futur/;
+
+/**
+ * O aviso pode mudar o valor AGENDADO de um pedido que já está gravado? Só
+ * enquanto o pedido ainda não saiu (cadastrado, confirmado, aguardando
+ * coleta…). Depois de enviado, entregue, em cobrança ou pago, desconto não
+ * muda a venda — o card "Vendas" do BlueSales segue com o valor de antes:
+ * 23/11/2026, #4180 (07/11) com R$ 35 de desconto na cobrança e #3858 (02/11)
+ * pago com R$ 135 de desconto contam R$ 735 lá, e aqui tinham baixado para
+ * 700 e 600 com avisos que chegaram depois. O ORDER_PAID já não mexia
+ * (15/11, #3992); os avisos depois dele mexiam. Troca de plano antes de sair
+ * continua valendo (02/11: 735 → 435).
+ */
+export function mantemAgendado(
+  atual: { status?: unknown; valor_agendado?: unknown; enviado_em?: unknown; entregue_em?: unknown } | null,
+): boolean {
+  if (!atual || atual.valor_agendado == null) return false;
+  if (atual.enviado_em || atual.entregue_em) return true;
+  const etapa = String(atual.status ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim()
+    .toLowerCase();
+  return etapa !== '' && !AINDA_NAO_SAIU.test(etapa);
+}
+
+/** Preço cheio do plano que o aviso traz (payment.gross_amount), ou null se
+ *  o aviso não traz — o `amount` sozinho não serve: pode ter desconto. */
+export function brutoDoAviso(body: Record<string, unknown>): number | null {
+  const pagamento = (body.payment ?? body.pagamento ?? {}) as Record<string, unknown>;
+  const b = num(pick(pagamento, 'gross_amount', 'valor_bruto'));
+  return b > 0 ? b : null;
+}
+
+/**
+ * Que valor AGENDADO gravar com este aviso; undefined = não mexer no gravado.
+ * - Pedido sem agendado gravado: o valor do aviso (menos o pagamento, que
+ *   nunca grava agendado — 15/11, #3992).
+ * - Pedido que ainda não saiu: segue o valor do aviso (troca de plano,
+ *   desconto do vendedor).
+ * - Já saiu, ou é o pagamento: desconto não muda a venda (mantemAgendado).
+ *   Mas TROCA PARA PLANO MAIS BARATO muda: a venda não vale mais que o preço
+ *   cheio do plano. Sem aviso próprio de troca de plano, ela pode chegar só
+ *   no pagamento (cliente paga antes de sair) ou depois de um aviso de envio
+ *   sem valor; o gross_amount separa os casos — desconto não mexe nele
+ *   (#4180, #3858 e #3992 seguiram com o cheio), troca de plano sim.
+ */
+export function agendadoParaGravar(
+  evento: string,
+  valorDoAviso: number,
+  brutoAviso: number | null,
+  atual: Parameters<typeof mantemAgendado>[0],
+): number | undefined {
+  const pagamento = evento.toUpperCase() === 'ORDER_PAID';
+  const guardado = atual?.valor_agendado != null ? num(atual.valor_agendado) : null;
+  if (guardado == null) return pagamento || !(valorDoAviso > 0) ? undefined : valorDoAviso;
+  if (!pagamento && !mantemAgendado(atual) && valorDoAviso > 0) return valorDoAviso;
+  if (brutoAviso != null && brutoAviso < guardado) return brutoAviso;
+  return undefined;
+}
+
 /**
  * Dia em que a venda conta. É o do cadastro (order.created_at), MENOS quando
  * o BlueSales só confirma o pedido depois: o "pedido criado" (ORDER_CREATE)
@@ -432,13 +495,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // (ver dataDaVenda).
   let { data: atual, error: erroAtual } = await supabase()
     .from('bluesales_pedidos')
-    .select('status,data,tipo_venda')
+    .select('status,data,tipo_venda,valor_agendado,enviado_em,entregue_em')
     .eq('user_id', userId)
     .eq('id', pedido.id as string)
     .maybeSingle();
   if (erroAtual && /tipo_venda/.test(erroAtual.message)) {
     // Migração 0032 ainda não rodada.
-    ({ data: atual } = await supabase().from('bluesales_pedidos').select('status,data').eq('user_id', userId).eq('id', pedido.id as string).maybeSingle());
+    ({ data: atual } = await supabase()
+      .from('bluesales_pedidos')
+      .select('status,data,valor_agendado,enviado_em,entregue_em')
+      .eq('user_id', userId)
+      .eq('id', pedido.id as string)
+      .maybeSingle());
   }
   if (atual && pedido.status != null && voltariaDoPago(atual.status, pedido.status)) delete pedido.status;
   // Mantém o dia que já está gravado — REPETIDO no upsert, nunca omitido: o
@@ -450,6 +518,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // "antecipado" quem paga antes da entrega (#4481), mas o card só tira o que
   // já nasce antecipado (#4190) — 15/11/2026.
   if (atual && (atual as { tipo_venda?: unknown }).tipo_venda) delete pedido.tipo_venda;
+  // Pedido que já saiu: desconto da cobrança/pagamento não muda a venda; troca
+  // para plano mais barato muda (agendadoParaGravar).
+  const agendado = agendadoParaGravar(
+    String((body as Record<string, unknown>).event ?? ''),
+    num(pedido.valor),
+    brutoDoAviso(body as Record<string, unknown>),
+    atual,
+  );
+  if (agendado === undefined) delete pedido.valor_agendado;
+  else pedido.valor_agendado = agendado;
 
   let { error } = await supabase()
     .from('bluesales_pedidos')
