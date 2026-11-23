@@ -15,15 +15,21 @@
 //     custos variáveis do mês inteiro, perda com frustração) ÷ a margem de
 //     contribuição (o que sobra de cada R$ recebido depois de produto,
 //     frete, taxa de boleto e comissões). Mesma divisão da DRE.
-//   • Previsão — a da Previsão do Mês (preverMes), que conta 80% de
-//     pagamento (decisão do Jonas de 05/10/2026).
+//   • Projeção do mês — mínimo e projeção na MESMA base: o ritmo dos dias
+//     já fechados (hoje ainda está pela metade; nos 3 primeiros dias, a
+//     média do mês anterior). O mínimo paga o anúncio do mês inteiro, então
+//     é comparado com o recebido do mês inteiro no mesmo ritmo — comparar com
+//     a Previsão do Mês (que não conta vendas novas) deixava todo começo de
+//     mês vermelho (revisão de 23/11/2026).
+//   • Previsão — a da Previsão do Mês (preverMes): só os pedidos que já
+//     existem, 80% pagam (decisão do Jonas de 05/10/2026). Informativa.
 //
 // Pedido e pagamento em REAIS; P&L, previsão e equilíbrio em CENTAVOS.
 // ─────────────────────────────────────────────────────────────
 
 import type { AfterpayDaily, CustoVariavel, IsoDate, Pedido, Periodo } from '@/types';
 import type { Cents } from '@/lib/money';
-import { diaSP, diasNoMes, isDentro, parseYmd, primeiroDiaMes, ultimoDiaMes } from '@/lib/dates';
+import { addDias, diaSP, diasNoMes, isDentro, parseYmd, primeiroDiaMes, ultimoDiaMes } from '@/lib/dates';
 import { ehFrustracao, foraDoAgendado, pagamentosDoPedido, pedidosAtivos, statusBucket } from '@/lib/pedidos';
 import { calcularPnl } from '@/lib/pnl';
 import { preverMes } from '@/lib/previsao';
@@ -115,6 +121,12 @@ export function conversaoPorGrupo(pedidos: Pedido[], periodo: Periodo, grupoDe: 
 
 // ── 2. De onde veio o dinheiro do período ─────────────────────
 
+/**
+ * Primeiro dia com aviso do BlueSales (o webhook começou em 28/08/2026).
+ * Pedido de antes, sem o dia da entrega, não diz se passou pela cobrança.
+ */
+export const INICIO_AVISOS: IsoDate = '2026-08-28';
+
 export interface OrigemPagamentos {
   /** Igual aos "Pagamentos aprovados" do P&L (mesma data, parcelas no dia delas). */
   total: Fatia;
@@ -124,6 +136,8 @@ export interface OrigemPagamentos {
   cobranca: Fatia;
   /** Venda antecipada (paga antes de sair). */
   antecipado: Fatia;
+  /** Pedido de antes dos avisos, sem o dia da entrega: não dá para saber. */
+  semDado: Fatia;
   /** Mediana de dias do pedido ao pagamento. */
   diasAtePagar: number | null;
   /** Mediana de dias da entrega ao pagamento, só dos que passaram pela cobrança. */
@@ -153,6 +167,7 @@ export function origemDosPagamentos(pedidos: Pedido[], periodo: Periodo): Origem
     naEntrega: { qtd: 0, valor: 0 },
     cobranca: { qtd: 0, valor: 0 },
     antecipado: { qtd: 0, valor: 0 },
+    semDado: { qtd: 0, valor: 0 },
     diasAtePagar: null,
     diasDaEntregaAoPagamento: null,
   };
@@ -166,7 +181,8 @@ export function origemDosPagamentos(pedidos: Pedido[], periodo: Periodo): Origem
       else if (p.entregue_em) {
         somar(out.cobranca, pg.valor);
         daEntrega.push(Math.max(0, diasEntre(diaSP(p.entregue_em), pg.data)));
-      } else somar(out.naEntrega, pg.valor);
+      } else if (p.data < INICIO_AVISOS) somar(out.semDado, pg.valor);
+      else somar(out.naEntrega, pg.valor);
       ate.push(Math.max(0, diasEntre(p.data, pg.data)));
     }
   }
@@ -177,6 +193,12 @@ export function origemDosPagamentos(pedidos: Pedido[], periodo: Periodo): Origem
 
 // ── 3. Ponto de equilíbrio do mês ─────────────────────────────
 
+/** Dias fechados que o mês precisa ter para projetar pelo ritmo dele; antes, vale a média do mês anterior. */
+export const DIAS_FECHADOS_MIN = 3;
+
+/** De onde vem o ritmo da projeção. */
+export type BaseRitmo = 'dias_fechados' | 'mes_anterior' | 'sem_base';
+
 export interface EquilibrioMes {
   /** 'YYYY-MM' do mês de hoje. */
   mes: string;
@@ -186,9 +208,11 @@ export interface EquilibrioMes {
   diasRestantes: number;
   /** Já entrou no mês (= Pagamentos aprovados do mês até hoje). */
   recebido: Cents;
+  /** Ritmo usado nas projeções: os dias já fechados do mês (hoje fica de fora, está pela metade) ou a média do mês anterior. */
+  ritmoDe: BaseRitmo;
   /** Custos que NÃO dependem do recebido. */
   fixos: {
-    /** Anúncio + taxas do anúncio até hoje, projetados para o mês inteiro pelo ritmo. */
+    /** Anúncio + taxas do anúncio do mês inteiro, no ritmo (nunca menos do que já foi gasto). */
     anuncios: Cents;
     /** Custos variáveis do mês inteiro (os mensais entram cheios no dia deles). */
     custosVariaveis: Cents;
@@ -208,11 +232,13 @@ export interface EquilibrioMes {
   falta: Cents;
   /** A falta dividida pelos dias que restam (contando hoje). */
   faltaPorDia: Cents;
-  /** Previsão do mês (já entrou + o que deve cair até o fim do mês, regra dos 80%). */
-  previsto: Cents;
-  /** A previsão cobre o mínimo? null = sem como calcular o mínimo. */
+  /** Recebido do mês inteiro no mesmo ritmo (nunca menos do que já entrou) — a mesma base do mínimo. */
+  projecao: Cents;
+  /** A projeção cobre o mínimo? null = sem como calcular o mínimo. */
   cobre: boolean | null;
-  /** Agendado do mês até hoje, projetado para o mês inteiro pelo ritmo. */
+  /** Previsão do Mês: só os pedidos que já existem, 80% pagam (sem vendas novas). Informativa. */
+  previsto: Cents;
+  /** Agendado do mês inteiro no mesmo ritmo. */
   agendadoProjetado: Cents;
   /** De cada R$ agendado, quanto precisa entrar para empatar. */
   conversaoMinima: number | null;
@@ -241,8 +267,23 @@ export function equilibrioDoMes(dailies: AfterpayDaily[], custos: CustoVariavel[
   const ateHoje = calcularPnl(dailies, custos, { inicio, fim: hoje }, {}, pedidos);
   const mesInteiro = calcularPnl(dailies, custos, { inicio, fim: ultimoDiaMes(y, m) }, {}, pedidos);
   const anterior = calcularPnl(dailies, custos, { inicio: primeiroDiaMes(ant.y, ant.m), fim: ultimoDiaMes(ant.y, ant.m) }, {}, pedidos);
+  // Hoje fica de fora do ritmo: o gasto do Meta e as vendas do dia ainda
+  // estão chegando (no dia 1, dividir pelo dia pela metade derrubava o mínimo).
+  const diasFechados = d - 1;
+  const fechados = diasFechados > 0 ? calcularPnl(dailies, custos, { inicio, fim: addDias(hoje, -1) }, {}, pedidos) : null;
+  const diasAnterior = diasNoMes(ant.y, ant.m);
+  const restantes = diasMes - diasFechados;
+  const usaMes = diasFechados >= DIAS_FECHADOS_MIN;
+  /** Valor do mês inteiro: o dos dias fechados + o ritmo × os dias que faltam (hoje incluído). */
+  const projetar = (fechado: number, doMesAnterior: number, jaFeito: number): number => {
+    const ritmo = usaMes || doMesAnterior <= 0 ? (diasFechados > 0 ? fechado / diasFechados : 0) : doMesAnterior / diasAnterior;
+    return Math.max(jaFeito, Math.round(fechado + ritmo * restantes));
+  };
+  const adsDe = (p: ReturnType<typeof calcularPnl> | null) => (p ? p.investimento_ads + p.taxas_investimento : 0);
+  const adsAnterior = adsDe(anterior);
+  const ritmoDe: BaseRitmo = usaMes ? 'dias_fechados' : adsAnterior > 0 ? 'mes_anterior' : diasFechados > 0 ? 'dias_fechados' : 'sem_base';
 
-  const anuncios = Math.round(((ateHoje.investimento_ads + ateHoje.taxas_investimento) / d) * diasMes);
+  const anuncios = projetar(adsDe(fechados), adsAnterior, adsDe(ateHoje));
   const custosVariaveis = mesInteiro.custos_variaveis_total;
   const frustracao = Math.max(ateHoje.desconto_frustrados, anterior.desconto_frustrados);
   const totalFixos = anuncios + custosVariaveis + frustracao;
@@ -256,8 +297,9 @@ export function equilibrioDoMes(dailies: AfterpayDaily[], custos: CustoVariavel[
   const diasRestantes = diasMes - d + 1;
   const recebido = ateHoje.receita_aprovada;
   const falta = minimo != null ? Math.max(0, minimo - recebido) : 0;
+  const projecao = projetar(fechados?.receita_aprovada ?? 0, anterior.receita_aprovada, recebido);
   const previsto = preverMes(pedidos, dailies, custos, hoje).faturamento_mes;
-  const agendadoProjetado = Math.round((ateHoje.valor_agendado / d) * diasMes);
+  const agendadoProjetado = projetar(fechados?.valor_agendado ?? 0, anterior.valor_agendado, ateHoje.valor_agendado);
 
   return {
     mes: inicio.slice(0, 7),
@@ -265,6 +307,7 @@ export function equilibrioDoMes(dailies: AfterpayDaily[], custos: CustoVariavel[
     diaHoje: d,
     diasRestantes,
     recebido,
+    ritmoDe,
     fixos: { anuncios, custosVariaveis, frustracao, total: totalFixos },
     margem,
     margemDe: margemOrigem,
@@ -272,8 +315,9 @@ export function equilibrioDoMes(dailies: AfterpayDaily[], custos: CustoVariavel[
     minimoPorDia: minimo != null ? Math.round(minimo / diasMes) : null,
     falta,
     faltaPorDia: Math.round(falta / diasRestantes),
+    projecao,
+    cobre: minimo != null ? projecao >= minimo : null,
     previsto,
-    cobre: minimo != null ? previsto >= minimo : null,
     agendadoProjetado,
     conversaoMinima: minimo != null ? div(minimo, agendadoProjetado) : null,
     conversaoMesAnterior: div(anterior.receita_aprovada, anterior.valor_agendado),

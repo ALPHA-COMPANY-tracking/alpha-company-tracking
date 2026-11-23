@@ -194,6 +194,8 @@ export function MetricasAprovadosScreen({ periodo }: { periodo: Periodo }) {
           "Pago pela cobrança" é o pedido que chegou a <b className="text-dim">entregue/cobrado</b> antes de pagar — a
           cliente não pagou na hora e foi cobrada. "Na entrega" pagou sem passar por essa etapa. O recebido do período é o
           mesmo dos Pagamentos aprovados da Demonstração.
+          {origem.semDado.qtd > 0 &&
+            ` ${brl(origem.semDado.valor)} (${plural(origem.semDado.qtd, 'pagamento', 'pagamentos')}) são de pedidos de antes de 28/08, sem o dia da entrega, e ficaram fora dessa divisão.`}
         </p>
       </div>
 
@@ -222,10 +224,16 @@ function BlocoEquilibrio({ eq }: { eq: ReturnType<typeof equilibrioDoMes> }) {
     eq.minimo == null
       ? 'Ainda sem base para o mínimo do mês'
       : eq.cobre
-        ? 'A previsão do mês cobre o mínimo'
-        : `A previsão do mês não cobre o mínimo — faltam ${formatBRL(Math.max(0, eq.minimo - eq.previsto))}`;
+        ? 'No ritmo atual, o mês cobre o mínimo'
+        : `No ritmo atual, o mês não cobre o mínimo — faltam ${formatBRL(Math.max(0, eq.minimo - eq.projecao))}`;
   const progresso = eq.minimo ? Math.min(1, eq.recebido / eq.minimo) : 0;
   const pctMargem = eq.margem != null ? eq.margem * 100 : null;
+  const ritmo =
+    eq.ritmoDe === 'mes_anterior'
+      ? 'no ritmo do mês anterior (o mês ainda tem poucos dias fechados)'
+      : eq.ritmoDe === 'dias_fechados'
+        ? 'no ritmo dos dias já fechados'
+        : 'sem dias fechados ainda';
 
   return (
     <section className={`rounded-card border bg-gradient-to-br to-transparent px-4 lg:px-6 py-4 lg:py-5 ${estilo}`}>
@@ -237,9 +245,9 @@ function BlocoEquilibrio({ eq }: { eq: ReturnType<typeof equilibrioDoMes> }) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 lg:gap-4 mt-4">
         <Numero rotulo="Mínimo para empatar" valor={eq.minimo != null ? formatBRL(eq.minimo) : '—'} nota="recebido que zera o Lucro Real do mês" />
         <Numero
-          rotulo="Previsão do mês"
-          valor={formatBRL(eq.previsto)}
-          nota="já entrou + o que deve cair até o fim do mês"
+          rotulo="Projeção do mês"
+          valor={formatBRL(eq.projecao)}
+          nota={`recebido do mês inteiro ${ritmo}`}
           cor={eq.cobre == null ? undefined : eq.cobre ? 'text-grn' : 'text-red'}
         />
         <Numero rotulo="Já entrou" valor={formatBRL(eq.recebido)} nota={`até hoje, dia ${eq.diaHoje} de ${eq.diasMes}`} />
@@ -267,18 +275,22 @@ function BlocoEquilibrio({ eq }: { eq: ReturnType<typeof equilibrioDoMes> }) {
           ))}
         {eq.conversaoMinima != null && (
           <span>
-            De cada <b className="text-tx">R$ 100</b> agendados precisam entrar <b className="text-tx">{brl(eq.conversaoMinima * 100)}</b> (
+            Se as vendas seguirem nesse ritmo (agendado do mês ≈ {formatBRL(eq.agendadoProjetado)}), de cada{' '}
+            <b className="text-tx">R$ 100</b> agendados precisam entrar <b className="text-tx">{brl(eq.conversaoMinima * 100)}</b> (
             {pct(eq.conversaoMinima)}) para empatar. No mês anterior entraram <b className="text-tx">{pct(eq.conversaoMesAnterior)}</b>
             {eq.conversaoMes != null && <> · neste mês até agora, {pct(eq.conversaoMes)}</>}.
           </span>
         )}
+        <span className="text-dim2">
+          Só com os pedidos que já existem (sem vendas novas, 80% pagam), a Previsão do Mês dá {formatBRL(eq.previsto)}.
+        </span>
       </div>
 
       <details className="mt-3 group">
         <summary className="cursor-pointer text-[12px] font-semibold text-gold2 select-none">Como o mínimo é calculado</summary>
         <div className="mt-2 rounded-[12px] border border-line bg-card/70 px-4 py-3 text-[12px] text-dim leading-relaxed">
           <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
-            <span>Anúncios do mês (ritmo até hoje × {eq.diasMes} dias)</span>
+            <span>Anúncios do mês inteiro ({ritmo})</span>
             <span className="mono text-tx text-right">{formatBRL(eq.fixos.anuncios)}</span>
             <span>Custos variáveis do mês inteiro</span>
             <span className="mono text-tx text-right">{formatBRL(eq.fixos.custosVariaveis)}</span>
@@ -296,8 +308,9 @@ function BlocoEquilibrio({ eq }: { eq: ReturnType<typeof equilibrioDoMes> }) {
             zero.
           </p>
           <p className="m-0 mt-2">
-            A previsão é a da Previsão do Mês: o que já entrou + o que os pedidos em aberto devem pagar até o fim do mês,
-            contando que 80% pagam.
+            O veredito compara o mínimo com a projeção do recebido do mês inteiro, no mesmo ritmo dos anúncios — o mínimo
+            já paga o anúncio dos dias que faltam, então a projeção conta as vendas que esse anúncio traz. O dia de hoje
+            fica de fora do ritmo porque ainda está pela metade.
           </p>
         </div>
       </details>
@@ -339,7 +352,8 @@ function GraficoDias({ dados, minimoDia }: { dados: { data: string; rotulo: stri
               );
             }}
           />
-          {minimoDia != null && <ReferenceLine y={minimoDia} stroke={HEX.ambar} strokeDasharray="5 4" strokeWidth={1.5} />}
+          {/* extendDomain: a linha aparece mesmo quando todos os dias ficam abaixo dela. */}
+          {minimoDia != null && <ReferenceLine y={minimoDia} ifOverflow="extendDomain" stroke={HEX.ambar} strokeDasharray="5 4" strokeWidth={1.5} />}
           <Bar dataKey="valor" radius={[4, 4, 0, 0]} isAnimationActive={false}>
             {dados.map((d) => (
               <Cell key={d.data} fill={minimoDia != null && d.valor >= minimoDia ? HEX.verde : HEX.ouro} />

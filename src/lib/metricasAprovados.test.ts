@@ -148,7 +148,15 @@ describe('ponto de equilíbrio do mês', () => {
     expect(eq.recebido).toBe(7350_00);
     expect(eq.falta).toBe(Math.max(0, eq.minimo! - eq.recebido));
     expect(eq.faltaPorDia).toBe(Math.round(eq.falta / 21));
-    expect(eq.cobre).toBe(eq.previsto >= eq.minimo!);
+    // O veredito compara bases iguais: o mínimo do mês inteiro com o recebido do mês inteiro no mesmo ritmo.
+    expect(eq.cobre).toBe(eq.projecao >= eq.minimo!);
+    expect(eq.ritmoDe).toBe('dias_fechados');
+  });
+
+  it('hoje fica de fora do ritmo: um dia pela metade não muda a projeção', () => {
+    const meioDia = [...dailies.slice(0, 9), dia('2026-11-10', 200)];
+    const parcial = equilibrioDoMes(meioDia, [], pedidos, '2026-11-10');
+    expect(parcial.fixos.anuncios).toBe(eq.fixos.anuncios); // 9 dias fechados × R$ 1.000 → R$ 30 mil
   });
 
   it('mês sem pagamento ainda: a margem vem do mês anterior; sem nenhum: sem mínimo', () => {
@@ -158,5 +166,75 @@ describe('ponto de equilíbrio do mês', () => {
     expect(semNov.minimo).not.toBeNull();
     const nada = equilibrioDoMes(dailies, [], [], '2026-11-10');
     expect([nada.margem, nada.minimo, nada.cobre]).toEqual([null, null, null]);
+  });
+});
+
+describe('começo do mês (revisão de 23/11/2026)', () => {
+  // Operação estável desde 01/10: R$ 1.000/dia de anúncio, 6 pedidos/dia de
+  // R$ 735; 4 pagam 8 dias depois, 1 devolve, 1 fica na rua.
+  const diasDe = (de: string, ate: string) => {
+    const out: string[] = [];
+    for (let t = Date.parse(`${de}T12:00:00Z`); t <= Date.parse(`${ate}T12:00:00Z`); t += 86_400_000) out.push(new Date(t).toISOString().slice(0, 10));
+    return out;
+  };
+  const somaDias = (iso: string, n: number) => new Date(Date.parse(`${iso}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+  const daily = (data: string): AfterpayDaily => ({
+    data,
+    receita_aprovada: 0,
+    qtd_pagamentos: 0,
+    taxas_plataforma: 0,
+    custo_produtos: 0,
+    frete: 0,
+    comissoes_vendedor: 0,
+    comissoes_cobranca: 0,
+    investimento_ads: 1000,
+    taxas_investimento: 0,
+    valor_frustrado: 0,
+    qtd_frustrados: 0,
+    valor_agendado: 0,
+    qtd_agendados: 0,
+  });
+  const operacao = (hoje: string) => {
+    const pedidos: Pedido[] = [];
+    for (const d of diasDe('2026-10-01', hoje)) {
+      for (let i = 0; i < 6; i++) {
+        const pago = somaDias(d, 8);
+        const base = { data: d, enviado_em: `${d}T15:00:00Z`, metodo_pagamento: 'pix' };
+        if (i < 4 && pago <= hoje) pedidos.push(ped(`${d}-${i}`, 'pagos', 735, { ...base, data_aprovacao: pago }));
+        else if (i === 4) pedidos.push(ped(`${d}-${i}`, 'devolvido', 735, base));
+        else pedidos.push(ped(`${d}-${i}`, 'enviados', 735, base));
+      }
+    }
+    // Hoje: o Meta ainda não mandou o gasto (linha zerada).
+    const dailies = diasDe('2026-10-01', hoje).map((d) => (d === hoje ? { ...daily(d), investimento_ads: 0 } : daily(d)));
+    return { pedidos, dailies };
+  };
+
+  it('dia 1, com o gasto de hoje ainda zerado: anúncio no ritmo do mês anterior, não zero', () => {
+    const { pedidos, dailies } = operacao('2026-11-01');
+    const eq = equilibrioDoMes(dailies, [], pedidos, '2026-11-01');
+    expect(eq.ritmoDe).toBe('mes_anterior');
+    expect(eq.fixos.anuncios).toBe(30_000_00); // R$ 31 mil em 31 dias de outubro → R$ 1.000/dia × 30
+    expect(eq.agendadoProjetado).toBeGreaterThan(0);
+  });
+
+  it('mês lucrativo no começo: o veredito não fica vermelho por comparar bases diferentes', () => {
+    const { pedidos, dailies } = operacao('2026-11-05');
+    const eq = equilibrioDoMes(dailies, [], pedidos, '2026-11-05');
+    expect(eq.minimo).not.toBeNull();
+    // ~R$ 2.940/dia entrando contra ~R$ 1.000/dia de anúncio: o mês fecha no lucro.
+    expect(eq.cobre).toBe(true);
+    // A Previsão do Mês (sem vendas novas) continua menor que o mínimo — por isso não é ela que decide.
+    expect(eq.previsto).toBeLessThan(eq.projecao);
+  });
+});
+
+describe('pedido de antes dos avisos', () => {
+  it('sem o dia da entrega não vai para "na entrega": fica sem dado', () => {
+    const antigo = ped('agosto', 'pagos', 735, { data: '2026-08-10', data_aprovacao: '2026-11-04' });
+    const o = origemDosPagamentos([antigo], P);
+    expect(o.naEntrega.qtd).toBe(0);
+    expect(o.semDado).toEqual({ qtd: 1, valor: 735 });
+    expect(o.total.valor).toBe(735);
   });
 });
