@@ -28,10 +28,10 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { AfterpayDaily, CustoVariavel, IsoDate, Pedido, Periodo } from '@/types';
-import type { Cents } from '@/lib/money';
+import { type Cents, reaisToCents } from '@/lib/money';
 import { addDias, diaSP, diasNoMes, isDentro, parseYmd, primeiroDiaMes, ultimoDiaMes } from '@/lib/dates';
 import { ehFrustracao, foraDoAgendado, pagamentosDoPedido, pedidosAtivos, statusBucket } from '@/lib/pedidos';
-import { calcularPnl } from '@/lib/pnl';
+import { calcularPnl, cobrancasNoPeriodo } from '@/lib/pnl';
 import { preverMes } from '@/lib/previsao';
 
 const div = (a: number, b: number): number | null => (b > 0 ? a / b : null);
@@ -245,10 +245,26 @@ export interface EquilibrioMes {
   recebido: Cents;
   /** Lucro Real do mês até hoje — o mesmo da Demonstração em "Este mês". */
   lucroHoje: Cents;
+  /**
+   * Custos variáveis do mês, os mesmos da tela Custos Variáveis (Jonas,
+   * 23/11/2026: "quando aumentar o custo variável, quando tiver uma dívida
+   * para pagar, também entrar aqui"). `ateHoje` já está no Lucro Real de
+   * hoje; `aVencer` são as contas lançadas para depois de hoje, ainda neste
+   * mês (o mensal no dia dele, a dívida na data lançada).
+   * ateHoje + aVencer = fixos.custosVariaveis.
+   */
+  custosDoMes: { ateHoje: Cents; aVencer: Cents; contas: ContaAVencer[] };
   /** Lucro Real do mês inteiro se tudo seguir no ritmo: projeção × margem − custos que não dependem do recebido. */
   lucroProjetado: Cents | null;
   /** Ritmo usado nas projeções: os dias já fechados do mês (hoje fica de fora, está pela metade) ou a média do mês anterior. */
   ritmoDe: BaseRitmo;
+  /**
+   * Como o anúncio do mês inteiro foi estimado (Jonas, 23/11/2026: "a gente
+   * não sabe quanto vai investir naquele dia — como é calculado?"): o já
+   * gasto nos dias fechados + a média por dia × os dias que faltam (hoje
+   * incluído). Em reais gastos, não em CPA. Refaz a cada sincronização do Meta.
+   */
+  anuncio: { diasFechados: number; gastoFechado: Cents; porDia: Cents; diasQueFaltam: number };
   /** Custos que NÃO dependem do recebido. */
   fixos: {
     /** Anúncio + taxas do anúncio do mês inteiro, no ritmo (nunca menos do que já foi gasto). */
@@ -287,6 +303,30 @@ export interface EquilibrioMes {
   conversaoMes: number | null;
 }
 
+/** Uma cobrança de custo variável que cai depois de hoje, ainda neste mês. */
+export interface ContaAVencer {
+  custoId: string;
+  descricao: string;
+  categoria_id: string | null;
+  dia: IsoDate;
+  valor: Cents;
+}
+
+/** Cobranças dos custos variáveis entre amanhã e o fim do mês, por dia. Mesma regra do P&L e da tela Custos Variáveis. */
+function contasAVencer(custos: CustoVariavel[], hoje: IsoDate, fimMes: IsoDate): ContaAVencer[] {
+  if (hoje >= fimMes) return [];
+  const resto = { inicio: addDias(hoje, 1), fim: fimMes };
+  const contas: ContaAVencer[] = [];
+  for (const c of custos) {
+    const valor = reaisToCents(c.valor);
+    if (valor <= 0) continue; // o P&L ignora custo sem valor
+    for (const dia of cobrancasNoPeriodo(c, resto)) {
+      contas.push({ custoId: c.id, descricao: c.descricao, categoria_id: c.categoria_id, dia, valor });
+    }
+  }
+  return contas.sort((a, b) => a.dia.localeCompare(b.dia) || b.valor - a.valor);
+}
+
 /** 'YYYY-MM' do mês anterior. */
 function mesAntes(y: number, m: number): { y: number; m: number } {
   return m === 1 ? { y: y - 1, m: 12 } : { y, m: m - 1 };
@@ -313,17 +353,20 @@ export function equilibrioDoMes(dailies: AfterpayDaily[], custos: CustoVariavel[
   const diasAnterior = diasNoMes(ant.y, ant.m);
   const restantes = diasMes - diasFechados;
   const usaMes = diasFechados >= DIAS_FECHADOS_MIN;
+  /** Média por dia: a dos dias fechados ou, com menos de 3, a do mês anterior. */
+  const ritmoDoValor = (fechado: number, doMesAnterior: number): number =>
+    usaMes || doMesAnterior <= 0 ? (diasFechados > 0 ? fechado / diasFechados : 0) : doMesAnterior / diasAnterior;
   /** Valor do mês inteiro: o dos dias fechados + o ritmo × os dias que faltam (hoje incluído). */
-  const projetar = (fechado: number, doMesAnterior: number, jaFeito: number): number => {
-    const ritmo = usaMes || doMesAnterior <= 0 ? (diasFechados > 0 ? fechado / diasFechados : 0) : doMesAnterior / diasAnterior;
-    return Math.max(jaFeito, Math.round(fechado + ritmo * restantes));
-  };
+  const projetar = (fechado: number, doMesAnterior: number, jaFeito: number): number =>
+    Math.max(jaFeito, Math.round(fechado + ritmoDoValor(fechado, doMesAnterior) * restantes));
   const adsDe = (p: ReturnType<typeof calcularPnl> | null) => (p ? p.investimento_ads + p.taxas_investimento : 0);
   const adsAnterior = adsDe(anterior);
   const ritmoDe: BaseRitmo = usaMes ? 'dias_fechados' : adsAnterior > 0 ? 'mes_anterior' : diasFechados > 0 ? 'dias_fechados' : 'sem_base';
 
   const anuncios = projetar(adsDe(fechados), adsAnterior, adsDe(ateHoje));
   const custosVariaveis = mesInteiro.custos_variaveis_total;
+  const contas = contasAVencer(custos, hoje, ultimoDiaMes(y, m));
+  const aVencer = contas.reduce((s, c) => s + c.valor, 0);
   const frustracao = Math.max(ateHoje.desconto_frustrados, anterior.desconto_frustrados);
   const totalFixos = anuncios + custosVariaveis + frustracao;
 
@@ -347,6 +390,13 @@ export function equilibrioDoMes(dailies: AfterpayDaily[], custos: CustoVariavel[
     diasRestantes,
     recebido,
     lucroHoje: ateHoje.lucro_real,
+    custosDoMes: { ateHoje: ateHoje.custos_variaveis_total, aVencer, contas },
+    anuncio: {
+      diasFechados,
+      gastoFechado: adsDe(fechados),
+      porDia: Math.round(ritmoDoValor(adsDe(fechados), adsAnterior)),
+      diasQueFaltam: restantes,
+    },
     lucroProjetado: margem != null ? Math.round(projecao * margem - totalFixos) : null,
     ritmoDe,
     fixos: { anuncios, custosVariaveis, frustracao, total: totalFixos },
@@ -369,7 +419,11 @@ export function equilibrioDoMes(dailies: AfterpayDaily[], custos: CustoVariavel[
 // ── 4. Sair do negativo: quanto precisa entrar ────────────────
 
 export interface QuantoPrecisa {
-  /** Com os custos que JÁ aconteceram (Lucro Real de hoje): quanto ainda tem de entrar. */
+  /**
+   * Com o que já foi gasto (Lucro Real de hoje) MAIS as contas do mês já
+   * lançadas em Custos Variáveis para depois de hoje: quanto ainda tem de
+   * entrar, sem contar anúncio novo.
+   */
   agora: Cents | null;
   /** Fechando o mês (anúncio dos dias que faltam no ritmo): o recebido do mês inteiro. */
   mes: Cents | null;
@@ -388,7 +442,8 @@ export interface QuantoPrecisa {
  */
 export function quantoPrecisaEntrar(eq: EquilibrioMes, lucroAlvo: Cents): QuantoPrecisa {
   if (eq.margem == null || eq.margem <= 0) return { agora: null, mes: null, faltaMes: null, porDia: null };
-  const agora = Math.max(0, Math.round((lucroAlvo - eq.lucroHoje) / eq.margem));
+  const lucroComContas = eq.lucroHoje - eq.custosDoMes.aVencer;
+  const agora = Math.max(0, Math.round((lucroAlvo - lucroComContas) / eq.margem));
   const mes = Math.round((eq.fixos.total + lucroAlvo) / eq.margem);
   const faltaMes = Math.max(0, mes - eq.recebido);
   return { agora, mes, faltaMes, porDia: Math.round(faltaMes / eq.diasRestantes) };

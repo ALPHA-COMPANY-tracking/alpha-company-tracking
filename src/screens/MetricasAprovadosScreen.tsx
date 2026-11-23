@@ -10,7 +10,7 @@
 // Contas em src/lib/metricasAprovados.ts (testes ao lado).
 // ─────────────────────────────────────────────────────────────
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { MoneyInput } from '@/components/MoneyInput';
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { CircleCheck, Clock, HandCoins, Hourglass, Percent, Truck, Wallet, Zap } from 'lucide-react';
@@ -407,20 +407,30 @@ function SairDoNegativo({ eq }: { eq: EquilibrioMes }) {
       /* sem armazenamento: vale só enquanto a página estiver aberta */
     }
   }, [alvo]);
+  const { categorias } = useData();
+  const nomeCategoria = new Map(categorias.map((c) => [c.id, c.nome]));
   const zero = quantoPrecisaEntrar(eq, 0);
   const meta = quantoPrecisaEntrar(eq, alvo);
   const corLucro = (v: number | null) => (v == null ? 'text-tx' : v < 0 ? 'text-red' : 'text-grn');
   const sobra = eq.margem != null ? eq.margem * 100 : null;
+  const { ateHoje: custosAteHoje, aVencer, contas } = eq.custosDoMes;
+  const fimDoMes = `${eq.diasMes}/${eq.mes.slice(5, 7)}`;
 
   return (
     <Panel title="Sair do negativo · quanto precisa entrar" hint={`${nomeDoMes(eq.mes)} · a partir do Lucro Real da Demonstração`}>
       <div className="p-3.5 lg:p-5 flex flex-col gap-4">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 lg:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 lg:gap-4">
           <Numero
             rotulo="Lucro real até hoje"
             valor={formatBRL(eq.lucroHoje)}
-            nota="o mesmo da Demonstração em 'Este mês'"
+            nota="o mesmo da Demonstração em 'Este mês' (já desconta os custos variáveis até hoje)"
             cor={corLucro(eq.lucroHoje)}
+          />
+          <Numero
+            rotulo="Custos variáveis do mês"
+            valor={formatBRL(custosAteHoje + aVencer)}
+            nota={`${formatBRL(custosAteHoje)} até hoje (o mesmo de Custos Variáveis em 'Este mês') + ${formatBRL(aVencer)} a pagar até ${fimDoMes}`}
+            cor={custosAteHoje + aVencer > 0 ? 'text-red' : undefined}
           />
           <Numero
             rotulo="De cada R$ 100 que entram, sobram"
@@ -430,10 +440,12 @@ function SairDoNegativo({ eq }: { eq: EquilibrioMes }) {
           <Numero
             rotulo="No ritmo atual, o mês fecha em"
             valor={eq.lucroProjetado != null ? formatBRL(eq.lucroProjetado) : '—'}
-            nota={`recebido do mês ≈ ${formatBRL(eq.projecao)}, menos anúncio, custos variáveis e frustração`}
+            nota={`recebido do mês ≈ ${formatBRL(eq.projecao)}, menos anúncio, custos variáveis do mês inteiro e frustração`}
             cor={corLucro(eq.lucroProjetado)}
           />
         </div>
+
+        <ContasAPagar contas={contas} total={aVencer} fimDoMes={fimDoMes} nomeCategoria={nomeCategoria} />
 
         <label className="flex flex-wrap items-center gap-2.5">
           <span className="text-[13px] text-tx font-semibold">Quero fechar o mês com lucro de</span>
@@ -446,18 +458,121 @@ function SairDoNegativo({ eq }: { eq: EquilibrioMes }) {
           <div className="text-[12.5px] text-dim2">Sem pagamento no mês nem no mês anterior: ainda não dá para calcular.</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 lg:gap-4">
-            <ColunaMeta titulo="Para sair do negativo (lucro zero)" q={zero} eq={eq} destaque={eq.lucroHoje < 0} />
+            <ColunaMeta titulo="Para sair do negativo (lucro zero)" q={zero} eq={eq} destaque={(zero.agora ?? 0) > 0} />
             <ColunaMeta titulo={`Para lucro de ${formatBRL(alvo)}`} q={meta} eq={eq} />
           </div>
         )}
 
-        <p className="m-0 text-[11px] text-dim2 leading-relaxed">
-          <b className="text-dim">Com o que já foi gasto até hoje</b>: quanto ainda tem de entrar para o Lucro Real da
-          Demonstração chegar lá, se nenhum custo novo acontecer. <b className="text-dim">Fechando o mês</b>: conta também o
-          anúncio dos dias que faltam (no ritmo) e os custos variáveis do mês inteiro — é o número para acompanhar dia a dia.
-        </p>
+        {eq.margem != null && eq.margem > 0 && <ComoECalculado eq={eq} fimDoMes={fimDoMes} />}
       </div>
     </Panel>
+  );
+}
+
+/**
+ * A conta à vista (Jonas, 23/11/2026: "a gente investe todo dia em tráfego,
+ * não sabe quanto vai ficar o CPA nem quanto vai investir naquele dia —
+ * como é calculado isso?").
+ */
+function ComoECalculado({ eq, fimDoMes }: { eq: EquilibrioMes; fimDoMes: string }) {
+  const margem = eq.margem!;
+  const sobra = (margem * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fator = `${sobra}%`;
+  const { diasFechados, gastoFechado, porDia, diasQueFaltam } = eq.anuncio;
+  const media =
+    eq.ritmoDe === 'mes_anterior'
+      ? 'média por dia do mês anterior (este mês ainda tem poucos dias fechados)'
+      : `média dos ${plural(diasFechados, 'dia fechado', 'dias fechados')}`;
+  return (
+    <div className="rounded-[12px] border border-line bg-card/70 px-4 py-3.5 text-[12px] text-dim leading-relaxed flex flex-col gap-2.5">
+      <div className="text-[12.5px] font-bold text-tx">Como é calculado</div>
+      <p className="m-0">
+        De cada R$ 100 que entram sobram <b className="text-tx">R$ {sobra}</b> (o resto vai para produto, frete, taxa de
+        boleto e comissões). Então, para cobrir um custo, precisa entrar o custo ÷ {fator}.
+      </p>
+      <p className="m-0">
+        <b className="text-tx">Com o que já foi gasto + as contas do mês</b> = (Lucro real até hoje − contas a pagar até{' '}
+        {fimDoMes}) ÷ {fator}. Supõe que nenhum anúncio novo seja feito — é a foto de agora. Como o tráfego roda todo dia,
+        esse número sobe com o anúncio do dia (na média, uns <b className="text-tx">{formatBRL(Math.round(porDia / margem))}</b>{' '}
+        a mais por dia) e desce com cada pagamento que entra.
+      </p>
+      <div>
+        <b className="text-tx">Fechando o mês</b> = custos do mês inteiro ÷ {fator}:
+        <div className="mt-1.5 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
+          <span>
+            Anúncio já gasto ({plural(diasFechados, 'dia fechado', 'dias fechados')}, com as taxas do anúncio)
+          </span>
+          <span className="mono text-tx text-right">{formatBRL(gastoFechado)}</span>
+          <span>
+            Anúncio dos {plural(diasQueFaltam, 'dia que falta', 'dias que faltam')} (hoje incluído): {formatBRL(porDia)} por dia, a{' '}
+            {media}
+          </span>
+          <span className="mono text-tx text-right">{formatBRL(eq.fixos.anuncios - gastoFechado)}</span>
+          <span>Custos variáveis do mês inteiro (já lançados + a pagar)</span>
+          <span className="mono text-tx text-right">{formatBRL(eq.fixos.custosVariaveis)}</span>
+          <span>Perda com frustração (a maior: mês anterior inteiro ou este mês)</span>
+          <span className="mono text-tx text-right">{formatBRL(eq.fixos.frustracao)}</span>
+          <span className="font-semibold text-tx border-t border-line pt-1">Custos do mês inteiro</span>
+          <span className="mono font-bold text-tx text-right border-t border-line pt-1">{formatBRL(eq.fixos.total)}</span>
+        </div>
+        <div className="mt-1">Para um lucro desejado, soma o lucro ÷ {fator}.</div>
+      </div>
+      <p className="m-0">
+        <b className="text-tx">E se investir mais ou menos que a média?</b> Cada {formatBRL(1000_00)} a mais em anúncio pede{' '}
+        <b className="text-tx">{formatBRL(Math.round(1000_00 / margem))}</b> a mais recebidos; investindo menos, o número desce.
+        A conta se refaz sozinha a cada sincronização do Meta, com o gasto real — no último dia do mês vira o valor exato.
+      </p>
+      <p className="m-0">
+        <b className="text-tx">E o CPA?</b> Ele não muda o quanto precisa entrar: decide quantas vendas o anúncio traz e,
+        com isso, se o mês chega lá. Isso está na Projeção do mês, lá em cima ({formatBRL(eq.projecao)} no ritmo de hoje).
+      </p>
+      <p className="m-0 text-dim2">
+        Lançou, mudou ou apagou um custo em Custos Variáveis? Os números daqui mudam juntos.
+      </p>
+    </div>
+  );
+}
+
+/** As contas de Custos Variáveis que vencem depois de hoje, ainda neste mês. */
+function ContasAPagar({
+  contas,
+  total,
+  fimDoMes,
+  nomeCategoria,
+}: {
+  contas: EquilibrioMes['custosDoMes']['contas'];
+  total: number;
+  fimDoMes: string;
+  nomeCategoria: Map<string, string>;
+}) {
+  if (contas.length === 0) {
+    return (
+      <div className="rounded-[12px] border border-line bg-card/70 px-4 py-3 text-[12px] text-dim leading-relaxed">
+        <b className="text-tx">Contas a pagar até {fimDoMes}:</b> nenhuma lançada em Custos Variáveis para depois de hoje.
+        Uma dívida ou conta lançada lá com data entre amanhã e {fimDoMes} aparece aqui e entra na conta sozinha; a lançada
+        com data de hoje ou de antes já está no Lucro real até hoje.
+      </div>
+    );
+  }
+  return (
+    <details className="rounded-[12px] border border-line bg-card/70 px-4 py-3" open={contas.length <= 6}>
+      <summary className="cursor-pointer select-none text-[12.5px] text-dim">
+        <b className="text-tx">Contas a pagar até {fimDoMes}</b> (Custos Variáveis):{' '}
+        <b className="mono text-red">{formatBRL(total)}</b> · {plural(contas.length, 'conta', 'contas')} — já estão nos números abaixo
+      </summary>
+      <div className="mt-2 grid grid-cols-[auto_1fr_auto] gap-x-4 gap-y-1 text-[12px]">
+        {contas.map((c) => (
+          <Fragment key={`${c.custoId}-${c.dia}`}>
+            <span className="mono text-dim">{formatDiaMes(c.dia)}</span>
+            <span className="min-w-0 text-tx2 break-words">
+              {c.descricao}
+              <span className="block text-[10.5px] text-dim2">{(c.categoria_id && nomeCategoria.get(c.categoria_id)) || 'Sem categoria'}</span>
+            </span>
+            <span className="mono text-right text-red">{formatBRL(c.valor)}</span>
+          </Fragment>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -467,7 +582,7 @@ function ColunaMeta({ titulo, q, eq, destaque }: { titulo: string; q: ReturnType
       <div className="text-[13px] font-bold text-tx">{titulo}</div>
       <div className="mt-2.5 flex flex-col gap-2.5">
         <div>
-          <div className="text-[11px] text-dim">Com o que já foi gasto até hoje</div>
+          <div className="text-[11px] text-dim">Com o que já foi gasto + as contas do mês já lançadas</div>
           {q.agora === 0 ? (
             <div className="mono text-[17px] font-extrabold text-grn">Já chegou</div>
           ) : (

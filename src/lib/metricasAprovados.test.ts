@@ -1,7 +1,7 @@
 // Métricas Aprovados (23/11/2026): conversão da safra, de onde veio o
 // dinheiro e o ponto de equilíbrio do mês.
 import { describe, expect, it } from 'vitest';
-import type { AfterpayDaily, Pedido, Periodo } from '@/types';
+import type { AfterpayDaily, CustoVariavel, Pedido, Periodo } from '@/types';
 import { calcularPnl } from '@/lib/pnl';
 import { agregarPedidos } from '@/lib/pedidos';
 import {
@@ -241,6 +241,66 @@ describe('ponto de equilíbrio do mês', () => {
       expect(eq.lucroProjetado).toBe(Math.round(eq.projecao * eq.margem! - eq.fixos.total));
       // A projeção vira o mínimo quando o lucro projetado é zero.
       expect(eq.lucroProjetado! >= 0).toBe(eq.cobre);
+    });
+
+    describe('custos variáveis (Jonas: "quando tiver uma dívida para pagar, também entrar aqui")', () => {
+      const custo = (id: string, data: string, valor: number, extra: Partial<CustoVariavel> = {}): CustoVariavel => ({
+        id,
+        data,
+        categoria_id: null,
+        descricao: id,
+        valor,
+        recorrencia: 'unico',
+        recorrencia_fim: null,
+        ratear_por_dias: false,
+        ...extra,
+      });
+      const custos = [
+        custo('aluguel-ontem', '2026-11-09', 1000), // já cobrado
+        custo('hoje', '2026-11-10', 200), // hoje: já está no Lucro Real
+        custo('divida', '2026-11-28', 3000), // dívida lançada para o fim do mês
+        custo('internet', '2026-10-25', 150, { recorrencia: 'mensal' }), // todo dia 25
+        custo('dezembro', '2026-12-05', 9999), // outro mês: fora
+        custo('zerado', '2026-11-20', 0),
+      ];
+      const com = equilibrioDoMes(dailies, custos, pedidos, '2026-11-10');
+
+      it('separa o que já foi cobrado (no Lucro Real de hoje) das contas que vencem até o fim do mês', () => {
+        expect(com.custosDoMes.ateHoje).toBe(1200_00);
+        expect(com.custosDoMes.aVencer).toBe(3150_00);
+        expect(com.custosDoMes.contas.map((c) => [c.custoId, c.dia, c.valor])).toEqual([
+          ['internet', '2026-11-25', 150_00],
+          ['divida', '2026-11-28', 3000_00],
+        ]);
+        // As duas partes somam os custos variáveis do mês inteiro (os do mínimo).
+        expect(com.custosDoMes.ateHoje + com.custosDoMes.aVencer).toBe(com.fixos.custosVariaveis);
+        // O Lucro Real de hoje desconta só o que já foi cobrado — igual à Demonstração.
+        const pnl = calcularPnl(dailies, custos, { inicio: '2026-11-01', fim: '2026-11-10' }, {}, pedidos);
+        expect(com.lucroHoje).toBe(pnl.lucro_real);
+        expect(com.lucroHoje).toBe(eq.lucroHoje - 1200_00);
+      });
+
+      it('a conta lançada para depois de hoje aumenta o quanto falta entrar, nos dois números', () => {
+        const antes = quantoPrecisaEntrar(com, 0);
+        const semDivida = equilibrioDoMes(dailies, custos.filter((c) => c.id !== 'divida'), pedidos, '2026-11-10');
+        const depois = quantoPrecisaEntrar(semDivida, 0);
+        expect(antes.agora! - depois.agora!).toBeCloseTo(3000_00 / com.margem!, -1);
+        expect(antes.mes! - depois.mes!).toBeCloseTo(3000_00 / com.margem!, -1);
+        // "agora" = o lucro de hoje menos as contas a vencer, dividido pela margem.
+        expect(antes.agora! * com.margem!).toBeCloseTo(-(com.lucroHoje - com.custosDoMes.aVencer), -1);
+      });
+
+      it('último dia do mês: nada mais a vencer', () => {
+        const fim = equilibrioDoMes(dailies, custos, pedidos, '2026-11-30');
+        expect(fim.custosDoMes.contas).toEqual([]);
+        expect(fim.custosDoMes.aVencer).toBe(0);
+        expect(fim.custosDoMes.ateHoje).toBe(fim.fixos.custosVariaveis);
+      });
+    });
+
+    it('o anúncio do mês à vista: já gasto nos dias fechados + média por dia × dias que faltam (em R$, não em CPA)', () => {
+      expect(eq.anuncio).toEqual({ diasFechados: 9, gastoFechado: 9000_00, porDia: 1000_00, diasQueFaltam: 21 });
+      expect(eq.anuncio.gastoFechado + eq.anuncio.porDia * eq.anuncio.diasQueFaltam).toBe(eq.fixos.anuncios);
     });
 
     it('sem margem: sem conta', () => {
