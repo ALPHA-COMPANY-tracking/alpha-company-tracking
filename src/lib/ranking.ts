@@ -18,26 +18,55 @@ import { isDentro } from '@/lib/dates';
 import {
   agregarPedidos,
   aguardaPagamento,
+  dataAprovacaoPedido,
   ehCancelado,
+  ehFrustracao,
   ehRecusado,
   pagamentosDoPedido,
   pedidosAtivos,
   statusBucket,
 } from '@/lib/pedidos';
-import { COMISSAO_POR_VENDEDOR, comissaoDoVendedor } from '@/lib/custosConfig';
+import {
+  COMISSAO_COBRANCA,
+  COMISSAO_POR_VENDEDOR,
+  comissaoDoVendedor,
+  custoProdutoDoPlano,
+  freteDoPedido,
+  perdaRealDePedido,
+} from '@/lib/custosConfig';
 import { comissaoVendedores } from '@/lib/pnl';
-import { taxasDoPeriodo } from '@/lib/taxas';
+import { taxaPorPagamento, taxasDoPeriodo } from '@/lib/taxas';
 import { periodoDoPreset } from '@/lib/periodo';
 import type { PresetPeriodo } from '@/lib/periodo';
 
 /** Por qual número o ranking é ordenado. */
-export type MetricaRanking = 'agendado' | 'aprovado' | 'qtd_agendados';
+export type MetricaRanking = 'agendado' | 'aprovado' | 'qtd_agendados' | 'lucro';
 
 export const METRICAS: { id: MetricaRanking; label: string; curto: string }[] = [
   { id: 'agendado', label: 'Faturamento agendado', curto: 'Agendado' },
   { id: 'aprovado', label: 'Faturamento aprovado', curto: 'Aprovado' },
   { id: 'qtd_agendados', label: 'Quantidade de agendamentos', curto: 'Pedidos' },
+  { id: 'lucro', label: 'Lucro', curto: 'Lucro' },
 ];
+
+/** De onde sai o lucro de cada vendedor (centavos) — tudo o que a
+ *  Demonstração de Resultados desconta, só que dos pedidos DELE. */
+export interface CustosDoVendedor {
+  /** Taxa de plataforma dos pagamentos dele (R$ 2,50 por boleto). */
+  taxas: Cents;
+  /** Produto e frete dos pedidos dele pagos no período. */
+  produto: Cents;
+  frete: Cents;
+  /** Comissão dele sobre o que entrou menos a taxa (a linha do P&L). */
+  comissao: Cents;
+  /** Cobrança: 1% do que entrou dele. */
+  cobranca: Cents;
+  /** Custo real dos pedidos dele que frustraram (feitos no período). */
+  frustracao: Cents;
+  /** A parte dele no anúncio do período: o total dividido IGUAL entre os
+   *  vendedores do ranking que tiveram movimento. */
+  anuncio: Cents;
+}
 
 /**
  * O pedido conta como agendamento no RANKING? Regra do Ranking do BlueSales,
@@ -94,6 +123,18 @@ export interface LinhaRanking {
 
   /** Comissão dele no período — mesma conta do P&L. */
   comissao: Cents;
+
+  /**
+   * Lucro dele no período, como a coluna "Lucro" do Ranking do BlueSales: o
+   * que entrou dos pagamentos dele menos os custos desses pedidos e menos a
+   * parte dele no anúncio, que o BlueSales divide IGUAL entre os vendedores
+   * (23/11/2026: R$ 1.942,42 de anúncio no dia → −R$ 647,47 para o Matheus,
+   * que não tinha pagamento). Sem custos variáveis, como lá.
+   */
+  lucro: Cents;
+  /** lucro ÷ aprovado dele — o "%" do BlueSales; null sem aprovado. */
+  margem_lucro: number | null;
+  custos: CustosDoVendedor;
 }
 
 /** Normaliza o nome: o BlueSales manda "Matheus", "MATHEUS " e "Matheus ". */
@@ -112,7 +153,22 @@ function nomeDe(p: Pedido): string {
 export function valorDaMetrica(l: LinhaRanking, m: MetricaRanking): number {
   if (m === 'agendado') return l.agendado;
   if (m === 'aprovado') return l.aprovado;
+  if (m === 'lucro') return l.lucro;
   return l.qtd_agendados;
+}
+
+/** Anúncio do período (investimento + taxas sobre ele), em centavos — as
+ *  mesmas linhas da Demonstração de Resultados. */
+export function anuncioDoPeriodo(dailies: AfterpayDaily[], periodo: Periodo): Cents {
+  return dailies
+    .filter((r) => isDentro(r.data, periodo.inicio, periodo.fim))
+    .reduce((s, r) => s + reaisToCents(r.investimento_ads) + reaisToCents(r.taxas_investimento), 0);
+}
+
+/** Teve movimento no período (agendou ou recebeu)? É quem divide o anúncio —
+ *  e quem a tela mostra (a mesma regra, para a soma à vista fechar). */
+export function temMovimento(l: Pick<LinhaRanking, 'qtd_agendados' | 'qtd_aprovados'>): boolean {
+  return l.qtd_agendados > 0 || l.qtd_aprovados > 0;
 }
 
 /** A pessoa fica fora da disputa (ver FORA_DO_RANKING)? */
@@ -134,10 +190,31 @@ export function rankingVendedores(
   periodo: Periodo,
   metrica: MetricaRanking = 'agendado',
 ): LinhaRanking[] {
-  return ordenar(
-    todasAsLinhas(pedidos, dailies, periodo).filter((l) => !foraDoRanking(l.nome)),
-    metrica,
-  );
+  const todas = todasAsLinhas(pedidos, dailies, periodo);
+  const linhas = todas.filter((l) => !foraDoRanking(l.nome));
+
+  // O anúncio do período é dividido IGUAL entre os vendedores do ranking que
+  // tiveram movimento — a conta do BlueSales. O último leva a sobra dos
+  // centavos, para a soma fechar com a Demonstração de Resultados.
+  // Vai junto, do mesmo jeito, a taxa lançada à mão num dia sem pagamento
+  // (ex.: R$ 2,50 da 2ª parcela no boleto): ela está na Demonstração, mas
+  // nenhum pedido é dono dela.
+  const dividem = linhas.filter(temMovimento);
+  let resto = anuncioDoPeriodo(dailies, periodo);
+  let restoTaxa = Math.max(0, taxasDoPeriodo(pedidos, dailies, periodo) - todas.reduce((s, l) => s + l.custos.taxas, 0));
+  dividem.forEach((l, i) => {
+    const ultimo = i === dividem.length - 1;
+    const parte = ultimo ? resto : Math.round(resto / (dividem.length - i));
+    const parteTaxa = ultimo ? restoTaxa : Math.round(restoTaxa / (dividem.length - i));
+    resto -= parte;
+    restoTaxa -= parteTaxa;
+    l.custos.anuncio = parte;
+    l.custos.taxas += parteTaxa;
+    l.lucro -= parte + parteTaxa;
+    l.margem_lucro = l.aprovado > 0 ? l.lucro / l.aprovado : null;
+  });
+
+  return ordenar(linhas, metrica);
 }
 
 /** O que quem está fora do ranking fez no período (só os que tiveram
@@ -153,8 +230,15 @@ export function deFora(pedidos: Pedido[], dailies: AfterpayDaily[], periodo: Per
 
 function todasAsLinhas(pedidos: Pedido[], dailies: AfterpayDaily[], periodo: Periodo): LinhaRanking[] {
   const ativos = pedidosAtivos(pedidos);
+  // Taxa de cada pagamento do período (a mesma da Demonstração de Resultados).
+  const taxaDoPagamento = taxaPorPagamento(pedidos, dailies, periodo);
 
-  type Acc = Omit<LinhaRanking, 'pct' | 'conversao' | 'ticket_medio' | 'comissao'>;
+  type Acc = Omit<LinhaRanking, 'pct' | 'conversao' | 'ticket_medio' | 'comissao' | 'lucro' | 'margem_lucro' | 'custos'> & {
+    taxas: Cents;
+    produto: Cents;
+    frete: Cents;
+    frustracao: Cents;
+  };
   const porPessoa = new Map<string, Acc>();
 
   const pegar = (nome: string): Acc => {
@@ -170,6 +254,10 @@ function todasAsLinhas(pedidos: Pedido[], dailies: AfterpayDaily[], periodo: Per
         frustrado: 0,
         qtd_frustrados: 0,
         qtd_agendados_pagos: 0,
+        taxas: 0,
+        produto: 0,
+        frete: 0,
+        frustracao: 0,
       };
       porPessoa.set(k, a);
     }
@@ -199,6 +287,19 @@ function todasAsLinhas(pedidos: Pedido[], dailies: AfterpayDaily[], periodo: Per
       a.aprovado += reaisToCents(pg.valor);
       a.qtd_aprovados++;
     }
+
+    // Custos do lucro dele — as regras da Demonstração de Resultados, pedido
+    // a pedido: produto e frete do que foi pago no período (custosDePedidos),
+    // a taxa de cada pagamento, e a perda real do que ele vendeu no período e
+    // frustrou (agregarPedidos).
+    if (bucket === 'aprovado' && isDentro(dataAprovacaoPedido(p), periodo.inicio, periodo.fim)) {
+      a.produto += reaisToCents(custoProdutoDoPlano(p.produto_plano));
+      a.frete += reaisToCents(freteDoPedido(p));
+    }
+    a.taxas += taxaDoPagamento.get(p.id) ?? 0;
+    if (ehFrustracao(p) && isDentro(p.data, periodo.inicio, periodo.fim)) {
+      a.frustracao += reaisToCents(perdaRealDePedido(p));
+    }
   }
 
   // Quem tem comissão combinada aparece mesmo sem venda no período: some
@@ -213,13 +314,34 @@ function todasAsLinhas(pedidos: Pedido[], dailies: AfterpayDaily[], periodo: Per
     comissaoVendedores(agg.porAtendente, receitaTotal, taxas).map((c) => [chave(c.nome), c.comissao]),
   );
 
-  return [...porPessoa.entries()].map(([k, a]) => ({
-    ...a,
-    pct: comissaoDoVendedor(a.nome),
-    conversao: safeDiv(a.qtd_agendados_pagos, a.qtd_agendados),
-    ticket_medio: a.qtd_agendados > 0 ? Math.round(a.agendado / a.qtd_agendados) : 0,
-    comissao: comissoes.get(k) ?? 0,
-  }));
+  return [...porPessoa.entries()].map(([k, { taxas: taxasDele, produto, frete, frustracao, ...a }]) => {
+    const pct = comissaoDoVendedor(a.nome);
+    // Comissão como a linha do P&L: sobre o que entrou menos a taxa dos
+    // pagamentos dele (o BlueSales: "a comissão é calculada sobre o valor que
+    // sobra após as taxas da plataforma").
+    const comissaoLiquida = a.aprovado > 0 ? Math.round((a.aprovado - taxasDele) * pct) : 0;
+    const cobranca = Math.round(a.aprovado * COMISSAO_COBRANCA);
+    const custos: CustosDoVendedor = {
+      taxas: taxasDele,
+      produto,
+      frete,
+      comissao: comissaoLiquida,
+      cobranca,
+      frustracao,
+      anuncio: 0, // rankingVendedores divide o anúncio entre quem disputa
+    };
+    const lucro = a.aprovado - taxasDele - produto - frete - comissaoLiquida - cobranca - frustracao;
+    return {
+      ...a,
+      pct,
+      conversao: safeDiv(a.qtd_agendados_pagos, a.qtd_agendados),
+      ticket_medio: a.qtd_agendados > 0 ? Math.round(a.agendado / a.qtd_agendados) : 0,
+      comissao: comissoes.get(k) ?? 0,
+      lucro,
+      margem_lucro: a.aprovado > 0 ? lucro / a.aprovado : null,
+      custos,
+    };
+  });
 }
 
 export function ordenar(linhas: LinhaRanking[], metrica: MetricaRanking): LinhaRanking[] {

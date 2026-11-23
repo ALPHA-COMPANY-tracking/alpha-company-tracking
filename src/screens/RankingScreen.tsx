@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { BadgeCheck, CalendarClock, Info, ShoppingCart, Trophy } from 'lucide-react';
+import { BadgeCheck, CalendarClock, Info, ShoppingCart, Trophy, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Periodo } from '@/types';
 import { formatBRL, formatBRLCompact, formatPercent, safeDiv } from '@/lib/money';
@@ -12,6 +12,7 @@ import {
   deFora,
   ordenar,
   rankingVendedores,
+  temMovimento,
   valorDaMetrica,
 } from '@/lib/ranking';
 import { useData } from '@/store/DataProvider';
@@ -49,10 +50,11 @@ function BlocoRanking({
   const ordenadas = ordenar(linhas, metrica);
   const total = ordenadas.reduce((s, l) => s + valorDaMetrica(l, metrica), 0);
   const lider = valorDaMetrica(ordenadas[0] ?? ({} as LinhaRanking), metrica) || 0;
-  // Todos os que tiveram movimento no período aparecem nos três blocos,
-  // mesmo zerados num deles: as linhas ficam alinhadas e dá para comparar
-  // na horizontal. Zerado em "Aprovado" é informação, não ausência dela.
-  const visiveis = ordenadas.filter((l) => l.agendado > 0 || l.aprovado > 0);
+  // Todos os que tiveram movimento no período aparecem nos blocos, mesmo
+  // zerados num deles: as linhas ficam alinhadas e dá para comparar na
+  // horizontal. Zerado em "Aprovado" é informação, não ausência dela.
+  const visiveis = ordenadas.filter(temMovimento);
+  const ehLucro = metrica === 'lucro';
 
   return (
     <div className="bg-card border border-line rounded-card overflow-hidden">
@@ -73,22 +75,42 @@ function BlocoRanking({
           visiveis.map((l, i) => {
             const v = valorDaMetrica(l, metrica);
             const zerado = v === 0;
+            const negativo = v < 0;
+            // Lucro: o "%" é o do BlueSales (lucro ÷ aprovado dele); nos
+            // outros, a fatia de cada um no total.
+            const pct = ehLucro ? l.margem_lucro : safeDiv(v, total);
             return (
               <div key={l.nome}>
                 <div className="flex items-center justify-between gap-2 mb-[5px]">
                   <span className="flex items-center gap-[7px] min-w-0">
                     <span className="text-[13px] leading-none shrink-0 w-[17px] text-center">
-                      {zerado ? <span className="text-dim2 text-[11px]">—</span> : i < 3 ? MEDALHA[i] : `${i + 1}º`}
+                      {zerado ? (
+                        <span className="text-dim2 text-[11px]">—</span>
+                      ) : i < 3 && !negativo ? (
+                        MEDALHA[i]
+                      ) : (
+                        <span className="text-dim2 text-[11px]">{i + 1}º</span>
+                      )}
                     </span>
-                    <span className={`text-[12.5px] truncate ${zerado ? 'text-dim2' : i === 0 ? 'text-gold font-bold' : 'text-tx2'}`}>
+                    <span
+                      className={`text-[12.5px] truncate ${
+                        zerado ? 'text-dim2' : i === 0 && !negativo ? 'text-gold font-bold' : 'text-tx2'
+                      }`}
+                    >
                       {l.nome}
                     </span>
                   </span>
                   <span className="flex items-baseline gap-1.5 shrink-0">
-                    <span className={`mono text-[13px] font-bold ${zerado ? 'text-dim2' : i === 0 ? 'text-gold' : 'text-tx'}`}>
+                    <span
+                      className={`mono text-[13px] font-bold ${
+                        zerado ? 'text-dim2' : negativo ? 'text-red' : i === 0 ? 'text-gold' : 'text-tx'
+                      }`}
+                    >
                       {formatar(v, metrica)}
                     </span>
-                    {!zerado && <span className="text-[10px] text-dim2">{formatPercent(safeDiv(v, total))}</span>}
+                    {!zerado && pct != null && (
+                      <span className={`text-[10px] ${negativo ? 'text-red/80' : 'text-dim2'}`}>{formatPercent(pct)}</span>
+                    )}
                   </span>
                 </div>
                 {/* A barra é relativa ao líder: dá a distância de um bate-olho. */}
@@ -96,7 +118,7 @@ function BlocoRanking({
                   <div
                     className="h-full rounded-full"
                     style={{
-                      width: `${zerado || lider <= 0 ? 0 : Math.max(3, (v / lider) * 100)}%`,
+                      width: `${v <= 0 || lider <= 0 ? 0 : Math.max(3, (v / lider) * 100)}%`,
                       background: i === 0 ? `linear-gradient(90deg, ${alfa(HEX.ouro, 45)}, ${HEX.ouro})` : alfa(cor, 70),
                     }}
                   />
@@ -110,6 +132,82 @@ function BlocoRanking({
   );
 }
 
+/** As linhas da conta do lucro, na ordem da Demonstração de Resultados. */
+const PARTES_DO_LUCRO: { rotulo: string; valor: (l: LinhaRanking) => number }[] = [
+  { rotulo: 'Recebido', valor: (l) => l.aprovado },
+  { rotulo: 'Taxa de plataforma', valor: (l) => -l.custos.taxas },
+  { rotulo: 'Produto', valor: (l) => -l.custos.produto },
+  { rotulo: 'Frete', valor: (l) => -l.custos.frete },
+  { rotulo: 'Comissão (após a taxa)', valor: (l) => -l.custos.comissao },
+  { rotulo: 'Cobrança (1%)', valor: (l) => -l.custos.cobranca },
+  { rotulo: 'Frustração', valor: (l) => -l.custos.frustracao },
+  { rotulo: 'Parte no anúncio', valor: (l) => -l.custos.anuncio },
+];
+
+/** De onde sai o lucro de cada vendedor — a conta inteira à vista. */
+function ComoSaiOLucro({ linhas }: { linhas: LinhaRanking[] }) {
+  // Os mesmos que dividem o anúncio (temMovimento): a soma à vista fecha.
+  const com = ordenar(linhas, 'lucro').filter(temMovimento);
+  if (com.length === 0) return null;
+  const anuncio = com.reduce((s, l) => s + l.custos.anuncio, 0);
+  const dividem = com.length;
+
+  return (
+    <details className="border-t border-line/70 px-2 sm:px-3 lg:px-5 py-3">
+      <summary className="cursor-pointer text-[12px] text-dim hover:text-tx select-none">
+        Como sai o lucro de cada um
+      </summary>
+      <div className="overflow-x-auto mt-3">
+        <table className="w-full text-[12px] min-w-[420px]">
+          <thead>
+            <tr className="text-dim2 text-[10.5px] uppercase tracking-wide">
+              <th className="text-left font-semibold py-1.5 pr-3" />
+              {com.map((l) => (
+                <th key={l.nome} className="text-right font-semibold py-1.5 px-2 whitespace-nowrap">
+                  {l.nome}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {PARTES_DO_LUCRO.map((parte) => (
+              <tr key={parte.rotulo} className="border-t border-line/50">
+                <td className="py-1.5 pr-3 text-dim whitespace-nowrap">{parte.rotulo}</td>
+                {com.map((l) => {
+                  const v = parte.valor(l);
+                  return (
+                    <td key={l.nome} className={`py-1.5 px-2 text-right mono ${v < 0 ? 'text-dim' : 'text-tx2'}`}>
+                      {v === 0 ? '—' : formatBRL(v)}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+            <tr className="border-t border-line2">
+              <td className="py-2 pr-3 text-tx font-semibold">Lucro</td>
+              {com.map((l) => (
+                <td key={l.nome} className={`py-2 px-2 text-right mono font-bold ${l.lucro < 0 ? 'text-red' : 'text-grn'}`}>
+                  {formatBRL(l.lucro)}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p className="m-0 mt-3 text-[11.5px] text-dim2 leading-relaxed">
+        A mesma conta do Ranking do BlueSales: o que entrou dos pagamentos de cada um, menos taxa, produto, frete e
+        comissão desses pedidos, menos a perda dos pedidos dele que frustraram, e menos a parte dele no anúncio — o
+        anúncio do período ({formatBRL(anuncio)}) dividido <b className="text-dim">igual</b> entre os {dividem}{' '}
+        vendedor{dividem === 1 ? '' : 'es'} que tiveram movimento. A comissão desta conta é sobre o que sobra depois da
+        taxa de plataforma (a linha da Demonstração de Resultados); a coluna Comissão acima é o valor cheio que o vendedor
+        recebe. Sem custos variáveis, como lá. O que ainda pode diferir
+        do BlueSales são as diferenças que já existem na Demonstração de Resultados: aqui a cobrança é 1% de tudo que entra
+        (lá é menos), e o recebido é o valor da venda, sem os juros e a taxa do cartão que o BlueSales soma e desconta.
+      </p>
+    </details>
+  );
+}
+
 export function RankingScreen({ periodo }: { periodo: Periodo }) {
   const { pedidos, dailies } = useData();
 
@@ -119,7 +217,7 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
   // BlueSales ("classificado por agendamentos").
   const colunas = useMemo(() => comparativoPorPeriodo(pedidos, dailies, 'qtd_agendados'), [pedidos, dailies]);
 
-  const vendeu = linhas.filter((l) => l.agendado > 0 || l.aprovado > 0);
+  const vendeu = linhas.filter(temMovimento);
   const totalAgendamentos = linhas.reduce((s, l) => s + l.qtd_agendados, 0);
   const totalValor = linhas.reduce((s, l) => s + l.agendado, 0);
   const qtdVendedores = linhas.filter((l) => l.qtd_agendados > 0).length;
@@ -164,7 +262,7 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
       ) : (
         <>
           {/* Os três rankings, juntos */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-[14px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 lg:gap-[14px]">
             <BlocoRanking
               titulo="Agendamentos"
               hint="quantidade de pedidos · como no BlueSales"
@@ -189,6 +287,14 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
               metrica="aprovado"
               linhas={linhas}
             />
+            <BlocoRanking
+              titulo="Lucro"
+              hint="% sobre o aprovado dele · como no BlueSales"
+              Icon={Wallet}
+              cor={HEX.ouro}
+              metrica="lucro"
+              linhas={linhas}
+            />
           </div>
 
           {/* Tabela completa */}
@@ -201,6 +307,7 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
                     <th className="text-left font-semibold px-2 sm:px-3 lg:px-5 py-3">Vendedor</th>
                     <th className="text-right font-semibold px-2 sm:px-3 lg:px-5 py-3">Agendamentos</th>
                     <th className="hidden lg:table-cell text-right font-semibold px-3 lg:px-5 py-3">Aprovado</th>
+                    <th className="text-right font-semibold px-2 sm:px-3 lg:px-5 py-3">Lucro</th>
                     <th className="hidden lg:table-cell text-right font-semibold px-3 lg:px-5 py-3">Conversão</th>
                     <th className="hidden lg:table-cell text-right font-semibold px-3 lg:px-5 py-3">Ticket médio</th>
                     <th className="hidden lg:table-cell text-right font-semibold px-3 lg:px-5 py-3">Frustrados</th>
@@ -209,7 +316,7 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
                 </thead>
                 <tbody>
                   {ordenar(linhas, 'qtd_agendados').map((l, i) => {
-                    const ativo = l.agendado > 0 || l.aprovado > 0;
+                    const ativo = temMovimento(l);
                     return (
                       <tr
                         key={l.nome}
@@ -219,7 +326,7 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
                           {ativo ? (i < 3 ? MEDALHA[i] : `${i + 1}º`) : '—'}
                         </td>
                         <td className="px-2 sm:px-3 lg:px-5 py-3.5 lg:py-4">
-                          <div className="text-tx font-medium truncate max-w-[110px] sm:max-w-none">{l.nome}</div>
+                          <div className="text-tx font-medium truncate max-w-[80px] sm:max-w-none">{l.nome}</div>
                           <div className="text-[10px] mono text-dim2 mt-[2px]">{formatPercent(l.pct)} de comissão</div>
                         </td>
                         <td className="px-2 sm:px-3 lg:px-5 py-3.5 lg:py-4 text-right">
@@ -231,6 +338,20 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
                           <div className="text-[10px] text-dim2 mt-[2px]">
                             {l.qtd_aprovados} pago{l.qtd_aprovados === 1 ? '' : 's'}
                           </div>
+                        </td>
+                        <td className="px-2 sm:px-3 lg:px-5 py-3.5 lg:py-4 text-right">
+                          {ativo ? (
+                            <>
+                              <div className={`mono font-bold whitespace-nowrap ${l.lucro < 0 ? 'text-red' : 'text-grn'}`}>
+                                {formatBRL(l.lucro)}
+                              </div>
+                              <div className="text-[10px] mono text-dim2 mt-[2px]">
+                                {l.margem_lucro != null ? formatPercent(l.margem_lucro) : 'sem aprovado'}
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-dim2">—</span>
+                          )}
                         </td>
                         <td className="hidden lg:table-cell px-3 lg:px-5 py-3.5 lg:py-4 text-right">
                           <span
@@ -266,6 +387,7 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
                 </tbody>
               </table>
             </div>
+            <ComoSaiOLucro linhas={linhas} />
           </Panel>
 
           {/* Posição em cada período */}

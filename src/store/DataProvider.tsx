@@ -44,6 +44,9 @@ interface DataContextValue {
   desfazerPagamento: (id: string) => void;
   /** Preenche o nome do cliente de uma venda antiga, à mão. */
   definirClientePedido: (id: string, nome: string | null) => void;
+  /** Corrige o valor AGENDADO de uma venda (o que o "Vendas" do BlueSales
+   *  conta). Depois que o pedido saiu, o webhook não sobrescreve. */
+  definirAgendadoPedido: (id: string, valor: number) => void;
   /** Conferência com o export do BlueSales: quando cada pedido chegou. */
   chegadaDosPedidos: (ids: string[]) => Promise<Record<string, string>>;
   /** Grava as correções da conferência (lixeira, volta, valor, etapa). */
@@ -255,6 +258,16 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
     [aplicar],
   );
 
+  const definirAgendadoPedido = useCallback<DataContextValue['definirAgendadoPedido']>(
+    (id, valor) => {
+      aplicar(
+        (d) => ({ ...d, pedidos: d.pedidos.map((p) => (p.id === id ? { ...p, valor_agendado: valor } : p)) }),
+        (b) => b.corrigirPedido(id, { valor_agendado: valor }),
+      );
+    },
+    [aplicar],
+  );
+
   const chegadaDosPedidos = useCallback<DataContextValue['chegadaDosPedidos']>((ids) => backendRef.current.chegadaDosPedidos(ids), []);
 
   // Não é otimista: a tela só diz "pronto" depois que o banco gravou tudo.
@@ -352,6 +365,7 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
       definirValorPago,
       desfazerPagamento,
       definirClientePedido,
+      definirAgendadoPedido,
       chegadaDosPedidos,
       aplicarConferencia,
       importarRegioes,
@@ -362,7 +376,7 @@ export function DataProvider({ backend = backendLocalPadrao, children }: { backe
       carregarMetaMensal,
       salvarMetaMensal,
     };
-  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, definirPerdaPedido, definirTaxaPedido, removerPedido, definirValorPago, desfazerPagamento, definirClientePedido, chegadaDosPedidos, aplicarConferencia, importarRegioes, lancarDaily, lancarDailies, marcarSync, recarregar, carregarMetaMensal, salvarMetaMensal]);
+  }, [data, addCusto, updateCusto, deleteCusto, importarCustos, addCategoria, updateCategoria, deleteCategoria, definirPerdaPedido, definirTaxaPedido, removerPedido, definirValorPago, desfazerPagamento, definirClientePedido, definirAgendadoPedido, chegadaDosPedidos, aplicarConferencia, importarRegioes, lancarDaily, lancarDailies, marcarSync, recarregar, carregarMetaMensal, salvarMetaMensal]);
 
   if (!value) {
     return (

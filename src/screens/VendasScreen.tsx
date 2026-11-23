@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Copy, RotateCcw, Search, ShoppingBag, Trash2, TriangleAlert, X } from 'lucide-react';
+import { Copy, Pencil, RotateCcw, Search, ShoppingBag, Trash2, TriangleAlert, X } from 'lucide-react';
 import type { Pedido, Periodo } from '@/types';
 import { formatBRL, reaisToCents } from '@/lib/money';
 import { isDentro } from '@/lib/dates';
@@ -37,15 +37,33 @@ function selo(p: Pedido): { texto: string; classe: string } {
 }
 
 export function VendasScreen({ periodo, registro }: { periodo: Periodo; registro?: RegistroAlertas }) {
-  const { pedidos, removerPedido, definirClientePedido } = useData();
+  const { pedidos, removerPedido, definirClientePedido, definirAgendadoPedido } = useData();
   const [confirmando, setConfirmando] = useState<string | null>(null);
   const [editando, setEditando] = useState<string | null>(null);
   const [rascunho, setRascunho] = useState('');
+  // Correção do valor AGENDADO (o que o "Vendas" do BlueSales conta), pedido a pedido.
+  const [editandoValor, setEditandoValor] = useState<string | null>(null);
+  const [rascunhoValor, setRascunhoValor] = useState('');
 
   function salvarNome(id: string) {
     const nome = rascunho.trim();
     definirClientePedido(id, nome || null);
     setEditando(null);
+  }
+
+  function salvarValor(p: Pedido) {
+    // Aceita "735", "735,00", "1.234,56", "1.470" e "R$ 735,00" (copiado do BlueSales).
+    const texto = rascunhoValor.replace(/[R$\s]/gi, '');
+    const normal = texto.includes(',')
+      ? texto.replace(/\./g, '').replace(',', '.')
+      : /^\d{1,3}(\.\d{3})+$/.test(texto)
+        ? texto.replace(/\./g, '')
+        : texto;
+    const valor = Number(normal);
+    setEditandoValor(null);
+    if (!Number.isFinite(valor) || valor <= 0) return;
+    if (valor === (Number(p.valor_agendado ?? p.valor) || 0)) return;
+    definirAgendadoPedido(p.id, Math.round(valor * 100) / 100);
   }
 
   // Pela data de CRIAÇÃO: é a lista do que foi agendado no período,
@@ -179,10 +197,43 @@ export function VendasScreen({ periodo, registro }: { periodo: Periodo; registro
         </td>
         <td className="hidden sm:table-cell px-3 lg:px-5 py-3.5 lg:py-4 text-dim">{p.vendedor?.trim() || '—'}</td>
         <td className="hidden md:table-cell px-3 lg:px-5 py-3.5 lg:py-4 text-dim">{planoCurto(p.produto_plano)}</td>
-        <td className="px-2 sm:px-3 lg:px-5 py-3.5 lg:py-4 text-right">
-          <span className={`mono font-bold ${removido || foraDoAgendado(p) ? 'text-dim2 line-through' : 'text-gold2'}`}>
-            {formatBRL(reaisToCents(valor))}
-          </span>
+        <td className="px-2 sm:px-3 lg:px-5 py-3.5 lg:py-4 text-right whitespace-nowrap">
+          {editandoValor === p.id ? (
+            <input
+              autoFocus
+              inputMode="decimal"
+              aria-label="Valor agendado"
+              value={rascunhoValor}
+              onChange={(e) => setRascunhoValor(e.target.value)}
+              onBlur={() => salvarValor(p)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') salvarValor(p);
+                if (e.key === 'Escape') setEditandoValor(null);
+              }}
+              className="w-[96px] bg-card2 border border-gold/50 rounded-[8px] px-2 py-[5px] text-[12.5px] text-right mono text-tx outline-none"
+            />
+          ) : (
+            <span className="inline-flex items-center gap-1.5 justify-end">
+              {/* Lápis: corrige o valor agendado quando o BlueSales conta outro
+                  (ex.: desconto que baixou aqui e lá não). */}
+              {!removido && (
+                <button
+                  onClick={() => {
+                    setRascunhoValor(String(valor).replace('.', ','));
+                    setEditandoValor(p.id);
+                  }}
+                  title="Corrigir o valor agendado (o que o Vendas do BlueSales conta)"
+                  aria-label={`Corrigir o valor agendado do pedido ${p.internal_id != null ? '#' + p.internal_id : p.id}`}
+                  className="grid place-items-center w-6 h-6 rounded-md text-dim2 hover:text-gold hover:bg-gold/10"
+                >
+                  <Pencil size={12} />
+                </button>
+              )}
+              <span className={`mono font-bold ${removido || foraDoAgendado(p) ? 'text-dim2 line-through' : 'text-gold2'}`}>
+                {formatBRL(reaisToCents(valor))}
+              </span>
+            </span>
+          )}
         </td>
         <td className="hidden sm:table-cell px-3 lg:px-5 py-3.5 lg:py-4">
           <span className={`text-[10.5px] border rounded-full px-[8px] py-[2px] whitespace-nowrap ${s.classe}`}>

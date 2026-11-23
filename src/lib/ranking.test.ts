@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AfterpayDaily, Pedido, Periodo } from '@/types';
 import { calcularPnl } from '@/lib/pnl';
-import { comparativoPorPeriodo, deFora, foraDoRanking, ordenar, rankingVendedores } from '@/lib/ranking';
+import { anuncioDoPeriodo, comparativoPorPeriodo, deFora, foraDoRanking, ordenar, rankingVendedores } from '@/lib/ranking';
 
 const periodo: Periodo = { inicio: '2026-09-01', fim: '2026-09-30' };
 
@@ -274,5 +274,100 @@ describe('comparativo entre períodos', () => {
     const sete = cols.find((c) => c.label === '7 dias')!;
     expect(sete.posicao.get('PETER')).toBe(1);
     expect(sete.posicao.get('MATHEUS')).toBe(2);
+  });
+});
+
+describe('lucro por vendedor (coluna "Lucro" do Ranking do BlueSales)', () => {
+  const comAnuncio = (data: string, ads: number): AfterpayDaily => ({ ...daily(data, 0), investimento_ads: ads });
+
+  it('o anúncio é dividido IGUAL entre os vendedores: quem não recebeu nada fica com −anúncio ÷ 3', () => {
+    // 23/11/2026: R$ 1.942,42 de anúncio no dia, Matheus sem pagamento → −R$ 647,47.
+    const dia = { inicio: '2026-11-23', fim: '2026-11-23' };
+    const p = [
+      pedido({ id: 'a', vendedor: 'PETER', data: '2026-11-23' }),
+      pedido({ id: 'b', vendedor: 'Lucas Magalhães', data: '2026-11-23' }),
+      pedido({ id: 'c', vendedor: 'Matheus', data: '2026-11-23' }),
+    ];
+    const linhas = rankingVendedores(p, [comAnuncio('2026-11-23', 1942.42)], dia);
+    expect(linhas.map((l) => l.custos.anuncio).sort()).toEqual([64_747, 64_747, 64_748]);
+    expect(linhas.reduce((s, l) => s + l.custos.anuncio, 0)).toBe(194_242);
+    expect(de('Matheus', linhas).lucro).toBeLessThanOrEqual(-64_747);
+    expect(de('Matheus', linhas).margem_lucro).toBeNull(); // sem aprovado, sem "%"
+  });
+
+  it('o lucro de cada um é o que entrou menos os custos dos pedidos dele e a parte do anúncio', () => {
+    const p = [
+      // PETER: 6 potes pago no boleto em 05/09 (produto 83, frete 33, taxa 2,50).
+      pedido({
+        id: 'a', vendedor: 'PETER', data: '2026-09-02', status: 'pagos', data_aprovacao: '2026-09-05',
+        metodo_pagamento: 'boleto', enviado_em: '2026-09-03T10:00:00Z',
+      }),
+      // PETER: roubo de um pedido de setembro → perda real produto + frete.
+      pedido({ id: 'b', vendedor: 'PETER', data: '2026-09-03', status: 'roubo', enviado_em: '2026-09-04T10:00:00Z' }),
+      // Matheus: só agendou.
+      pedido({ id: 'c', vendedor: 'Matheus', data: '2026-09-04' }),
+    ];
+    const linhas = rankingVendedores(p, [comAnuncio('2026-09-05', 1000)], periodo);
+    const peter = de('PETER', linhas);
+    expect(peter.custos).toEqual({
+      taxas: 250,
+      produto: 8_300,
+      frete: 3_300,
+      comissao: Math.round((73_500 - 250) * 0.05),
+      cobranca: 735,
+      frustracao: 8_300 + 3_300,
+      anuncio: 50_000,
+    });
+    expect(peter.lucro).toBe(73_500 - 250 - 8_300 - 3_300 - 3_663 - 735 - 11_600 - 50_000);
+    expect(peter.margem_lucro).toBeCloseTo(peter.lucro / 73_500);
+    expect(de('Matheus', linhas).lucro).toBe(-50_000);
+  });
+
+  it('a soma dos lucros fecha com a Demonstração de Resultados (sem custos variáveis)', () => {
+    const p = [
+      pedido({ id: 'a', vendedor: 'PETER', data: '2026-09-02', status: 'pagos', data_aprovacao: '2026-09-05', metodo_pagamento: 'boleto' }),
+      pedido({ id: 'b', vendedor: 'PETER', data: '2026-09-03', status: 'devolvido', enviado_em: '2026-09-04T10:00:00Z' }),
+      pedido({
+        id: 'c', vendedor: 'Matheus', data: '2026-09-04', status: 'pagos', data_aprovacao: '2026-09-06',
+        valor: 435, valor_agendado: 435, produto_plano: 'DERMAX PREMIUM - 3 POTE',
+      }),
+      pedido({ id: 'd', vendedor: 'Matheus', data: '2026-09-07' }),
+    ];
+    const dailies = [comAnuncio('2026-09-05', 812.37), comAnuncio('2026-09-06', 455.1)];
+    const pnl = calcularPnl(dailies, [], periodo, { descontarFrustrados: 'real' }, p);
+    const linhas = rankingVendedores(p, dailies, periodo);
+    const soma = linhas.reduce((s, l) => s + l.lucro, 0);
+    // Só a cobrança é arredondada por vendedor: no máximo 1 centavo cada.
+    expect(Math.abs(soma - pnl.lucro_sem_variaveis)).toBeLessThanOrEqual(linhas.length);
+    expect(linhas.reduce((s, l) => s + l.custos.anuncio, 0)).toBe(anuncioDoPeriodo(dailies, periodo));
+  });
+
+  it('taxa lançada à mão num dia sem pagamento também sai do lucro (a soma fecha com o P&L)', () => {
+    // 2ª parcela no boleto em 05/11, com R$ 2,50 lançado na tela Taxas nesse dia:
+    // nenhum pedido "é dono" do dia (o pagamento é de 28/10), mas a taxa está no P&L.
+    const nov = { inicio: '2026-11-01', fim: '2026-11-30' };
+    const p = [
+      pedido({
+        id: 'a', vendedor: 'PETER', data: '2026-10-20', status: 'pagos', data_aprovacao: '2026-10-28',
+        metodo_pagamento: 'boleto', parcelas: [{ data: '2026-10-28', valor: 400 }, { data: '2026-11-05', valor: 335 }],
+      }),
+      pedido({ id: 'b', vendedor: 'Matheus', data: '2026-11-06' }),
+    ];
+    const dailies = [daily('2026-11-05', 2.5)];
+    const pnl = calcularPnl(dailies, [], nov, { descontarFrustrados: 'real' }, p);
+    const linhas = rankingVendedores(p, dailies, nov);
+    expect(linhas.reduce((s, l) => s + l.custos.taxas, 0)).toBe(pnl.taxas_plataforma);
+    expect(Math.abs(linhas.reduce((s, l) => s + l.lucro, 0) - pnl.lucro_sem_variaveis)).toBeLessThanOrEqual(linhas.length);
+  });
+
+  it('quem está fora do ranking não divide o anúncio', () => {
+    const p = [
+      pedido({ id: 'a', vendedor: 'PETER', data: '2026-09-02' }),
+      pedido({ id: 'b', vendedor: 'Alyenderson Lima', data: '2026-09-02', status: 'pagos', data_aprovacao: '2026-09-02' }),
+    ];
+    const linhas = rankingVendedores(p, [comAnuncio('2026-09-02', 300)], periodo);
+    // Só o PETER teve movimento entre quem disputa: leva o anúncio inteiro.
+    expect(de('PETER', linhas).custos.anuncio).toBe(30_000);
+    expect(deFora(p, [comAnuncio('2026-09-02', 300)], periodo)[0].custos.anuncio).toBe(0);
   });
 });
