@@ -331,9 +331,6 @@ function BlocoEquilibrio({ eq }: { eq: ReturnType<typeof equilibrioDoMes> }) {
             {eq.conversaoMes != null && <> · neste mês até agora, {pct(eq.conversaoMes)}</>}.
           </span>
         )}
-        <span className="text-dim2">
-          Só com os pedidos que já existem (sem vendas novas, 80% pagam), a Previsão do Mês dá {formatBRL(eq.previsto)}.
-        </span>
       </div>
 
       <details className="mt-3 group">
