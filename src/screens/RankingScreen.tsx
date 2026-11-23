@@ -363,9 +363,14 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
             {foraDaDisputa.map((l, i) => (
               <span key={l.nome}>
                 {i > 0 && '; '}
-                <b className="text-tx2">{l.nome}</b> — {l.qtd_agendados} agendamento{l.qtd_agendados === 1 ? '' : 's'} ·{' '}
-                {formatBRL(l.agendado)}
-                {l.qtd_aprovados > 0 && <> · {formatBRL(l.aprovado)} aprovado</>}
+                <b className="text-tx2">{l.nome}</b> —{' '}
+                {[
+                  l.qtd_agendados > 0 &&
+                    `${l.qtd_agendados} agendamento${l.qtd_agendados === 1 ? '' : 's'} · ${formatBRL(l.agendado)}`,
+                  l.qtd_aprovados > 0 && `${formatBRL(l.aprovado)} aprovado`,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </span>
             ))}
             . Essas vendas continuam no P&L e nas comissões.
