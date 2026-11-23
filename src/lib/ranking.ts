@@ -20,7 +20,6 @@ import {
   aguardaPagamento,
   dataAprovacaoPedido,
   ehCancelado,
-  ehFrustracao,
   ehRecusado,
   pagamentosDoPedido,
   pedidosAtivos,
@@ -32,7 +31,6 @@ import {
   comissaoDoVendedor,
   custoProdutoDoPlano,
   freteDoPedido,
-  perdaRealDePedido,
 } from '@/lib/custosConfig';
 import { comissaoVendedores } from '@/lib/pnl';
 import { taxaPorPagamento, taxasDoPeriodo } from '@/lib/taxas';
@@ -61,8 +59,6 @@ export interface CustosDoVendedor {
   comissao: Cents;
   /** Cobrança: 1% do que entrou dele. */
   cobranca: Cents;
-  /** Custo real dos pedidos dele que frustraram (feitos no período). */
-  frustracao: Cents;
   /** A parte dele no anúncio do período: o total dividido IGUAL entre os
    *  vendedores do ranking que tiveram movimento. */
   anuncio: Cents;
@@ -129,7 +125,9 @@ export interface LinhaRanking {
    * que entrou dos pagamentos dele menos os custos desses pedidos e menos a
    * parte dele no anúncio, que o BlueSales divide IGUAL entre os vendedores
    * (23/11/2026: R$ 1.942,42 de anúncio no dia → −R$ 647,47 para o Matheus,
-   * que não tinha pagamento). Sem custos variáveis, como lá.
+   * que não tinha pagamento). Sem custos variáveis e SEM a frustração, como
+   * lá: a soma dos vendedores é o card "Lucro total" do BlueSales, que é o
+   * P&L dele mais o custo de frustração (nov/2026: 7.592,90 = 7.016,91 + 576).
    */
   lucro: Cents;
   /** lucro ÷ aprovado dele — o "%" do BlueSales; null sem aprovado. */
@@ -237,7 +235,6 @@ function todasAsLinhas(pedidos: Pedido[], dailies: AfterpayDaily[], periodo: Per
     taxas: Cents;
     produto: Cents;
     frete: Cents;
-    frustracao: Cents;
   };
   const porPessoa = new Map<string, Acc>();
 
@@ -257,7 +254,6 @@ function todasAsLinhas(pedidos: Pedido[], dailies: AfterpayDaily[], periodo: Per
         taxas: 0,
         produto: 0,
         frete: 0,
-        frustracao: 0,
       };
       porPessoa.set(k, a);
     }
@@ -289,17 +285,14 @@ function todasAsLinhas(pedidos: Pedido[], dailies: AfterpayDaily[], periodo: Per
     }
 
     // Custos do lucro dele — as regras da Demonstração de Resultados, pedido
-    // a pedido: produto e frete do que foi pago no período (custosDePedidos),
-    // a taxa de cada pagamento, e a perda real do que ele vendeu no período e
-    // frustrou (agregarPedidos).
+    // a pedido: produto e frete do que foi pago no período (custosDePedidos)
+    // e a taxa de cada pagamento. A frustração NÃO entra (como no BlueSales):
+    // fica na coluna Frustrados e na Demonstração.
     if (bucket === 'aprovado' && isDentro(dataAprovacaoPedido(p), periodo.inicio, periodo.fim)) {
       a.produto += reaisToCents(custoProdutoDoPlano(p.produto_plano));
       a.frete += reaisToCents(freteDoPedido(p));
     }
     a.taxas += taxaDoPagamento.get(p.id) ?? 0;
-    if (ehFrustracao(p) && isDentro(p.data, periodo.inicio, periodo.fim)) {
-      a.frustracao += reaisToCents(perdaRealDePedido(p));
-    }
   }
 
   // Quem tem comissão combinada aparece mesmo sem venda no período: some
@@ -314,7 +307,7 @@ function todasAsLinhas(pedidos: Pedido[], dailies: AfterpayDaily[], periodo: Per
     comissaoVendedores(agg.porAtendente, receitaTotal, taxas).map((c) => [chave(c.nome), c.comissao]),
   );
 
-  return [...porPessoa.entries()].map(([k, { taxas: taxasDele, produto, frete, frustracao, ...a }]) => {
+  return [...porPessoa.entries()].map(([k, { taxas: taxasDele, produto, frete, ...a }]) => {
     const pct = comissaoDoVendedor(a.nome);
     // Comissão como a linha do P&L: sobre o que entrou menos a taxa dos
     // pagamentos dele (o BlueSales: "a comissão é calculada sobre o valor que
@@ -327,10 +320,9 @@ function todasAsLinhas(pedidos: Pedido[], dailies: AfterpayDaily[], periodo: Per
       frete,
       comissao: comissaoLiquida,
       cobranca,
-      frustracao,
       anuncio: 0, // rankingVendedores divide o anúncio entre quem disputa
     };
-    const lucro = a.aprovado - taxasDele - produto - frete - comissaoLiquida - cobranca - frustracao;
+    const lucro = a.aprovado - taxasDele - produto - frete - comissaoLiquida - cobranca;
     return {
       ...a,
       pct,

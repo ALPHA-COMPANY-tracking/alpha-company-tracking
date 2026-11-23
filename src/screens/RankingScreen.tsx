@@ -140,7 +140,6 @@ const PARTES_DO_LUCRO: { rotulo: string; valor: (l: LinhaRanking) => number }[] 
   { rotulo: 'Frete', valor: (l) => -l.custos.frete },
   { rotulo: 'Comissão (após a taxa)', valor: (l) => -l.custos.comissao },
   { rotulo: 'Cobrança (1%)', valor: (l) => -l.custos.cobranca },
-  { rotulo: 'Frustração', valor: (l) => -l.custos.frustracao },
   { rotulo: 'Parte no anúncio', valor: (l) => -l.custos.anuncio },
 ];
 
@@ -195,12 +194,13 @@ function ComoSaiOLucro({ linhas }: { linhas: LinhaRanking[] }) {
         </table>
       </div>
       <p className="m-0 mt-3 text-[11.5px] text-dim2 leading-relaxed">
-        A mesma conta do Ranking do BlueSales: o que entrou dos pagamentos de cada um, menos taxa, produto, frete e
-        comissão desses pedidos, menos a perda dos pedidos dele que frustraram, e menos a parte dele no anúncio — o
+        A mesma conta do Ranking do BlueSales: o que entrou dos pagamentos de cada um, menos taxa, produto, frete,
+        comissão e cobrança desses pedidos, e menos a parte dele no anúncio — o
         anúncio do período ({formatBRL(anuncio)}) dividido <b className="text-dim">igual</b> entre os {dividem}{' '}
         vendedor{dividem === 1 ? '' : 'es'} que tiveram movimento. A comissão desta conta é sobre o que sobra depois da
         taxa de plataforma (a linha da Demonstração de Resultados); a coluna Comissão acima é o valor cheio que o vendedor
-        recebe. Sem custos variáveis, como lá. O que ainda pode diferir
+        recebe. Sem custos variáveis e sem a frustração, como lá (a frustração fica na coluna Frustrados e na
+        Demonstração de Resultados). O que ainda pode diferir
         do BlueSales são as diferenças que já existem na Demonstração de Resultados: aqui a cobrança é 1% de tudo que entra
         (lá é menos), e o recebido é o valor da venda, sem os juros e a taxa do cartão que o BlueSales soma e desconta.
       </p>

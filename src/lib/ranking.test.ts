@@ -315,15 +315,15 @@ describe('lucro por vendedor (coluna "Lucro" do Ranking do BlueSales)', () => {
       frete: 3_300,
       comissao: Math.round((73_500 - 250) * 0.05),
       cobranca: 735,
-      frustracao: 8_300 + 3_300,
       anuncio: 50_000,
     });
-    expect(peter.lucro).toBe(73_500 - 250 - 8_300 - 3_300 - 3_663 - 735 - 11_600 - 50_000);
+    // O roubo NÃO entra no lucro do vendedor (como no BlueSales).
+    expect(peter.lucro).toBe(73_500 - 250 - 8_300 - 3_300 - 3_663 - 735 - 50_000);
     expect(peter.margem_lucro).toBeCloseTo(peter.lucro / 73_500);
     expect(de('Matheus', linhas).lucro).toBe(-50_000);
   });
 
-  it('a soma dos lucros fecha com a Demonstração de Resultados (sem custos variáveis)', () => {
+  it('a soma dos lucros fecha com a Demonstração de Resultados sem custos variáveis e sem a frustração', () => {
     const p = [
       pedido({ id: 'a', vendedor: 'PETER', data: '2026-09-02', status: 'pagos', data_aprovacao: '2026-09-05', metodo_pagamento: 'boleto' }),
       pedido({ id: 'b', vendedor: 'PETER', data: '2026-09-03', status: 'devolvido', enviado_em: '2026-09-04T10:00:00Z' }),
@@ -337,8 +337,10 @@ describe('lucro por vendedor (coluna "Lucro" do Ranking do BlueSales)', () => {
     const pnl = calcularPnl(dailies, [], periodo, { descontarFrustrados: 'real' }, p);
     const linhas = rankingVendedores(p, dailies, periodo);
     const soma = linhas.reduce((s, l) => s + l.lucro, 0);
-    // Só a cobrança é arredondada por vendedor: no máximo 1 centavo cada.
-    expect(Math.abs(soma - pnl.lucro_sem_variaveis)).toBeLessThanOrEqual(linhas.length);
+    // O card "Lucro total" do BlueSales = P&L + custo de frustração. Só a
+    // cobrança é arredondada por vendedor: no máximo 1 centavo cada.
+    expect(pnl.desconto_frustrados).toBeGreaterThan(0);
+    expect(Math.abs(soma - (pnl.lucro_sem_variaveis + pnl.desconto_frustrados))).toBeLessThanOrEqual(linhas.length);
     expect(linhas.reduce((s, l) => s + l.custos.anuncio, 0)).toBe(anuncioDoPeriodo(dailies, periodo));
   });
 
