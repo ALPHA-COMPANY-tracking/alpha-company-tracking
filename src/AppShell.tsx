@@ -77,9 +77,10 @@ const MENU_COMPLETO: ItemMenu[] = [
   { aba: 'export' },
 ];
 
-/** Telas ocultas a pedido do Jonas (02/11/2026). O código continua aqui:
- *  para voltar uma delas, é só tirá-la desta lista. */
-const OCULTAS: Tab[] = ['previsao', 'instagram', 'export'];
+/** Telas ocultas a pedido do Jonas (02/11/2026; Fila de Cobrança e Mapa de
+ *  Frustração em 23/11/2026). O código continua aqui: para voltar uma delas,
+ *  é só tirá-la desta lista. */
+const OCULTAS: Tab[] = ['previsao', 'instagram', 'export', 'cobranca', 'mapa'];
 
 const MENU: ItemMenu[] = MENU_COMPLETO.flatMap((m): ItemMenu[] => {
   if ('aba' in m) return OCULTAS.includes(m.aba) ? [] : [m];
