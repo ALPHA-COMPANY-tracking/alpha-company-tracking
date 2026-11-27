@@ -25,6 +25,7 @@ import {
   ptaxAntesDe,
   regraDoDia,
   SEMPRE,
+  ultimaRegraPtax,
   tokensDasContas,
   usaPtax,
 } from '../../api/lib-meta';
@@ -453,6 +454,22 @@ describe('câmbio do BlueSales: PTAX + spread + IOF (27/11/2026)', () => {
     expect(cambioDoDia('2026-11-05', opts)).toBe(5.4);
     // O dólar digitado para um dia passa na frente de tudo.
     expect(cambioDoDia('2026-11-27', { ...opts, dias: { '2026-11-27': 6.01 } })).toBe(6.01);
+  });
+
+  it('mudar com data no passado vale DALI EM DIANTE, por cima de uma regra de data maior', () => {
+    // Já existe spread 6% desde 27/11; salvo depois spread 7% desde 20/11.
+    const depois = novaRegraPtax(regras, 6.15, { desde: '2026-11-20', ptax: true, spread: 7, iof: 0, em: '2026-11-28T12:00:00Z' });
+    expect(regraDoDia('2026-11-28', depois)).toMatchObject({ spread: 7 });
+    expect(regraDoDia('2026-11-27', depois)).toMatchObject({ spread: 7 });
+    expect(regraDoDia('2026-11-21', depois)).toMatchObject({ spread: 7 });
+    expect(regraDoDia('2026-11-19', depois)).toEqual({ desde: '2026-11-10', valor: 6.15 }); // antes da data: não muda
+    // O spread/IOF "de agora" é o da regra salva por último.
+    expect(ultimaRegraPtax(depois)).toMatchObject({ spread: 7, desde: '2026-11-20' });
+    expect(ultimaRegraPtax(regras)).toMatchObject({ spread: 6, iof: 0 });
+    // Uma taxa fixa salva depois (com data de salvamento) também manda dali em diante.
+    const fixa = novaCotacaoDesde(depois, 6.15, '2026-11-25', 6.2, '2026-11-29T12:00:00Z');
+    expect(regraDoDia('2026-11-28', fixa)).toMatchObject({ valor: 6.2 });
+    expect(regraDoDia('2026-11-24', fixa)).toMatchObject({ spread: 7 });
   });
 
   it('sem a PTAX do Banco Central não grava com taxa errada', () => {

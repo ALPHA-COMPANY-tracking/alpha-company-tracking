@@ -1122,13 +1122,13 @@ function CambioDolar(p: {
   // A PTAX publicada hoje à tarde só vale a partir de amanhã.
   const novaParaAmanha = ultima && vigente && ultima.data > vigente.data ? ultima : null;
   // O que mudou em cada alteração: a regra que valia naquele dia antes dela.
-  const historico = [...p.regras].sort((a, b) =>
-    ehPtax(a) && ehPtax(b) ? (b.em ?? '').localeCompare(a.em ?? '') || ordemDasRegras(a, b) : ordemDasRegras(a, b),
-  );
+  // Histórico: a alteração mais recente primeiro; as fixas antigas (sem data) no fim.
+  const historico = [...p.regras].sort((a, b) => (b.em ?? '').localeCompare(a.em ?? '') || ordemDasRegras(a, b));
   const antesDe = (r: RegraDolar) =>
     regraDoDia(
       r.desde,
-      p.regras.filter((x) => x !== r && (!ehPtax(x) || !ehPtax(r) || (x.em ?? '') < (r.em ?? ''))),
+      // As salvas antes dela (as fixas antigas não têm data: são as mais velhas).
+      p.regras.filter((x) => x !== r && (x.em ?? '') < (r.em ?? '')),
     );
   const deAte = (r: RegraDolar): string => {
     if (!ehPtax(r)) return `taxa fixa R$ ${numBR(r.valor)}`;

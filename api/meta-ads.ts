@@ -172,6 +172,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       meta.cambioDoDia(dia, { regras: efetiva.cotacoes_usd, dias: efetiva.cotacoes_dia, fixa: efetiva.cotacao_usd, ptax });
     const versao = process.env.META_API_VERSION || undefined;
     const buscar = (url: string) => fetch(url);
+    /** Banco Central com limite de tempo: ele às vezes demora ou trava, e a
+     *  tela (e a sincronização) não podem ficar presas esperando. */
+    const buscarBcb = (ms: number) => (url: string) => fetch(url, { signal: AbortSignal.timeout(ms) });
 
     // Token da Vercel: vale para as contas sem BM importada.
     const tokenEnv = meta.limparToken(process.env.META_ACCESS_TOKEN);
@@ -222,14 +225,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const c = numeroOuNulo(corpo.cotacao_usd);
         if (!c || c > 50) return aviso('Taxa do dólar inválida.');
         const desde = typeof corpo.cotacao_desde === 'string' && DATA.test(corpo.cotacao_desde) ? corpo.cotacao_desde : hoje;
-        nova.cotacoes_usd = meta.novaCotacaoDesde(nova.cotacoes_usd, config?.cotacao_usd ?? meta.COTACAO_BLUESALES, desde, c);
+        nova.cotacoes_usd = meta.novaCotacaoDesde(
+          nova.cotacoes_usd,
+          config?.cotacao_usd ?? meta.COTACAO_BLUESALES,
+          desde,
+          c,
+          new Date().toISOString(),
+        );
       }
       if (corpo.cambio !== undefined) {
         // PTAX + spread + IOF a partir de um dia. O que não veio no pedido
         // continua como estava na regra que valia nesse dia.
         const c = (corpo.cambio ?? {}) as { spread?: unknown; iof?: unknown; desde?: unknown };
         const desde = typeof c.desde === 'string' && DATA.test(c.desde) ? c.desde : hoje;
-        const antes = meta.regraDoDia(desde, nova.cotacoes_usd);
+        // O campo que não veio fica como está AGORA (a regra de PTAX salva por
+        // último), como no BlueSales: cada "Alterar" mexe num campo só.
+        const antes = meta.ultimaRegraPtax(nova.cotacoes_usd) ?? meta.regraDoDia(desde, nova.cotacoes_usd);
         const pct = (v: unknown, atual: number, max: number): number | null => {
           if (v === undefined) return atual;
           const n = Number(String(v).replace(',', '.'));
@@ -396,7 +407,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const hojeSP = meta.hojeSP();
       let cambio: Record<string, unknown> = { regra: meta.regraDoDia(hojeSP, efetiva.cotacoes_usd) };
       try {
-        const ptax = await meta.buscarPtax({ fetch: buscar, desde: meta.somarDias(hojeSP, -3), ate: hojeSP });
+        // (buscarPtax ainda volta 7 dias: cobre feriado emendado com fim de semana.)
+        const ptax = await meta.buscarPtax({ fetch: buscarBcb(6_000), desde: meta.somarDias(hojeSP, -3), ate: hojeSP });
         cambio = {
           ...cambio,
           ultima: ptax[ptax.length - 1] ?? null,
@@ -462,6 +474,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       cotacaoFixa: efetiva.cotacao_usd,
       cotacaoDoDia: taxaDoDia,
       precisaPtax: meta.usaPtax(efetiva.cotacoes_usd, efetiva.cotacoes_dia, desde, ate),
+      fetchPtax: buscarBcb(15_000),
       acrescimoPct: numeroOuNulo(process.env.META_ACRESCIMO_PCT) ?? 0,
       impostoBrlPct: efetiva.imposto_brl_pct,
     });

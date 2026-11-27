@@ -448,6 +448,8 @@ export const COTACAO_BLUESALES = 5.4;
 export interface CotacaoDesde {
   desde: string;
   valor: number;
+  /** Quando foi salva (ISO). As antigas (5,40 e 6,15) não têm. */
+  em?: string;
 }
 
 /**
@@ -481,7 +483,19 @@ export function cambioEfetivo(ptax: number, spread: number, iof: number): number
 
 /** Ordem do histórico: "desde" mais recente primeiro; no mesmo dia, a salva por último. */
 function ordemDasRegras(a: RegraDolar, b: RegraDolar): number {
-  return b.desde.localeCompare(a.desde) || (ehPtax(b) ? b.em ?? '' : '').localeCompare(ehPtax(a) ? a.em ?? '' : '');
+  return b.desde.localeCompare(a.desde) || (b.em ?? '').localeCompare(a.em ?? '');
+}
+
+/**
+ * Qual de duas regras manda num dia em que as duas já valem: a SALVA POR
+ * ÚLTIMO ("mudar spread ou IOF vale da data escolhida em diante" — mudar com
+ * data de 20/11 depois de já existir uma de 27/11 vale também de 27/11 em
+ * diante). Sem data de salvamento (as fixas antigas), a de "desde" maior.
+ */
+function mandaMais(a: RegraDolar, b: RegraDolar): boolean {
+  const ea = a.em ?? '';
+  const eb = b.em ?? '';
+  return ea !== eb ? ea > eb : a.desde > b.desde;
 }
 
 /** Primeiro "desde" do histórico: a taxa que já valia antes de qualquer troca. */
@@ -507,12 +521,19 @@ export function cotacaoDoDia(
 }
 
 /**
- * A regra que vale num dia: a de "desde" mais recente até ele; no mesmo
- * "desde", a salva por último (o spread/IOF trocado duas vezes no dia).
+ * A regra que vale num dia: entre as que já valem nele (desde ≤ dia), a
+ * salva por último; as antigas sem data de salvamento, pela "desde" maior.
  */
 export function regraDoDia(dia: string, regras: RegraDolar[]): RegraDolar | null {
   let achada: RegraDolar | null = null;
-  for (const r of regras) if (r.desde <= dia && (!achada || ordemDasRegras(r, achada) < 0)) achada = r;
+  for (const r of regras) if (r.desde <= dia && (!achada || mandaMais(r, achada))) achada = r;
+  return achada;
+}
+
+/** O spread e o IOF de agora: os da regra de PTAX salva por último. */
+export function ultimaRegraPtax(regras: RegraDolar[]): CambioPtax | null {
+  let achada: CambioPtax | null = null;
+  for (const r of regras) if (ehPtax(r) && (!achada || mandaMais(r, achada))) achada = r;
   return achada;
 }
 
@@ -566,7 +587,7 @@ export function lerCotacoes(aPartir: unknown, dias: unknown): { aPartir: RegraDo
         ...(typeof c.por === 'string' ? { por: c.por } : {}),
       });
     } else if (Number(c?.valor) > 0) {
-      lista.push({ desde, valor: Number(c.valor) });
+      lista.push({ desde, valor: Number(c.valor), ...(typeof c.em === 'string' ? { em: c.em } : {}) });
     }
   }
   lista.sort(ordemDasRegras);
@@ -582,9 +603,15 @@ export function lerCotacoes(aPartir: unknown, dias: unknown): { aPartir: RegraDo
  * troca, a taxa que valia até então fica para trás (SEMPRE), para os dias
  * antigos não mudarem.
  */
-export function novaCotacaoDesde(lista: RegraDolar[], anterior: number | null, desde: string, valor: number): RegraDolar[] {
+export function novaCotacaoDesde(
+  lista: RegraDolar[],
+  anterior: number | null,
+  desde: string,
+  valor: number,
+  em?: string,
+): RegraDolar[] {
   const base = lista.length || anterior == null || desde === SEMPRE ? lista : [{ desde: SEMPRE, valor: anterior }];
-  return [...base.filter((c) => c.desde !== desde), { desde, valor }].sort(ordemDasRegras);
+  return [...base.filter((c) => c.desde !== desde), { desde, valor, ...(em ? { em } : {}) }].sort(ordemDasRegras);
 }
 
 /**
@@ -614,6 +641,8 @@ export interface ConfigMeta {
   cotacaoDoDia?: (dia: string, ptax: Ptax[]) => number | null;
   /** Algum dia do período usa PTAX + spread + IOF: busca o Banco Central. */
   precisaPtax?: boolean;
+  /** fetch só para o Banco Central (com limite de tempo); sem ele, `fetch`. */
+  fetchPtax?: Fetch;
   /** Acréscimo sobre a cotação, em % (ex.: 3,5 de IOF do cartão). */
   acrescimoPct?: number;
   /** Imposto do Meta sobre as contas em real, em % (padrão da tela: 12,5). */
@@ -645,7 +674,7 @@ export async function gastoMetaPorDia(cfg: ConfigMeta): Promise<GastoDoDia[]> {
   const dias = diasEntre(cfg.desde, cfg.ate);
   const precisaDolar = gastos.some((g) => g.moeda.toUpperCase() === 'USD' && g.valor > 0);
   const faltaTaxa = cfg.precisaPtax || (!cfg.cotacaoFixa && dias.some((d) => (cfg.cotacaoDoDia?.(d, []) ?? null) == null));
-  const ptax = precisaDolar && faltaTaxa ? await buscarPtax({ fetch: cfg.fetch, desde: cfg.desde, ate: cfg.ate }) : [];
+  const ptax = precisaDolar && faltaTaxa ? await buscarPtax({ fetch: cfg.fetchPtax ?? cfg.fetch, desde: cfg.desde, ate: cfg.ate }) : [];
   const fator = 1 + (cfg.acrescimoPct ?? 0) / 100;
 
   return consolidar({

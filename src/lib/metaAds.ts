@@ -37,6 +37,7 @@ export interface ContaMeta {
 export interface CotacaoDesde {
   desde: string;
   valor: number;
+  em?: string;
 }
 
 /** Câmbio do BlueSales a partir de um dia: PTAX do Banco Central + spread do
@@ -58,13 +59,20 @@ export function ehPtax(r: RegraDolar | null | undefined): r is CambioPtax {
 
 /** Ordem do histórico: "desde" mais recente primeiro; no mesmo dia, a salva por último. */
 export function ordemDasRegras(a: RegraDolar, b: RegraDolar): number {
-  return b.desde.localeCompare(a.desde) || (ehPtax(b) ? b.em ?? '' : '').localeCompare(ehPtax(a) ? a.em ?? '' : '');
+  return b.desde.localeCompare(a.desde) || (b.em ?? '').localeCompare(a.em ?? '');
+}
+
+/** Entre duas regras que já valem no dia, manda a salva por último (a mesma conta do servidor). */
+function mandaMais(a: RegraDolar, b: RegraDolar): boolean {
+  const ea = a.em ?? '';
+  const eb = b.em ?? '';
+  return ea !== eb ? ea > eb : a.desde > b.desde;
 }
 
 /** A regra que vale num dia (a mesma conta do servidor). */
 export function regraDoDia(dia: string, regras: RegraDolar[]): RegraDolar | null {
   let achada: RegraDolar | null = null;
-  for (const r of regras) if (r.desde <= dia && (!achada || ordemDasRegras(r, achada) < 0)) achada = r;
+  for (const r of regras) if (r.desde <= dia && (!achada || mandaMais(r, achada))) achada = r;
   return achada;
 }
 
