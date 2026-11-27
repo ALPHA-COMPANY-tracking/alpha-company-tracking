@@ -33,10 +33,60 @@ export interface ContaMeta {
   business: string | null;
 }
 
-/** Taxa do dólar que vale a partir de um dia ('0001-01-01' = antes de tudo). */
+/** Taxa do dólar FIXA que vale a partir de um dia ('0001-01-01' = antes de tudo). */
 export interface CotacaoDesde {
   desde: string;
   valor: number;
+}
+
+/** Câmbio do BlueSales a partir de um dia: PTAX do Banco Central + spread do
+ *  banco + IOF (em %). Cada mudança é um registro, com quem e quando. */
+export interface CambioPtax {
+  desde: string;
+  ptax: true;
+  spread: number;
+  iof: number;
+  em?: string;
+  por?: string;
+}
+
+export type RegraDolar = CotacaoDesde | CambioPtax;
+
+export function ehPtax(r: RegraDolar | null | undefined): r is CambioPtax {
+  return Boolean(r && (r as CambioPtax).ptax === true);
+}
+
+/** Ordem do histórico: "desde" mais recente primeiro; no mesmo dia, a salva por último. */
+export function ordemDasRegras(a: RegraDolar, b: RegraDolar): number {
+  return b.desde.localeCompare(a.desde) || (ehPtax(b) ? b.em ?? '' : '').localeCompare(ehPtax(a) ? a.em ?? '' : '');
+}
+
+/** A regra que vale num dia (a mesma conta do servidor). */
+export function regraDoDia(dia: string, regras: RegraDolar[]): RegraDolar | null {
+  let achada: RegraDolar | null = null;
+  for (const r of regras) if (r.desde <= dia && (!achada || ordemDasRegras(r, achada) < 0)) achada = r;
+  return achada;
+}
+
+/** PTAX de venda de um dia útil (Banco Central) e a hora em que saiu. */
+export interface Ptax {
+  data: string;
+  venda: number;
+  hora?: string;
+}
+
+/** O câmbio ao vivo que o servidor manda junto com o cadastro. */
+export interface CambioAoVivo {
+  /** A regra que vale hoje. */
+  regra: RegraDolar | null;
+  /** A última PTAX que o Banco Central publicou. */
+  ultima?: Ptax | null;
+  /** A PTAX que vale para o gasto de hoje (a do último dia útil antes de hoje). */
+  vigente?: Ptax | null;
+  /** O dólar de hoje, com spread e IOF. */
+  hoje?: number | null;
+  /** O Banco Central não respondeu. */
+  erro?: string;
 }
 
 export interface ConfigMeta {
@@ -44,8 +94,8 @@ export interface ConfigMeta {
   /** A taxa de hoje. null = cotação do Banco Central (só pela variável da Vercel). */
   cotacao_usd: number | null;
   imposto_brl_pct: number;
-  /** Histórico da taxa (migração 0033): cada uma vale a partir do seu dia. */
-  cotacoes_usd?: CotacaoDesde[];
+  /** Histórico do dólar (migração 0033): cada regra vale a partir do seu dia. */
+  cotacoes_usd?: RegraDolar[];
   /** Dólar exato de um dia só (migração 0033). */
   cotacoes_dia?: Record<string, number>;
 }
@@ -69,6 +119,8 @@ export type RespostaContas =
       migracao: boolean;
       /** A migração 0033 (taxa com data) já rodou. */
       cotacoes?: boolean;
+      /** PTAX do Banco Central, spread e IOF que valem hoje. */
+      cambio?: CambioAoVivo;
     }
   | { ok: false; aviso: string; configurado?: boolean };
 
@@ -163,6 +215,8 @@ export function salvarConfigMeta(
     cotacao_desde: string;
     remover_cotacao_desde: string;
     cotacao_dia: { dia: string; valor: number | null };
+    /** PTAX + spread + IOF (em %) a partir de `desde` (padrão: hoje). */
+    cambio: { spread?: number; iof?: number; desde?: string };
     imposto_brl_pct: number;
   }>,
 ) {

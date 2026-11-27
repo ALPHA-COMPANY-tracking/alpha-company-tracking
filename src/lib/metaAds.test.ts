@@ -7,6 +7,8 @@ import {
   COTACAO_BLUESALES,
   type ContaCadastrada,
   buscarPtax,
+  cambioDoDia,
+  cambioEfetivo,
   consolidar,
   cotacaoDoDia,
   cotacaoNaData,
@@ -19,8 +21,12 @@ import {
   mesclarCadastro,
   normalizarConta,
   novaCotacaoDesde,
+  novaRegraPtax,
+  ptaxAntesDe,
+  regraDoDia,
   SEMPRE,
   tokensDasContas,
+  usaPtax,
 } from '../../api/lib-meta';
 
 /** fetch falso: responde conforme o trecho da URL. */
@@ -384,5 +390,131 @@ describe('taxa do dólar com data (20/11/2026: 5,40 → 6,15 só a partir do dia
     });
     expect(dias.map((d) => d.reais)).toEqual([540, 615]);
     expect(chamadas.some((u) => u.includes('bcb.gov.br'))).toBe(false);
+  });
+});
+
+describe('câmbio do BlueSales: PTAX + spread + IOF (27/11/2026)', () => {
+  // PTAX de venda (fechamento) do Banco Central, como a API devolve.
+  const PTAX = {
+    value: [
+      { cotacaoVenda: 5.9708, dataHoraCotacao: '2026-11-23 13:06:23.798289' },
+      { cotacaoVenda: 5.8573, dataHoraCotacao: '2026-11-24 13:07:40.485706' },
+      { cotacaoVenda: 5.8825, dataHoraCotacao: '2026-11-25 13:02:42.418138' },
+      { cotacaoVenda: 5.7446, dataHoraCotacao: '2026-11-26 13:11:27.937451' },
+    ],
+  };
+  const ptax = [
+    { data: '2026-11-19', venda: 5.9 },
+    { data: '2026-11-21', venda: 5.95 }, // (sábado não tem; só para o teste de ordem)
+    { data: '2026-11-26', venda: 5.7446, hora: '13:11' },
+  ];
+  // Como ficou no BlueSales: 5,40 até 09/11, 6,15 de 10/11 a 26/11, e a
+  // partir de 27/11 PTAX + 6% de spread + 0% de IOF (o "Sistema" ligou com
+  // 0% e 3,5% às 11:15; o Jonas trocou às 11:35).
+  const regras = novaRegraPtax(
+    novaRegraPtax(
+      [
+        { desde: '2026-11-10', valor: 6.15 },
+        { desde: SEMPRE, valor: 5.4 },
+      ],
+      6.15,
+      { desde: '2026-11-27', ptax: true, spread: 0, iof: 3.5, em: '2026-11-27T14:15:00Z', por: 'Sistema' },
+    ),
+    6.15,
+    { desde: '2026-11-27', ptax: true, spread: 6, iof: 0, em: '2026-11-27T14:35:00Z', por: 'Jonas Neto' },
+  );
+
+  it('PTAX de venda de fechamento, com a hora de publicação', async () => {
+    const { f } = fetchFalso([[/olinda\.bcb\.gov\.br/, PTAX]]);
+    const cot = await buscarPtax({ fetch: f, desde: '2026-11-24', ate: '2026-11-27' });
+    expect(cot.at(-1)).toEqual({ data: '2026-11-26', venda: 5.7446, hora: '13:11' });
+  });
+
+  it('o dia usa a PTAX do último dia útil ANTES dele (a de hoje à tarde vale amanhã)', () => {
+    expect(ptaxAntesDe(ptax, '2026-11-27')?.venda).toBe(5.7446);
+    expect(ptaxAntesDe(ptax, '2026-11-26')?.venda).toBe(5.95); // a do próprio dia não vale ainda
+    expect(ptaxAntesDe(ptax, '2026-11-20')?.venda).toBe(5.9); // feriado: a do último dia útil
+    expect(ptaxAntesDe(ptax, '2026-11-19')).toBeNull();
+  });
+
+  it('câmbio efetivo = PTAX × (1 + spread) × (1 + IOF), com 4 casas', () => {
+    expect(cambioEfetivo(5.7446, 6, 0)).toBe(6.0893); // o do BlueSales em 27/11
+    expect(cambioEfetivo(5.7446, 0, 3.5)).toBe(5.9457);
+    expect(cambioEfetivo(5.7446, 6, 3.5)).toBe(6.3024);
+  });
+
+  it('no mesmo dia vale a regra salva por último; os dias de antes não mudam', () => {
+    expect(regraDoDia('2026-11-27', regras)).toMatchObject({ spread: 6, iof: 0, por: 'Jonas Neto' });
+    expect(regraDoDia('2026-11-26', regras)).toEqual({ desde: '2026-11-10', valor: 6.15 });
+    expect(regraDoDia('2026-11-09', regras)).toEqual({ desde: SEMPRE, valor: 5.4 });
+    const opts = { regras, dias: {}, fixa: 6.15, ptax };
+    expect(cambioDoDia('2026-11-27', opts)).toBe(6.0893);
+    expect(cambioDoDia('2026-11-26', opts)).toBe(6.15);
+    expect(cambioDoDia('2026-11-05', opts)).toBe(5.4);
+    // O dólar digitado para um dia passa na frente de tudo.
+    expect(cambioDoDia('2026-11-27', { ...opts, dias: { '2026-11-27': 6.01 } })).toBe(6.01);
+  });
+
+  it('sem a PTAX do Banco Central não grava com taxa errada', () => {
+    expect(() => cambioDoDia('2026-11-27', { regras, dias: {}, fixa: 6.15, ptax: [] })).toThrow(/PTAX/);
+    // cotacaoDoDia (só as fixas) não inventa: devolve null no dia de PTAX.
+    expect(cotacaoDoDia('2026-11-27', { aPartir: regras, dias: {}, fixa: 6.15 })).toBeNull();
+  });
+
+  it('a primeira regra de PTAX guarda a taxa de antes para trás; o histórico guarda cada mudança', () => {
+    const primeira = novaRegraPtax([], 6.15, { desde: '2026-11-27', ptax: true, spread: 6, iof: 0 });
+    expect(primeira).toEqual([
+      { desde: '2026-11-27', ptax: true, spread: 6, iof: 0 },
+      { desde: SEMPRE, valor: 6.15 },
+    ]);
+    expect(regras.filter((r) => r.desde === '2026-11-27')).toHaveLength(2);
+  });
+
+  it('lê do banco as duas formas de regra e descarta a inválida', () => {
+    const lido = lerCotacoes(
+      [
+        ...regras,
+        { desde: '2026-12-01', ptax: true, spread: 'x', iof: 0 },
+        { desde: '2026-12-02', ptax: true, spread: 6, iof: null },
+      ],
+      {},
+    );
+    expect(lido.aPartir).toEqual(regras);
+  });
+
+  it('só busca o Banco Central quando algum dia usa PTAX', () => {
+    expect(usaPtax(regras, {}, '2026-11-20', '2026-11-26')).toBe(false);
+    expect(usaPtax(regras, {}, '2026-11-25', '2026-11-27')).toBe(true);
+    expect(usaPtax(regras, { '2026-11-27': 6.01 }, '2026-11-25', '2026-11-27')).toBe(false);
+  });
+
+  it('a sincronização: 26/11 a R$ 6,15 e 27/11 a PTAX de 26/11 + 6% (R$ 6,0893)', async () => {
+    const { f, chamadas } = fetchFalso([
+      [
+        /insights/,
+        {
+          data: [
+            { spend: '481.17', account_currency: 'USD', date_start: '2026-11-26' },
+            { spend: '100', account_currency: 'USD', date_start: '2026-11-27' },
+          ],
+        },
+      ],
+      [/olinda\.bcb\.gov\.br/, PTAX],
+    ]);
+    const dias = await gastoMetaPorDia({
+      fetch: f,
+      token: 't',
+      contas: ['1'],
+      desde: '2026-11-26',
+      ate: '2026-11-27',
+      cotacaoFixa: 6.15,
+      cotacaoDoDia: (d, p) => cambioDoDia(d, { regras, dias: {}, fixa: 6.15, ptax: p }),
+      precisaPtax: usaPtax(regras, {}, '2026-11-26', '2026-11-27'),
+    });
+    expect(dias.map((d) => [d.data, d.partes[0].cotacao, d.reais])).toEqual([
+      ['2026-11-26', 6.15, 2959.2], // igual ao Resultado Diário do BlueSales
+      ['2026-11-27', 6.0893, 608.93],
+    ]);
+    expect(chamadas.some((u) => u.includes('bcb.gov.br'))).toBe(true);
   });
 });

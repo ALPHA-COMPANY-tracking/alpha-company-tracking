@@ -1,28 +1,33 @@
 // ─────────────────────────────────────────────────────────────
 // Integração Facebook: as contas de anúncio que entram no P&L, o cadastro
-// delas (Importar BM / Manual), a taxa do dólar, o imposto das contas em
-// real e o gasto sincronizado — o mesmo que o BlueSales mostra.
+// delas (Importar BM / Manual), o câmbio do dólar (PTAX + spread + IOF), o
+// imposto das contas em real e o gasto sincronizado — o mesmo que o
+// BlueSales mostra.
 // ─────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Loader2, Plug, RefreshCw, Save, Scale, Search, Trash2, TriangleAlert, X } from 'lucide-react';
+import { Check, ChevronRight, Loader2, Plug, RefreshCw, Save, Scale, Search, Trash2, TriangleAlert, X } from 'lucide-react';
 import { formatBRL, reaisToCents } from '@/lib/money';
 import { addDias, hojeIso } from '@/lib/dates';
 import { haQuanto } from '@/lib/saudacao';
 import { useData } from '@/store/DataProvider';
 import { Panel } from '@/components/ui';
 import {
+  type CambioAoVivo,
   type ContaCadastro,
   type ContaMeta,
-  type CotacaoDesde,
+  type RegraDolar,
   type ResultadoBusca,
   type RespostaMeta,
   sincronizarPeriodoMeta,
   buscarNomesMeta,
   cadastrarContasMeta,
   cadastrarManualMeta,
+  ehPtax,
   listarContasMeta,
   metaDisponivel,
+  ordemDasRegras,
+  regraDoDia,
   redetectarContasMeta,
   removerContaMeta,
   salvarConfigMeta,
@@ -69,7 +74,8 @@ export function FacebookScreen() {
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
   const [imposto, setImposto] = useState('');
   const [cfg, setCfg] = useState<{ cotacao: number | null; imposto: number } | null>(null);
-  const [historico, setHistorico] = useState<{ aPartir: CotacaoDesde[]; dias: Record<string, number> }>({ aPartir: [], dias: {} });
+  const [historico, setHistorico] = useState<{ aPartir: RegraDolar[]; dias: Record<string, number> }>({ aPartir: [], dias: {} });
+  const [cambio, setCambio] = useState<CambioAoVivo | null>(null);
   const [temCotacoes, setTemCotacoes] = useState(true);
   const [migracao, setMigracao] = useState(true);
   const [salvando, setSalvando] = useState<'contas' | 'cotacao' | 'imposto' | null>(null);
@@ -87,6 +93,7 @@ export function FacebookScreen() {
       setCfg({ cotacao: r.config.cotacao_usd, imposto: r.config.imposto_brl_pct });
       setHistorico({ aPartir: r.config.cotacoes_usd ?? [], dias: r.config.cotacoes_dia ?? {} });
       setTemCotacoes(Boolean(r.cotacoes));
+      setCambio(r.cambio ?? null);
       setImposto(numBR(r.config.imposto_brl_pct, 1));
       setMigracao(r.migracao);
     });
@@ -139,6 +146,9 @@ export function FacebookScreen() {
     const desde = periodo.desde < INICIO_INTEGRACAO ? INICIO_INTEGRACAO : periodo.desde;
     const sync = desde <= periodo.ate ? await sincronizarPeriodoMeta(desde, periodo.ate) : null;
     if (sync?.ok) await recarregar();
+    // O câmbio de hoje muda com o spread/IOF novo: busca de novo.
+    const atual = await listarContasMeta();
+    if (atual.ok) setCambio(atual.cambio ?? null);
     setSalvando(null);
     const dias = desde === periodo.ate ? formatData(desde) : `${formatData(desde)} a ${formatData(periodo.ate)}`;
     setAviso(
@@ -393,20 +403,24 @@ export function FacebookScreen() {
             taxa mudaria também os dias de antes).
           </div>
         )}
-        <div className="p-3.5 lg:p-5 grid gap-4 lg:grid-cols-2">
-          <TaxaDolar
-            hoje={hojeIso()}
-            atual={cfg?.cotacao ?? null}
-            historico={historico.aPartir}
-            ocupado={salvando === 'cotacao'}
-            desabilitado={!migracao || !temCotacoes}
-            onSalvar={(valor, desde) =>
-              salvarTaxa({ cotacao_usd: valor, cotacao_desde: desde }, { desde, ate: hojeIso() }, `Taxa de R$ ${numBR(valor)} salva a partir de ${formatData(desde)}.`)
-            }
-            onRemover={(desde) =>
-              salvarTaxa({ remover_cotacao_desde: desde }, { desde, ate: hojeIso() }, `Taxa de ${formatData(desde)} removida.`)
-            }
-          />
+        <CambioDolar
+          hoje={hojeIso()}
+          cambio={cambio}
+          regras={historico.aPartir}
+          ocupado={salvando === 'cotacao'}
+          desabilitado={!migracao || !temCotacoes}
+          onSalvar={(qual, valor, desde) =>
+            salvarTaxa(
+              { cambio: { [qual]: valor, desde } },
+              { desde, ate: hojeIso() },
+              `${qual === 'spread' ? 'Spread' : 'IOF'} de ${numBR(valor)}% salvo a partir de ${formatData(desde)}.`,
+            )
+          }
+          onRemover={(desde) =>
+            salvarTaxa({ remover_cotacao_desde: desde }, { desde, ate: hojeIso() }, `Câmbio de ${formatData(desde)} removido.`)
+          }
+        />
+        <div className="px-3.5 lg:px-5 pb-4 grid gap-4 lg:grid-cols-2">
           <CampoNumero
             rotulo="Imposto do Meta nas contas em real (%)"
             ajuda="Contas em BRL: gasto + este imposto. Contas em dólar não pagam."
@@ -433,7 +447,7 @@ export function FacebookScreen() {
           }
         />
         <div className="px-3.5 lg:px-5 pb-4 text-[11.5px] text-dim2 leading-relaxed">
-          A taxa do dólar refaz sozinha só os dias que ela muda. O imposto vale a partir da próxima sincronização: a
+          Mudar spread ou IOF refaz sozinho só os dias que ele muda. O imposto vale a partir da próxima sincronização: a
           automática refaz os últimos 3 dias, e o botão Sincronizar agora, os últimos 30.
         </div>
         {aviso && (
@@ -996,84 +1010,248 @@ function BotaoSalvar({ onClick, desabilitado, ocupado, texto }: { onClick: () =>
   );
 }
 
-/**
- * Taxa USD → BRL com data: vale a partir do dia escolhido e não muda os
- * dias de antes (Jonas, 20/11/2026). Mostra o histórico.
- */
-function TaxaDolar(p: {
+/** "26/11 às 13:11". */
+function quandoPtax(p: { data: string; hora?: string }): string {
+  const [, m, d] = p.data.split('-');
+  return p.hora ? `${d}/${m} às ${p.hora}` : `${d}/${m}`;
+}
+
+const pctBR = (n: number) => `${numBR(n)} %`;
+
+/** "27/11/2026, 11:35". */
+function quandoSalvo(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+/** Uma linha de "rótulo · valor · desde · Alterar", como no BlueSales. */
+function LinhaCambio(p: {
+  rotulo: string;
+  valor: string;
+  desde?: string | null;
+  qual?: 'spread' | 'iof';
+  atual?: number;
   hoje: string;
-  atual: number | null;
-  historico: CotacaoDesde[];
   ocupado: boolean;
   desabilitado: boolean;
-  onSalvar: (valor: number, desde: string) => void;
-  onRemover: (desde: string) => void;
+  onSalvar?: (qual: 'spread' | 'iof', valor: number, desde: string) => void;
 }) {
+  const [editando, setEditando] = useState(false);
   const [valor, setValor] = useState('');
   const [desde, setDesde] = useState(p.hoje);
   const v = lerNum(valor);
+  const max = p.qual === 'iof' ? 10 : 30;
   return (
-    <div className="rounded-[12px] border border-line bg-card2 px-4 py-3.5">
-      <div className="text-[10.5px] uppercase tracking-[0.1em] font-bold text-dim2">Taxa USD → BRL</div>
-      <div className="flex flex-wrap items-center gap-2 mt-2">
-        <input
-          value={valor}
-          onChange={(e) => setValor(e.target.value)}
-          inputMode="decimal"
-          placeholder={p.atual != null ? numBR(p.atual) : '6,15'}
-          aria-label="Nova taxa do dólar"
-          disabled={p.desabilitado}
-          className={`w-[100px] ${CAMPO_TAXA}`}
-        />
-        <span className="text-[12px] text-dim">a partir de</span>
-        <input
-          type="date"
-          value={desde}
-          max={p.hoje}
-          min={INICIO_INTEGRACAO}
-          onChange={(e) => e.target.value && setDesde(e.target.value)}
-          aria-label="A taxa vale a partir de"
-          disabled={p.desabilitado}
-          className={`text-[13px] ${CAMPO_TAXA}`}
-        />
-        <BotaoSalvar
-          onClick={() => {
-            p.onSalvar(v, desde);
-            setValor('');
-          }}
-          desabilitado={p.desabilitado || !(v > 0 && v <= 50)}
-          ocupado={p.ocupado}
-          texto="Salvar taxa"
-        />
+    <div className="py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <span className="text-[13px] text-dim">{p.rotulo}</span>
+        <span className="flex items-center gap-2.5">
+          <span className="mono text-[13.5px] font-bold text-tx">{p.valor}</span>
+          {p.desde && <span className="text-[11px] text-dim2">desde {formatData(p.desde)}</span>}
+          {p.qual && p.onSalvar && (
+            <button
+              onClick={() => {
+                setValor(p.atual != null ? numBR(p.atual) : '');
+                setDesde(p.hoje);
+                setEditando((e) => !e);
+              }}
+              disabled={p.desabilitado || p.ocupado}
+              className="px-3 py-[6px] rounded-[9px] border border-line2 text-[12px] font-semibold text-tx hover:border-gold/50 disabled:opacity-40"
+            >
+              {editando ? 'Cancelar' : 'Alterar'}
+            </button>
+          )}
+        </span>
       </div>
-      <div className="text-[11px] text-dim2 mt-2 leading-snug">
-        Contas em dólar: gasto × a taxa do dia. A taxa nova vale <b className="text-dim">a partir do dia escolhido</b> — os dias
-        de antes não mudam. O BlueSales usa R$ 5,40.
-      </div>
-      {p.historico.length > 0 && (
-        <div className="mt-3 rounded-[10px] border border-line bg-card divide-y divide-line/70">
-          {p.historico.map((c) => (
-            <div key={c.desde} className="flex items-center justify-between gap-3 px-3 py-[7px] text-[12.5px]">
-              <span className="text-dim">{c.desde === SEMPRE ? 'antes disso' : `a partir de ${formatData(c.desde)}`}</span>
-              <span className="flex items-center gap-2">
-                <span className="mono font-semibold text-tx">R$ {numBR(c.valor)}</span>
-                {c.desde !== SEMPRE ? (
-                  <button
-                    onClick={() => p.onRemover(c.desde)}
-                    disabled={p.ocupado || p.desabilitado}
-                    title="Tirar esta taxa (os dias voltam para a taxa de antes)"
-                    className="grid place-items-center w-6 h-6 rounded-md text-dim2 hover:text-red hover:bg-red/10 disabled:opacity-40"
-                  >
-                    <X size={13} />
-                  </button>
-                ) : (
-                  <span className="w-6" />
-                )}
-              </span>
-            </div>
-          ))}
+      {editando && p.qual && p.onSalvar && (
+        <div className="flex flex-wrap items-center gap-2 mt-2.5 justify-end">
+          <input
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+            inputMode="decimal"
+            autoFocus
+            aria-label={`Novo ${p.rotulo}`}
+            className={`w-[90px] ${CAMPO_TAXA}`}
+          />
+          <span className="text-[12px] text-dim">% a partir de</span>
+          <input
+            type="date"
+            value={desde}
+            max={p.hoje}
+            min={INICIO_INTEGRACAO}
+            onChange={(e) => e.target.value && setDesde(e.target.value)}
+            aria-label="Vale a partir de"
+            className={`text-[13px] ${CAMPO_TAXA}`}
+          />
+          <BotaoSalvar
+            onClick={() => {
+              p.onSalvar!(p.qual!, v, desde);
+              setEditando(false);
+            }}
+            desabilitado={p.desabilitado || !(valor.trim() !== '' && v >= 0 && v <= max)}
+            ocupado={p.ocupado}
+            texto="Salvar"
+          />
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Câmbio das contas em dólar, como o BlueSales (27/11/2026): PTAX de venda
+ * do Banco Central + spread do banco + IOF. Cada dia guarda o câmbio usado
+ * (a PTAX do último dia útil antes dele); mudar spread ou IOF vale da data
+ * escolhida em diante e não mexe nos dias de antes.
+ */
+function CambioDolar(p: {
+  hoje: string;
+  cambio: CambioAoVivo | null;
+  regras: RegraDolar[];
+  ocupado: boolean;
+  desabilitado: boolean;
+  onSalvar: (qual: 'spread' | 'iof', valor: number, desde: string) => void;
+  onRemover: (desde: string) => void;
+}) {
+  const regraHoje = regraDoDia(p.hoje, p.regras);
+  const ptaxHoje = ehPtax(regraHoje) ? regraHoje : null;
+  const vigente = p.cambio?.vigente ?? null;
+  const ultima = p.cambio?.ultima ?? null;
+  // A PTAX publicada hoje à tarde só vale a partir de amanhã.
+  const novaParaAmanha = ultima && vigente && ultima.data > vigente.data ? ultima : null;
+  // O que mudou em cada alteração: a regra que valia naquele dia antes dela.
+  const historico = [...p.regras].sort((a, b) =>
+    ehPtax(a) && ehPtax(b) ? (b.em ?? '').localeCompare(a.em ?? '') || ordemDasRegras(a, b) : ordemDasRegras(a, b),
+  );
+  const antesDe = (r: RegraDolar) =>
+    regraDoDia(
+      r.desde,
+      p.regras.filter((x) => x !== r && (!ehPtax(x) || !ehPtax(r) || (x.em ?? '') < (r.em ?? ''))),
+    );
+  const deAte = (r: RegraDolar): string => {
+    if (!ehPtax(r)) return `taxa fixa R$ ${numBR(r.valor)}`;
+    const a = antesDe(r);
+    if (!ehPtax(a)) return `${a ? `taxa fixa R$ ${numBR(a.valor)}` : 'taxa fixa'} → PTAX + spread ${numBR(r.spread)}% + IOF ${numBR(r.iof)}%`;
+    const partes = [
+      a.spread !== r.spread ? `spread ${numBR(a.spread)}% → ${numBR(r.spread)}%` : null,
+      a.iof !== r.iof ? `IOF ${numBR(a.iof)}% → ${numBR(r.iof)}%` : null,
+    ].filter(Boolean);
+    return partes.length ? partes.join(' · ') : `spread ${numBR(r.spread)}% · IOF ${numBR(r.iof)}%`;
+  };
+  // O X tira a regra do dia (todas as daquele "desde"): só na mais recente de cada dia.
+  const primeiraDoDia = new Set<RegraDolar>();
+  const vistos = new Set<string>();
+  for (const r of [...p.regras].sort(ordemDasRegras)) {
+    if (!vistos.has(r.desde)) primeiraDoDia.add(r);
+    vistos.add(r.desde);
+  }
+
+  return (
+    <div className="mx-3.5 lg:mx-5 mt-4 mb-4">
+      <div className="text-[14px] font-bold text-tx">Câmbio das contas em dólar</div>
+      <div className="text-[11.5px] text-dim2 mt-0.5">
+        Cada dia guarda o câmbio usado. Mudar spread ou IOF vale da data escolhida em diante; os dias anteriores não
+        mudam.
+      </div>
+      <div className="mt-3 rounded-[12px] border border-line bg-card2 px-4 py-1.5 divide-y divide-line/70">
+        <div className="py-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <span className="text-[13px] text-dim">Cotação do dia (PTAX · Banco Central)</span>
+          {vigente ? (
+            <span className="flex items-baseline gap-2">
+              <span className="mono text-[13.5px] font-bold text-tx">R$ {numBR(vigente.venda, 4)}</span>
+              <span className="text-[11px] text-dim2">{quandoPtax(vigente)}</span>
+            </span>
+          ) : (
+            <span className="text-[12px] text-yel">{p.cambio?.erro ? 'Banco Central sem resposta agora' : '—'}</span>
+          )}
+        </div>
+        <div>
+          <LinhaCambio
+            rotulo="Spread do banco"
+            valor={ptaxHoje ? pctBR(ptaxHoje.spread) : '—'}
+            desde={ptaxHoje?.desde}
+            qual="spread"
+            atual={ptaxHoje?.spread}
+            hoje={p.hoje}
+            ocupado={p.ocupado}
+            desabilitado={p.desabilitado}
+            onSalvar={p.onSalvar}
+          />
+          <LinhaCambio
+            rotulo="IOF"
+            valor={ptaxHoje ? pctBR(ptaxHoje.iof) : '—'}
+            desde={ptaxHoje?.desde}
+            qual="iof"
+            atual={ptaxHoje?.iof}
+            hoje={p.hoje}
+            ocupado={p.ocupado}
+            desabilitado={p.desabilitado}
+            onSalvar={p.onSalvar}
+          />
+        </div>
+        <div className="py-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <span className="text-[13px] text-dim">Câmbio efetivo hoje</span>
+          <span className="mono text-[14px] font-extrabold text-tx">
+            {p.cambio?.hoje != null ? `R$ ${numBR(p.cambio.hoje, 4)}` : '—'}
+          </span>
+        </div>
+        {(!ptaxHoje || novaParaAmanha) && (
+          <div className="py-2.5 text-[11.5px] text-dim2 leading-relaxed">
+            {!ptaxHoje && regraHoje && !ehPtax(regraHoje) && (
+              <>
+                Hoje vale a taxa fixa de <b className="text-dim">R$ {numBR(regraHoje.valor)}</b>
+                {regraHoje.desde !== SEMPRE && <> (desde {formatData(regraHoje.desde)})</>}. Ao salvar spread ou IOF, o dólar
+                passa a ser a PTAX do Banco Central + spread + IOF a partir da data escolhida.{' '}
+              </>
+            )}
+            {novaParaAmanha && (
+              <>
+                O Banco Central já publicou a PTAX de {quandoPtax(novaParaAmanha)} (R$ {numBR(novaParaAmanha.venda, 4)}): ela vale
+                a partir de amanhã — o gasto de hoje fica com a de {quandoPtax(vigente!)}.
+              </>
+            )}
+          </div>
+        )}
+        <details className="py-2.5 group">
+          <summary className="cursor-pointer list-none text-[12px] text-dim hover:text-tx select-none inline-flex items-center gap-1">
+            <ChevronRight size={13} className="transition-transform group-open:rotate-90" />
+            Histórico de alterações
+          </summary>
+          {historico.length === 0 ? (
+            <div className="text-[12px] text-dim2 mt-2">Nenhuma alteração ainda.</div>
+          ) : (
+            <div className="mt-2 flex flex-col gap-1.5">
+              {historico.map((r, i) => (
+                <div key={`${r.desde}-${ehPtax(r) ? r.em ?? i : i}`} className="flex items-start justify-between gap-3 text-[12px]">
+                  <span className="text-dim leading-snug">
+                    {ehPtax(r) && (r.por || r.em) && (
+                      <>
+                        {[r.por, quandoSalvo(r.em)].filter(Boolean).join(' · ')} ·{' '}
+                      </>
+                    )}
+                    {deAte(r)} ·{' '}
+                    {r.desde === SEMPRE ? 'antes de tudo' : `vale a partir de ${formatData(r.desde)}`}
+                  </span>
+                  {r.desde !== SEMPRE && primeiraDoDia.has(r) ? (
+                    <button
+                      onClick={() => p.onRemover(r.desde)}
+                      disabled={p.ocupado || p.desabilitado}
+                      title="Tirar o câmbio deste dia (os dias voltam para o de antes)"
+                      className="grid place-items-center w-6 h-6 shrink-0 rounded-md text-dim2 hover:text-red hover:bg-red/10 disabled:opacity-40"
+                    >
+                      <X size={13} />
+                    </button>
+                  ) : (
+                    <span className="w-6 shrink-0" />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </details>
+      </div>
     </div>
   );
 }
@@ -1124,7 +1302,7 @@ function DolarDoDia(p: {
         />
       </div>
       <div className="text-[11px] text-dim2 mt-2 leading-snug">
-        Vale só para esse dia e passa na frente da taxa acima — use para o dólar que o cartão cobrou de verdade.
+        Vale só para esse dia e passa na frente do câmbio acima — use para o dólar que o cartão cobrou de verdade.
       </div>
       {lista.length > 0 && (
         <div className="mt-3 rounded-[10px] border border-line bg-card divide-y divide-line/70">

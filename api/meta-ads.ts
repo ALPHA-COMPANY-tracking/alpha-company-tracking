@@ -9,10 +9,13 @@
 //   POST /api/meta-ads?acao=salvar        grava a configuração (corpo JSON:
 //        { contas?: string[], cotacao_usd?: number, cotacao_desde?: 'AAAA-MM-DD',
 //          remover_cotacao_desde?: 'AAAA-MM-DD', cotacao_dia?: { dia, valor|null },
+//          cambio?: { spread?: %, iof?: %, desde?: 'AAAA-MM-DD' },
 //          imposto_brl_pct?: number })
 //        A taxa do dólar vale A PARTIR de `cotacao_desde` (padrão: hoje) e não
 //        muda os dias de antes; `cotacao_dia` é o dólar exato de um dia só
-//        (migração 0033). Depois de salvar, a tela sincroniza o período afetado.
+//        (migração 0033). `cambio` liga o câmbio do BlueSales a partir de
+//        `desde`: PTAX do Banco Central + spread do banco + IOF (27/11/2026).
+//        Depois de salvar, a tela sincroniza o período afetado.
 //
 // Cadastro de contas, como no BlueSales (corpo JSON):
 //   acao=buscar      { bm_id, token?, ids }  nome/moeda/status de cada conta
@@ -39,7 +42,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ContaCadastrada, CotacaoDesde, ResultadoConta } from './lib-meta.js';
+import type { CambioPtax, ContaCadastrada, Ptax, RegraDolar, ResultadoConta } from './lib-meta.js';
 
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -54,8 +57,9 @@ interface ConfigSalva {
   /** A taxa que vale hoje (a da tela). */
   cotacao_usd: number;
   imposto_brl_pct: number;
-  /** Taxa a partir de um dia (migração 0033); vazio = `cotacao_usd` em todos. */
-  cotacoes_usd: CotacaoDesde[];
+  /** Regras do dólar a partir de um dia (migração 0033): taxa fixa ou PTAX +
+   *  spread + IOF; vazio = `cotacao_usd` em todos. */
+  cotacoes_usd: RegraDolar[];
   /** Dólar exato de um dia só (migração 0033). */
   cotacoes_dia: Record<string, number>;
 }
@@ -120,9 +124,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const enviado = String(req.headers['authorization'] ?? '').replace(/^Bearer\s+/i, '').trim();
     const cron = process.env.CRON_TOKEN;
     let autorizado = Boolean(cron) && enviado === cron;
+    /** Quem mexeu (histórico do câmbio): só o nome, nunca o e-mail. */
+    let nomeDeQuem = 'Sistema';
     if (!autorizado && enviado) {
       const { data } = await db.auth.getUser(enviado);
       const quem = data.user?.id;
+      const meta_ = (data.user?.user_metadata ?? {}) as Record<string, unknown>;
+      const nome = [meta_.full_name, meta_.name, meta_.nome].find((v) => typeof v === 'string' && v.trim()) as string | undefined;
+      nomeDeQuem = nome?.trim() || (quem === userId ? 'Dono' : 'Sócio');
       autorizado = quem === userId;
       if (!autorizado && quem) {
         const { data: membro } = await db
@@ -157,9 +166,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       cotacoes_dia: config?.cotacoes_dia ?? {},
     };
     const temCotacoes = !semTabela && lido.cotacoes;
-    /** Taxa do dólar de cada dia: a do próprio dia, a que valia a partir de… ou a fixa. */
-    const taxaDoDia = (dia: string) =>
-      meta.cotacaoDoDia(dia, { aPartir: efetiva.cotacoes_usd, dias: efetiva.cotacoes_dia, fixa: efetiva.cotacao_usd });
+    /** Dólar de cada dia: o do próprio dia, a regra que valia a partir de… (fixa
+     *  ou PTAX + spread + IOF) ou a fixa. */
+    const taxaDoDia = (dia: string, ptax: Ptax[]) =>
+      meta.cambioDoDia(dia, { regras: efetiva.cotacoes_usd, dias: efetiva.cotacoes_dia, fixa: efetiva.cotacao_usd, ptax });
     const versao = process.env.META_API_VERSION || undefined;
     const buscar = (url: string) => fetch(url);
 
@@ -198,7 +208,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         cotacoes_usd: config?.cotacoes_usd ?? [],
         cotacoes_dia: { ...(config?.cotacoes_dia ?? {}) },
       };
-      const mexeNaTaxa = corpo.cotacao_usd !== undefined || corpo.remover_cotacao_desde !== undefined || corpo.cotacao_dia !== undefined;
+      const mexeNaTaxa =
+        corpo.cotacao_usd !== undefined ||
+        corpo.remover_cotacao_desde !== undefined ||
+        corpo.cotacao_dia !== undefined ||
+        corpo.cambio !== undefined;
       // Sem a 0033, salvar a taxa trocaria TODOS os dias para trás — é o que
       // não pode acontecer.
       if (mexeNaTaxa && !temCotacoes) return aviso('Rode a migração 0033 no Supabase: sem ela a taxa nova mudaria também os dias de antes.');
@@ -209,6 +223,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!c || c > 50) return aviso('Taxa do dólar inválida.');
         const desde = typeof corpo.cotacao_desde === 'string' && DATA.test(corpo.cotacao_desde) ? corpo.cotacao_desde : hoje;
         nova.cotacoes_usd = meta.novaCotacaoDesde(nova.cotacoes_usd, config?.cotacao_usd ?? meta.COTACAO_BLUESALES, desde, c);
+      }
+      if (corpo.cambio !== undefined) {
+        // PTAX + spread + IOF a partir de um dia. O que não veio no pedido
+        // continua como estava na regra que valia nesse dia.
+        const c = (corpo.cambio ?? {}) as { spread?: unknown; iof?: unknown; desde?: unknown };
+        const desde = typeof c.desde === 'string' && DATA.test(c.desde) ? c.desde : hoje;
+        const antes = meta.regraDoDia(desde, nova.cotacoes_usd);
+        const pct = (v: unknown, atual: number, max: number): number | null => {
+          if (v === undefined) return atual;
+          const n = Number(String(v).replace(',', '.'));
+          return v !== null && v !== '' && Number.isFinite(n) && n >= 0 && n <= max ? Math.round(n * 100) / 100 : null;
+        };
+        const spread = pct(c.spread, meta.ehPtax(antes) ? antes.spread : 0, 30);
+        const iof = pct(c.iof, meta.ehPtax(antes) ? antes.iof : 0, 10);
+        if (spread == null) return aviso('Spread inválido (de 0% a 30%).');
+        if (iof == null) return aviso('IOF inválido (de 0% a 10%).');
+        const regra: CambioPtax = { desde, ptax: true, spread, iof, em: new Date().toISOString(), por: nomeDeQuem };
+        nova.cotacoes_usd = meta.novaRegraPtax(nova.cotacoes_usd, config?.cotacao_usd ?? meta.COTACAO_BLUESALES, regra);
       }
       if (typeof corpo.remover_cotacao_desde === 'string' && corpo.remover_cotacao_desde !== meta.SEMPRE) {
         nova.cotacoes_usd = nova.cotacoes_usd.filter((x) => x.desde !== corpo.remover_cotacao_desde);
@@ -359,10 +391,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ── Cadastro + configuração, para a tela ──
     if (acao === 'contas') {
+      // Câmbio ao vivo: a última PTAX publicada pelo Banco Central e o dólar
+      // que vale hoje. Se o Banco Central não responder, a tela abre igual.
+      const hojeSP = meta.hojeSP();
+      let cambio: Record<string, unknown> = { regra: meta.regraDoDia(hojeSP, efetiva.cotacoes_usd) };
+      try {
+        const ptax = await meta.buscarPtax({ fetch: buscar, desde: meta.somarDias(hojeSP, -3), ate: hojeSP });
+        cambio = {
+          ...cambio,
+          ultima: ptax[ptax.length - 1] ?? null,
+          vigente: meta.ptaxAntesDe(ptax, hojeSP),
+          hoje: meta.cambioDoDia(hojeSP, { regras: efetiva.cotacoes_usd, dias: efetiva.cotacoes_dia, fixa: efetiva.cotacao_usd, ptax }),
+        };
+      } catch (e) {
+        cambio = { ...cambio, erro: e instanceof Error ? e.message : String(e) };
+      }
       if (cadastro) {
-        return res
-          .status(200)
-          .json({ ok: true, cadastro: vista(cadastro), contas: [], config: efetiva, salva: Boolean(config), migracao: true, cotacoes: temCotacoes });
+        return res.status(200).json({
+          ok: true,
+          cadastro: vista(cadastro),
+          contas: [],
+          config: efetiva,
+          salva: Boolean(config),
+          migracao: true,
+          cotacoes: temCotacoes,
+          cambio,
+        });
       }
       // Antes da migração 0020: as contas que o token da Vercel enxerga.
       if (!tokenVercel) return res.status(200).json({ ok: false, configurado: false, aviso: avisoVercel });
@@ -407,6 +461,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       versao,
       cotacaoFixa: efetiva.cotacao_usd,
       cotacaoDoDia: taxaDoDia,
+      precisaPtax: meta.usaPtax(efetiva.cotacoes_usd, efetiva.cotacoes_dia, desde, ate),
       acrescimoPct: numeroOuNulo(process.env.META_ACRESCIMO_PCT) ?? 0,
       impostoBrlPct: efetiva.imposto_brl_pct,
     });

@@ -348,7 +348,7 @@ function formatoBcb(iso: string): string {
  * Cotações PTAX de venda do dólar (Banco Central) no período. Busca uma
  * semana antes para cobrir fim de semana e feriado no começo do período.
  */
-export async function buscarPtax(opts: { fetch: Fetch; desde: string; ate: string }): Promise<{ data: string; venda: number }[]> {
+export async function buscarPtax(opts: { fetch: Fetch; desde: string; ate: string }): Promise<Ptax[]> {
   const inicio = formatoBcb(somarDias(opts.desde, -7));
   const fim = formatoBcb(opts.ate);
   const url =
@@ -359,9 +359,34 @@ export async function buscarPtax(opts: { fetch: Fetch; desde: string; ate: strin
   if (!r.ok) throw new Error(`Banco Central: erro ${r.status} ao buscar o dólar`);
   const corpo = (await r.json()) as { value?: { cotacaoVenda: number; dataHoraCotacao: string }[] };
   // O Banco Central publica várias cotações por dia; vale a última (fechamento).
-  const porDia = new Map<string, number>();
-  for (const v of corpo.value ?? []) porDia.set(v.dataHoraCotacao.slice(0, 10), Number(v.cotacaoVenda));
-  return [...porDia.entries()].map(([data, venda]) => ({ data, venda })).sort((a, b) => a.data.localeCompare(b.data));
+  const porDia = new Map<string, Ptax>();
+  for (const v of corpo.value ?? []) {
+    const data = v.dataHoraCotacao.slice(0, 10);
+    porDia.set(data, { data, venda: Number(v.cotacaoVenda), hora: v.dataHoraCotacao.slice(11, 16) });
+  }
+  return [...porDia.values()].sort((a, b) => a.data.localeCompare(b.data));
+}
+
+/** PTAX de venda de um dia útil, com a hora em que o Banco Central publicou. */
+export interface Ptax {
+  data: string;
+  venda: number;
+  /** 'HH:MM' da publicação (fechamento, por volta das 13h). */
+  hora?: string;
+}
+
+/**
+ * PTAX que vale para o gasto de um dia: a do último dia útil ANTES dele — a
+ * que estava publicada quando o dia começou. É a que o BlueSales guarda no
+ * dia (27/11/2026: "Cotação do dia R$ 5,7446 · 26/11 às 13:11", e o gasto de
+ * 27/11 a R$ 5,7446 × 1,06 = R$ 6,0893). Fim de semana e feriado caem no
+ * último dia útil, e a PTAX do próprio dia (publicada à tarde) só vale a
+ * partir do dia seguinte.
+ */
+export function ptaxAntesDe(cotacoes: Ptax[], dia: string): Ptax | null {
+  let achada: Ptax | null = null;
+  for (const c of cotacoes) if (c.data < dia && (!achada || c.data > achada.data)) achada = c;
+  return achada;
 }
 
 /**
@@ -419,10 +444,44 @@ export function consolidar(opts: {
  */
 export const COTACAO_BLUESALES = 5.4;
 
-/** Taxa do dólar que passa a valer a partir de um dia. */
+/** Taxa do dólar FIXA que passa a valer a partir de um dia. */
 export interface CotacaoDesde {
   desde: string;
   valor: number;
+}
+
+/**
+ * Câmbio do BlueSales (27/11/2026) a partir de um dia: PTAX do Banco Central
+ * + spread do banco + IOF, em %. Cada mudança é um registro novo (com quem e
+ * quando) — o histórico de alterações da tela sai daqui.
+ */
+export interface CambioPtax {
+  desde: string;
+  ptax: true;
+  spread: number;
+  iof: number;
+  /** Quando foi salvo (ISO) e por quem — só o nome. */
+  em?: string;
+  por?: string;
+}
+
+/** Regra do dólar a partir de um dia: taxa fixa ou PTAX + spread + IOF. */
+export type RegraDolar = CotacaoDesde | CambioPtax;
+
+export function ehPtax(r: RegraDolar | null | undefined): r is CambioPtax {
+  return Boolean(r && (r as CambioPtax).ptax === true);
+}
+
+const arred4 = (n: number) => Math.round(n * 10_000) / 10_000;
+
+/** Câmbio efetivo de PTAX + spread + IOF (4 casas, como o BlueSales). */
+export function cambioEfetivo(ptax: number, spread: number, iof: number): number {
+  return arred4(ptax * (1 + spread / 100) * (1 + iof / 100));
+}
+
+/** Ordem do histórico: "desde" mais recente primeiro; no mesmo dia, a salva por último. */
+function ordemDasRegras(a: RegraDolar, b: RegraDolar): number {
+  return b.desde.localeCompare(a.desde) || (ehPtax(b) ? b.em ?? '' : '').localeCompare(ehPtax(a) ? a.em ?? '' : '');
 }
 
 /** Primeiro "desde" do histórico: a taxa que já valia antes de qualquer troca. */
@@ -437,24 +496,80 @@ export const SEMPRE = '0001-01-01';
  */
 export function cotacaoDoDia(
   dia: string,
-  opts: { aPartir: CotacaoDesde[]; dias: Record<string, number>; fixa: number | null },
+  opts: { aPartir: RegraDolar[]; dias: Record<string, number>; fixa: number | null },
 ): number | null {
   const doDia = Number(opts.dias[dia]);
   if (doDia > 0) return doDia;
-  let achada: CotacaoDesde | null = null;
-  for (const c of opts.aPartir) if (c.desde <= dia && (!achada || c.desde > achada.desde)) achada = c;
-  return achada ? achada.valor : opts.fixa;
+  const regra = regraDoDia(dia, opts.aPartir);
+  if (!regra) return opts.fixa;
+  // PTAX + spread + IOF depende do Banco Central: ver cambioDoDia.
+  return ehPtax(regra) ? null : regra.valor;
+}
+
+/**
+ * A regra que vale num dia: a de "desde" mais recente até ele; no mesmo
+ * "desde", a salva por último (o spread/IOF trocado duas vezes no dia).
+ */
+export function regraDoDia(dia: string, regras: RegraDolar[]): RegraDolar | null {
+  let achada: RegraDolar | null = null;
+  for (const r of regras) if (r.desde <= dia && (!achada || ordemDasRegras(r, achada) < 0)) achada = r;
+  return achada;
+}
+
+/** Algum dia do período usa PTAX + spread + IOF (e não tem dólar digitado)? */
+export function usaPtax(regras: RegraDolar[], dias: Record<string, number>, desde: string, ate: string): boolean {
+  return diasEntre(desde, ate).some((d) => !(Number(dias[d]) > 0) && ehPtax(regraDoDia(d, regras)));
+}
+
+/**
+ * Dólar de um dia, com tudo: o digitado para o dia (o valor exato do
+ * cartão); senão a regra que vale nele — fixa, ou PTAX do último dia útil
+ * antes dele × (1 + spread) × (1 + IOF). Sem regra, `fixa`. Regra de PTAX
+ * sem a cotação do Banco Central ERRA de propósito: melhor não gravar do que
+ * gravar o gasto com a taxa errada.
+ */
+export function cambioDoDia(
+  dia: string,
+  opts: { regras: RegraDolar[]; dias: Record<string, number>; fixa: number | null; ptax?: Ptax[] },
+): number | null {
+  const doDia = Number(opts.dias[dia]);
+  if (doDia > 0) return doDia;
+  const regra = regraDoDia(dia, opts.regras);
+  if (!regra) return opts.fixa;
+  if (!ehPtax(regra)) return regra.valor;
+  const p = ptaxAntesDe(opts.ptax ?? [], dia);
+  if (!p) throw new Error(`Sem a cotação PTAX do Banco Central para ${dia}: tente de novo em alguns minutos.`);
+  return cambioEfetivo(p.venda, regra.spread, regra.iof);
 }
 
 /** Histórico vindo do banco (jsonb), só com o que é válido. */
-export function lerCotacoes(aPartir: unknown, dias: unknown): { aPartir: CotacaoDesde[]; dias: Record<string, number> } {
+export function lerCotacoes(aPartir: unknown, dias: unknown): { aPartir: RegraDolar[]; dias: Record<string, number> } {
   const data = /^\d{4}-\d{2}-\d{2}$/;
-  const lista = Array.isArray(aPartir)
-    ? (aPartir as Record<string, unknown>[])
-        .map((c) => ({ desde: String(c?.desde ?? ''), valor: Number(c?.valor) }))
-        .filter((c) => data.test(c.desde) && c.valor > 0)
-        .sort((a, b) => b.desde.localeCompare(a.desde))
-    : [];
+  const pct = (v: unknown) => {
+    const n = Number(v);
+    return v !== null && v !== '' && Number.isFinite(n) && n >= 0 && n <= 100 ? n : null;
+  };
+  const lista: RegraDolar[] = [];
+  for (const c of Array.isArray(aPartir) ? (aPartir as Record<string, unknown>[]) : []) {
+    const desde = String(c?.desde ?? '');
+    if (!data.test(desde)) continue;
+    if (c?.ptax === true) {
+      const spread = pct(c.spread);
+      const iof = pct(c.iof);
+      if (spread == null || iof == null) continue;
+      lista.push({
+        desde,
+        ptax: true,
+        spread,
+        iof,
+        ...(typeof c.em === 'string' ? { em: c.em } : {}),
+        ...(typeof c.por === 'string' ? { por: c.por } : {}),
+      });
+    } else if (Number(c?.valor) > 0) {
+      lista.push({ desde, valor: Number(c.valor) });
+    }
+  }
+  lista.sort(ordemDasRegras);
   const porDia: Record<string, number> = {};
   if (dias && typeof dias === 'object' && !Array.isArray(dias)) {
     for (const [d, v] of Object.entries(dias as Record<string, unknown>)) if (data.test(d) && Number(v) > 0) porDia[d] = Number(v);
@@ -467,9 +582,20 @@ export function lerCotacoes(aPartir: unknown, dias: unknown): { aPartir: Cotacao
  * troca, a taxa que valia até então fica para trás (SEMPRE), para os dias
  * antigos não mudarem.
  */
-export function novaCotacaoDesde(lista: CotacaoDesde[], anterior: number | null, desde: string, valor: number): CotacaoDesde[] {
+export function novaCotacaoDesde(lista: RegraDolar[], anterior: number | null, desde: string, valor: number): RegraDolar[] {
   const base = lista.length || anterior == null || desde === SEMPRE ? lista : [{ desde: SEMPRE, valor: anterior }];
-  return [...base.filter((c) => c.desde !== desde), { desde, valor }].sort((a, b) => b.desde.localeCompare(a.desde));
+  return [...base.filter((c) => c.desde !== desde), { desde, valor }].sort(ordemDasRegras);
+}
+
+/**
+ * Grava PTAX + spread + IOF a partir de um dia. Cada mudança fica guardada
+ * (é o histórico de alterações); no mesmo dia, vale a salva por último. Na
+ * primeira regra, a taxa que valia até então fica para trás (SEMPRE), para
+ * os dias antigos não mudarem.
+ */
+export function novaRegraPtax(lista: RegraDolar[], anterior: number | null, regra: CambioPtax): RegraDolar[] {
+  const base = lista.length || anterior == null || regra.desde === SEMPRE ? lista : [{ desde: SEMPRE, valor: anterior }];
+  return [...base, regra].sort(ordemDasRegras);
 }
 
 export interface ConfigMeta {
@@ -483,8 +609,11 @@ export interface ConfigMeta {
   versao?: string;
   /** Cotação fixa (R$ por US$). Sem ela, vale a PTAX de venda do dia. */
   cotacaoFixa?: number | null;
-  /** Taxa de cada dia (histórico da tela); null no dia = cai na fixa/PTAX. */
-  cotacaoDoDia?: (dia: string) => number | null;
+  /** Taxa de cada dia (histórico da tela); null no dia = cai na fixa/PTAX.
+   *  Recebe a PTAX do Banco Central do período (vazia se ninguém precisa). */
+  cotacaoDoDia?: (dia: string, ptax: Ptax[]) => number | null;
+  /** Algum dia do período usa PTAX + spread + IOF: busca o Banco Central. */
+  precisaPtax?: boolean;
   /** Acréscimo sobre a cotação, em % (ex.: 3,5 de IOF do cartão). */
   acrescimoPct?: number;
   /** Imposto do Meta sobre as contas em real, em % (padrão da tela: 12,5). */
@@ -515,7 +644,7 @@ export async function gastoMetaPorDia(cfg: ConfigMeta): Promise<GastoDoDia[]> {
 
   const dias = diasEntre(cfg.desde, cfg.ate);
   const precisaDolar = gastos.some((g) => g.moeda.toUpperCase() === 'USD' && g.valor > 0);
-  const faltaTaxa = !cfg.cotacaoFixa && dias.some((d) => (cfg.cotacaoDoDia?.(d) ?? null) == null);
+  const faltaTaxa = cfg.precisaPtax || (!cfg.cotacaoFixa && dias.some((d) => (cfg.cotacaoDoDia?.(d, []) ?? null) == null));
   const ptax = precisaDolar && faltaTaxa ? await buscarPtax({ fetch: cfg.fetch, desde: cfg.desde, ate: cfg.ate }) : [];
   const fator = 1 + (cfg.acrescimoPct ?? 0) / 100;
 
@@ -525,7 +654,7 @@ export async function gastoMetaPorDia(cfg: ConfigMeta): Promise<GastoDoDia[]> {
     impostoBrlPct: cfg.impostoBrlPct,
     cotacao: (moeda, dia) => {
       if (moeda !== 'USD') return null;
-      const base = cfg.cotacaoDoDia?.(dia) ?? cfg.cotacaoFixa ?? cotacaoNaData(ptax, dia);
+      const base = cfg.cotacaoDoDia?.(dia, ptax) ?? cfg.cotacaoFixa ?? cotacaoNaData(ptax, dia);
       return base == null ? null : Math.round(base * fator * 10_000) / 10_000;
     },
   });
