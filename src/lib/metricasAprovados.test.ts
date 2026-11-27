@@ -34,7 +34,7 @@ describe('conversão da safra', () => {
     ped('pago-boleto', 'pagos', 735, { data_aprovacao: '2026-11-12', metodo_pagamento: 'boleto', vendedor: 'Matheus' }),
     ped('devolvido', 'devolvido', 435, { enviado_em: '2026-11-04T12:00:00Z', metodo_pagamento: 'boleto' }),
     ped('rota', 'enviados', 535),
-    ped('cancelado', 'cancelados', 235),
+    ped('cancelado', 'cancelados', 235), // fora do agendado desde 26/11/2026, como no BlueSales
     ped('recusado', 'recusados', 735), // não é venda: fora da safra
     ped('outubro', 'pagos', 735, { data: '2026-10-30', data_aprovacao: '2026-11-02' }), // pago em novembro, safra de outubro
     ped('lixeira', 'enviados', 435, { removido_em: '2026-11-05T00:00:00Z' }),
@@ -42,23 +42,23 @@ describe('conversão da safra', () => {
 
   it('conta os pedidos FEITOS no período (regra do agendado) e tudo o que já pagaram', () => {
     const c = conversaoDaSafra(pedidos, P);
-    expect(c.qtd).toBe(5); // pago, pago-boleto, devolvido, rota, cancelado
-    expect(c.valor).toBe(435 + 735 + 435 + 535 + 235);
+    expect(c.qtd).toBe(4); // pago, pago-boleto, devolvido, rota (cancelado fora, como no BlueSales)
+    expect(c.valor).toBe(435 + 735 + 435 + 535);
     expect(c.valor).toBe(agregarPedidos(pedidos, P).valor_agendado); // = Faturamento Agendado
     expect(c.pagos).toBe(2);
     expect(c.recebido).toBe(1170);
     expect(c.perdidos).toBe(1); // cancelado não é frustração
     expect(c.emAberto).toEqual({ qtd: 1, valor: 535 });
-    expect(c.pct_valor).toBeCloseTo(1170 / 2375, 6);
-    expect(c.pct_qtd).toBeCloseTo(2 / 5, 6);
+    expect(c.pct_valor).toBeCloseTo(1170 / 2140, 6);
+    expect(c.pct_qtd).toBeCloseTo(2 / 4, 6);
     expect(c.pct_resolvidos).toBeCloseTo(2 / 3, 6);
   });
 
   it('separa por forma de pagamento e por vendedor; maior agendado primeiro', () => {
     const m = conversaoPorGrupo(pedidos, P, (p) => p.metodo_pagamento ?? '');
     expect(m.map((g) => [g.grupo, g.qtd, g.recebido])).toEqual([
-      ['pix', 3, 435],
       ['boleto', 2, 735],
+      ['pix', 2, 435],
     ]);
     expect(m.reduce((s, g) => s + g.valor, 0)).toBe(conversaoDaSafra(pedidos, P).valor);
   });
@@ -85,7 +85,7 @@ describe('conversão do período, como o BlueSales (23/11/2026: 162 ÷ 376 = 43,
     ped('pago', 'pagos', 435, { data_aprovacao: '2026-11-10' }),
     ped('rota', 'enviados', 535),
     ped('devolvido', 'devolvido', 435, { enviado_em: '2026-11-04T12:00:00Z' }),
-    ped('cancelado', 'cancelados', 235), // agendado conta o cancelado
+    ped('cancelado', 'cancelados', 235), // fora do agendado desde 26/11/2026, como no BlueSales
     ped('outubro', 'pagos', 735, { data: '2026-10-28', data_aprovacao: '2026-11-02' }), // pagamento de pedido de outubro CONTA
     ped('antecipado', 'pagos', 335, { data_aprovacao: '2026-11-03', tipo_venda: 'antecipado' }), // fora: não foi agendado
     ped('partes', 'pagos', 735, {
@@ -99,12 +99,12 @@ describe('conversão do período, como o BlueSales (23/11/2026: 162 ÷ 376 = 43,
 
   it('pagamentos do período (sem antecipado) ÷ agendamentos do período', () => {
     const c = conversaoDoPeriodo(pedidos, P);
-    expect(c.agendados).toEqual({ qtd: 5, valor: 435 + 535 + 435 + 235 + 735 });
+    expect(c.agendados).toEqual({ qtd: 4, valor: 435 + 535 + 435 + 735 });
     expect(c.agendados.qtd).toBe(agregarPedidos(pedidos, P).qtd_agendados);
     expect(c.pagos).toEqual({ qtd: 4, valor: 435 + 735 + 400 + 335 });
     expect(c.antecipado).toEqual({ qtd: 1, valor: 335 });
-    expect(c.pct_qtd).toBeCloseTo(4 / 5, 9);
-    expect(c.pct_valor).toBeCloseTo(1905 / 2375, 9);
+    expect(c.pct_qtd).toBeCloseTo(4 / 4, 9);
+    expect(c.pct_valor).toBeCloseTo(1905 / 2140, 9);
     // Com o antecipado, bate com os Pagamentos aprovados do P&L.
     expect(c.pagos.qtd + c.antecipado.qtd).toBe(agregarPedidos(pedidos, P).qtd_pagamentos);
     expect(c.pagos.valor + c.antecipado.valor).toBe(reaisDoPnl(pedidos));

@@ -4,7 +4,7 @@ import type { Periodo } from '@/types';
 import { formatBRL, formatBRLCompact, formatMultiplier, formatPercent, reaisToCents, safeDiv } from '@/lib/money';
 import { formatDiaMes } from '@/lib/dates';
 import { calcularPnl } from '@/lib/pnl';
-import { agregarPedidos } from '@/lib/pedidos';
+import { agregarPedidos, CANCELADO_NO_AGENDADO } from '@/lib/pedidos';
 import { pagosDaSafra, situacaoDosAgendados } from '@/lib/indicadores';
 import { FRUSTRACAO_PREVISTA } from '@/lib/previsao';
 import { planosSemCusto } from '@/lib/custosConfig';
@@ -193,8 +193,8 @@ export function PnlScreen({
                   : 'nenhum no período'
               }
             />
-            {/* O Faturamento Agendado soma os cancelados, como o BlueSales;
-                aqui aparece quanto daquele número foi cancelado. */}
+            {/* Cancelados criados no período. Desde 26/11/2026 ficam FORA do
+                Faturamento Agendado, como no BlueSales (CANCELADO_NO_AGENDADO). */}
             <KpiCard
               Icon={Ban}
               color={COR.vermelho}
@@ -202,7 +202,7 @@ export function PnlScreen({
               value={formatBRL(reaisToCents(agg.valor_cancelados))}
               sub={
                 agg.qtd_cancelados > 0
-                  ? `${agg.qtd_cancelados} pedido${agg.qtd_cancelados === 1 ? '' : 's'} · dentro do agendado`
+                  ? `${agg.qtd_cancelados} pedido${agg.qtd_cancelados === 1 ? '' : 's'} · ${CANCELADO_NO_AGENDADO ? 'dentro' : 'fora'} do agendado`
                   : 'nenhum no período'
               }
             />

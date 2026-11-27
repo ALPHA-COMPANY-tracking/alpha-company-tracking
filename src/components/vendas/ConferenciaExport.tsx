@@ -244,7 +244,7 @@ function ListaMudancas({ mudancas }: { mudancas: Mudanca[] }) {
       />
       <Grupo
         titulo="Etapa corrigida"
-        nota="Recusado e aguardando pagamento não contam como venda; cancelado conta e aparece no card Cancelados."
+        nota="Recusado, aguardando pagamento e cancelado não contam como venda (como no BlueSales); o cancelado aparece no card Cancelados."
         itens={de('etapa').map((m) => linha(m.pedido, `${etapaAqui(m.de)} → ${m.etapa}`))}
       />
     </div>

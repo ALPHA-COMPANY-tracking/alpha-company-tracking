@@ -504,8 +504,9 @@ export function RankingScreen({ periodo }: { periodo: Periodo }) {
         <Info size={16} className="text-gold shrink-0 mt-[2px]" />
         <p className="m-0 text-[12.5px] text-dim leading-relaxed">
           <b className="text-dim">Agendamentos</b> e <b className="text-dim">Valor bruto</b> contam como o Ranking do
-          BlueSales: todo pedido que o vendedor fez no período, inclusive o que depois cancelou, voltou ou foi roubado e o
-          antecipado já pago. Ficam fora só o recusado, o que ainda aguarda pagamento e o excluído em Vendas Agendadas.
+          BlueSales: todo pedido que o vendedor fez no período, inclusive o que depois voltou ou foi roubado e o
+          antecipado já pago. Ficam fora o cancelado, o recusado, o que ainda aguarda pagamento e o excluído em Vendas
+          Agendadas.
           Por isso o total aqui pode passar do Faturamento Agendado da Demonstração de Resultados, que tira o
           antecipado pago (o card &quot;Vendas&quot; do BlueSales também tira). <b className="text-dim">Aprovado</b> conta pela data em que o
           cliente pagou. A <b className="text-dim">conversão</b> olha só o que ele agendou no período: de tudo que

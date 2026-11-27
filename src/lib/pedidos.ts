@@ -49,14 +49,18 @@ export function ehCancelado(p: Pick<Pedido, 'status'>): boolean {
 }
 
 /**
- * Cancelado conta no saldo agendado? SIM — igual ao BlueSales, que soma os
- * cancelados em "Vendas este mês" (conferido no export de 22/10/2026: 217
- * pedidos, 6 cancelados, todos no número). Decisão do Jonas em 22/10/2026:
- * o Faturamento Agendado bate sempre com o BlueSales, e o card "Cancelados"
- * mostra quanto disso foi cancelado. false volta a tirá-los (como de 07 a
- * 17/10 e na manhã de 22/10).
+ * Cancelado conta no saldo agendado? NÃO — igual ao BlueSales. Decisão do
+ * Jonas em 22/10/2026: o Faturamento Agendado bate sempre com o BlueSales.
+ * Até 23/11/2026 o BlueSales somava os cancelados (export de 22/10: 217
+ * pedidos, 6 cancelados, todos no número) e aqui era true. Em 26/11/2026 o
+ * BlueSales passou a TIRAR os cancelados, em todos os meses, do card
+ * "Vendas", do Resultado Diário e do Ranking: novembro 01–26 lá 430 ·
+ * R$ 242.705 = aqui 444 · R$ 249.195 menos os 14 cancelados (R$ 6.490), dia a
+ * dia; outubro lá 379 · R$ 220.670 = 390 · R$ 227.055 menos 11 (R$ 6.385).
+ * O card "Cancelados" continua mostrando quanto foi cancelado (agora fora do
+ * agendado). true volta a somá-los.
  */
-export const CANCELADO_NO_AGENDADO = true;
+export const CANCELADO_NO_AGENDADO = false;
 
 /**
  * Entra na FRUSTRAÇÃO (cards Frustrados e Taxa, Perdas do P&L, tela

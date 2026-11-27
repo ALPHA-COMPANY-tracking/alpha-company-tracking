@@ -63,7 +63,7 @@ describe('rankingVendedores', () => {
     expect(dele[0].qtd_agendados).toBe(3);
   });
 
-  it('frustrado e cancelado continuam no agendado, como no Ranking do BlueSales', () => {
+  it('frustrado continua no agendado; cancelado sai, como no Ranking do BlueSales (desde 26/11/2026)', () => {
     const p = [
       pedido({ id: 'a', vendedor: 'PETER', data: '2026-09-01' }),
       pedido({ id: 'b', vendedor: 'PETER', data: '2026-09-02', status: 'devolvido' }),
@@ -71,8 +71,8 @@ describe('rankingVendedores', () => {
       pedido({ id: 'd', vendedor: 'PETER', data: '2026-09-03', status: 'cancelados', valor_agendado: 535 }),
     ];
     const peter = de('PETER', rankingVendedores(p, [], periodo));
-    expect(peter.qtd_agendados).toBe(4);
-    expect(peter.agendado).toBe(73_500 + 73_500 + 43_500 + 53_500);
+    expect(peter.qtd_agendados).toBe(3);
+    expect(peter.agendado).toBe(73_500 + 73_500 + 43_500);
     // A frustração fica à vista (já dentro do agendado); cancelado não é frustração.
     expect(peter.qtd_frustrados).toBe(2);
     expect(peter.frustrado).toBe(73_500 + 43_500);
@@ -137,14 +137,44 @@ describe('rankingVendedores', () => {
     const nov = rankingVendedores(p, [], { inicio: '2026-11-01', fim: '2026-11-23' }, 'qtd_agendados');
     const placar = nov.filter((l) => l.qtd_agendados > 0).map((l) => [l.nome, l.qtd_agendados, l.agendado]);
     // #4180 (PETER, 735) e #3858 (Matheus, 735) com o valor do BlueSales.
+    // Em 23/11 o BlueSales mostrava Lucas 146 · 76.875, PETER 140 · 80.745 e
+    // Matheus 97 · 56.475 — COM os cancelados. Desde 26/11 ele os tira (de
+    // todos os meses): menos 7 · 3.645, 3 · 905 e 4 · 1.940.
     expect(placar).toEqual([
-      ['Lucas Magalhães', 146, 76_875_00],
-      ['PETER', 140, 80_745_00],
-      ['Matheus', 97, 56_475_00],
+      ['Lucas Magalhães', 146 - 7, (76_875 - 3_645) * 100],
+      ['PETER', 140 - 3, (80_745 - 905) * 100],
+      ['Matheus', 97 - 4, (56_475 - 1_940) * 100],
     ]);
     // Alyenderson não disputa posição, mas aparece no "fora do ranking".
     const fora = deFora(p, [], { inicio: '2026-11-01', fim: '2026-11-23' });
     expect(fora.map((l) => [l.nome, l.qtd_agendados, l.agendado])).toEqual([['Alyenderson Lima', 1, 400_00]]);
+  });
+
+  it('bate com o Ranking do BlueSales de 01–26/11/2026, que tira os cancelados', () => {
+    // [vendedor, agendado sem cancelado no BlueSales (qtd, R$), cancelados daqui]
+    const reais: [string, number, number, number[]][] = [
+      ['Lucas Magalhães', 166, 87_975, [435, 435, 735, 335, 435, 735, 535]], // #5376 #5375 #5345 #4693 #4627 #4610 #4317
+      ['PETER', 156, 90_205, [435, 235, 235]], // #5367 #4385 #4312
+      ['Matheus', 110, 65_530, [735, 335, 435, 435]], // #5188 #4517 #3871 #3867
+    ];
+    const p: Pedido[] = [];
+    for (const [vendedor, n, total, cancelados] of reais) {
+      const base = Math.floor(total / n);
+      for (let i = 0; i < n; i++) {
+        const v = i === n - 1 ? total - base * (n - 1) : base;
+        p.push(pedido({ id: `${vendedor}-${i}`, vendedor, data: '2026-11-12', valor: v, valor_agendado: v }));
+      }
+      cancelados.forEach((v, i) =>
+        p.push(pedido({ id: `${vendedor}-c${i}`, vendedor, data: '2026-11-12', status: 'cancelados', valor: v, valor_agendado: v })),
+      );
+    }
+    const nov = rankingVendedores(p, [], { inicio: '2026-11-01', fim: '2026-11-26' }, 'qtd_agendados');
+    // Com os cancelados a dashboard mostrava 173 · 91.620, 159 · 91.110 e 114 · 67.470.
+    expect(nov.map((l) => [l.nome, l.qtd_agendados, l.agendado])).toEqual([
+      ['Lucas Magalhães', 166, 87_975_00],
+      ['PETER', 156, 90_205_00],
+      ['Matheus', 110, 65_530_00],
+    ]);
   });
 
   it('quem não é vendedor no BlueSales fica fora da disputa, mas não some', () => {

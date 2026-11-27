@@ -20,7 +20,7 @@
 
 import type { IsoDate, Pedido, Periodo } from '@/types';
 import { lerCsvBluesales, numeroDoPedido } from '@/lib/csvBluesales';
-import { aguardaPagamento, ehCancelado, ehRecusado, foraDoAgendado, statusBucket } from '@/lib/pedidos';
+import { CANCELADO_NO_AGENDADO, aguardaPagamento, ehCancelado, ehRecusado, foraDoAgendado, statusBucket } from '@/lib/pedidos';
 import { isDentro } from '@/lib/dates';
 
 export interface PedidoDoExport {
@@ -224,8 +224,16 @@ export function conferirComExport(
   const antes = somar(pedidos.filter(conta).map((p) => ({ valor: valorAgendado(p) })));
   const corrigidos = aplicarMudancas(pedidos, mudancas, new Date(0).toISOString());
   const depois = somar(corrigidos.filter(conta).map((p) => ({ valor: valorAgendado(p) })));
-  // Como o card: sem recusado, aguardando pagamento e antecipado já pago.
-  const blueSales = somar(doExport.filter((l) => !/recus|aguard.*pag/i.test(norm(l.etapa)) && !(/antecip/i.test(l.tipo) && l.pago_em)));
+  // Como o card: sem recusado, aguardando pagamento e antecipado já pago — e,
+  // desde 26/11/2026, sem cancelado (CANCELADO_NO_AGENDADO).
+  const blueSales = somar(
+    doExport.filter(
+      (l) =>
+        !/recus|aguard.*pag/i.test(norm(l.etapa)) &&
+        !(/antecip/i.test(l.tipo) && l.pago_em) &&
+        (CANCELADO_NO_AGENDADO || !/cancel/i.test(norm(l.etapa))),
+    ),
+  );
 
   return { periodo, mudancas, avisos, antes, depois, blueSales };
 }

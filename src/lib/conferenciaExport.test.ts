@@ -89,10 +89,11 @@ describe('conferirComExport', () => {
   it('antes, depois e o BlueSales', () => {
     // Antes: AAA 435 + BBB 735 + CCC 735 + EEE 435 + APAGADO 735 + PAGO-FORA 435 + NOVO 535 = 7 · 4.045
     expect(conf.antes).toEqual({ qtd: 7, valor: 4045 });
-    // Depois: − APAGADO 735, − CCC (recusado) 735, BBB 700, + DDD 535 = 6 · 3.075
-    expect(conf.depois).toEqual({ qtd: 6, valor: 3075 });
-    // Export sem o recusado: AAA 435 + BBB 700 + DDD 535 + EEE 435 + FFF 400 = 5 · 2.505
-    expect(conf.blueSales).toEqual({ qtd: 5, valor: 2505 });
+    // Depois: − APAGADO 735, − CCC (recusado) 735, BBB 700; o DDD volta da
+    // lixeira, mas é cancelado e não conta (BlueSales, desde 26/11/2026) = 5 · 2.540
+    expect(conf.depois).toEqual({ qtd: 5, valor: 2540 });
+    // Export sem o recusado e sem o cancelado: AAA 435 + BBB 700 + EEE 435 + FFF 400 = 4 · 1.970
+    expect(conf.blueSales).toEqual({ qtd: 4, valor: 1970 });
   });
 
   it('as correções saem uma por pedido, e o estado depois é o mesmo da conta', () => {

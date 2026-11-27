@@ -18,6 +18,7 @@ import { isDentro } from '@/lib/dates';
 import {
   agregarPedidos,
   aguardaPagamento,
+  CANCELADO_NO_AGENDADO,
   dataAprovacaoPedido,
   ehCancelado,
   ehRecusado,
@@ -68,16 +69,19 @@ export interface CustosDoVendedor {
  * O pedido conta como agendamento no RANKING? Regra do Ranking do BlueSales,
  * conferida pedido a pedido em 23/11/2026 (novembro 01–23: Lucas 146 ·
  * R$ 76.875,00, PETER 140, Matheus 97): TODO pedido que o vendedor fez no
- * período — inclusive o que depois cancelou, voltou, foi devolvido ou
- * roubado, e o antecipado já pago. Fica fora só o recusado (nunca foi venda),
- * o que ainda aguarda pagamento e o excluído (lixeira).
+ * período — inclusive o que depois voltou, foi devolvido ou roubado, e o
+ * antecipado já pago. Fica fora o recusado (nunca foi venda), o que ainda
+ * aguarda pagamento, o excluído (lixeira) e — desde 26/11/2026, quando o
+ * BlueSales passou a tirar os cancelados de tudo — o CANCELADO, pela mesma
+ * chave do Faturamento Agendado (CANCELADO_NO_AGENDADO). Novembro 01–26 lá:
+ * Lucas 166 · R$ 87.975, PETER 156 · R$ 90.205, Matheus 110 · R$ 65.530 =
+ * aqui menos os cancelados de cada um (7, 3 e 4).
  *
  * Conta MAIS que o card "Vendas"/Faturamento Agendado, que tira o antecipado
- * pago. No BlueSales é igual: card 381 agendamentos, ranking 383. Antes daqui
- * o ranking tirava cancelado e frustrado e ficava 25 pedidos abaixo.
+ * pago. No BlueSales é igual: card 430 agendamentos, ranking 432 (26/11).
  */
 export function contaNoRanking(p: Pick<Pedido, 'status' | 'removido_em'>): boolean {
-  return !p.removido_em && !ehRecusado(p) && !aguardaPagamento(p);
+  return !p.removido_em && !ehRecusado(p) && !aguardaPagamento(p) && (CANCELADO_NO_AGENDADO || !ehCancelado(p));
 }
 
 /**
