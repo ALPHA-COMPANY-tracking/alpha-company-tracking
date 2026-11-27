@@ -472,6 +472,25 @@ describe('câmbio do BlueSales: PTAX + spread + IOF (27/11/2026)', () => {
     expect(regraDoDia('2026-11-24', fixa)).toMatchObject({ spread: 7 });
   });
 
+  it('conta em dólar com gasto zero no dia de PTAX ainda busca o Banco Central (não trava)', async () => {
+    const { f, chamadas } = fetchFalso([
+      [/insights/, { data: [{ spend: '0', account_currency: 'USD', date_start: '2026-11-27' }] }],
+      [/olinda\.bcb\.gov\.br/, PTAX],
+    ]);
+    const dias = await gastoMetaPorDia({
+      fetch: f,
+      token: 't',
+      contas: ['1'],
+      desde: '2026-11-27',
+      ate: '2026-11-27',
+      cotacaoFixa: 6.15,
+      cotacaoDoDia: (d, p) => cambioDoDia(d, { regras, dias: {}, fixa: 6.15, ptax: p }),
+      precisaPtax: true,
+    });
+    expect(dias[0].reais).toBe(0);
+    expect(chamadas.some((u) => u.includes('bcb.gov.br'))).toBe(true);
+  });
+
   it('sem a PTAX do Banco Central não grava com taxa errada', () => {
     expect(() => cambioDoDia('2026-11-27', { regras, dias: {}, fixa: 6.15, ptax: [] })).toThrow(/PTAX/);
     // cotacaoDoDia (só as fixas) não inventa: devolve null no dia de PTAX.

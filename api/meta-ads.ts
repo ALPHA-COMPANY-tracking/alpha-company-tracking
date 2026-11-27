@@ -8,7 +8,8 @@
 //   POST /api/meta-ads?acao=contas        o cadastro de contas + a configuração
 //   POST /api/meta-ads?acao=salvar        grava a configuração (corpo JSON:
 //        { contas?: string[], cotacao_usd?: number, cotacao_desde?: 'AAAA-MM-DD',
-//          remover_cotacao_desde?: 'AAAA-MM-DD', cotacao_dia?: { dia, valor|null },
+//          remover_cotacao_desde?: 'AAAA-MM-DD', remover_cotacao_em?: ISO,
+//          cotacao_dia?: { dia, valor|null },
 //          cambio?: { spread?: %, iof?: %, desde?: 'AAAA-MM-DD' },
 //          imposto_brl_pct?: number })
 //        A taxa do dólar vale A PARTIR de `cotacao_desde` (padrão: hoje) e não
@@ -254,7 +255,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         nova.cotacoes_usd = meta.novaRegraPtax(nova.cotacoes_usd, config?.cotacao_usd ?? meta.COTACAO_BLUESALES, regra);
       }
       if (typeof corpo.remover_cotacao_desde === 'string' && corpo.remover_cotacao_desde !== meta.SEMPRE) {
-        nova.cotacoes_usd = nova.cotacoes_usd.filter((x) => x.desde !== corpo.remover_cotacao_desde);
+        // Com `remover_cotacao_em`, tira só aquela alteração (a linha do
+        // histórico); sem, todas as do dia (a taxa fixa é uma por dia).
+        const em = typeof corpo.remover_cotacao_em === 'string' ? corpo.remover_cotacao_em : null;
+        nova.cotacoes_usd = nova.cotacoes_usd.filter(
+          (x) => x.desde !== corpo.remover_cotacao_desde || (em != null && (x.em ?? '') !== em),
+        );
       }
       if (corpo.cotacao_dia !== undefined) {
         const cd = (corpo.cotacao_dia ?? {}) as { dia?: unknown; valor?: unknown };
@@ -416,7 +422,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           hoje: meta.cambioDoDia(hojeSP, { regras: efetiva.cotacoes_usd, dias: efetiva.cotacoes_dia, fixa: efetiva.cotacao_usd, ptax }),
         };
       } catch (e) {
-        cambio = { ...cambio, erro: e instanceof Error ? e.message : String(e) };
+        // Sem o Banco Central, o dólar de hoje ainda sai se ele não depende da
+        // PTAX (taxa fixa ou digitada para o dia).
+        let hoje: number | null = null;
+        try {
+          hoje = meta.cambioDoDia(hojeSP, { regras: efetiva.cotacoes_usd, dias: efetiva.cotacoes_dia, fixa: efetiva.cotacao_usd, ptax: [] });
+        } catch {
+          // dia de PTAX sem a PTAX: fica sem número
+        }
+        cambio = { ...cambio, erro: e instanceof Error ? e.message : String(e), hoje };
       }
       if (cadastro) {
         return res.status(200).json({

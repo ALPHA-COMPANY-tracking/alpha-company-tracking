@@ -222,6 +222,8 @@ export function salvarConfigMeta(
     cotacao_usd: number;
     cotacao_desde: string;
     remover_cotacao_desde: string;
+    /** Junto com remover_cotacao_desde: tira só a alteração salva nesse instante. */
+    remover_cotacao_em: string;
     cotacao_dia: { dia: string; valor: number | null };
     /** PTAX + spread + IOF (em %) a partir de `desde` (padrão: hoje). */
     cambio: { spread?: number; iof?: number; desde?: string };

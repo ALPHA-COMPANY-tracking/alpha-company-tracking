@@ -416,8 +416,12 @@ export function FacebookScreen() {
               `${qual === 'spread' ? 'Spread' : 'IOF'} de ${numBR(valor)}% salvo a partir de ${formatData(desde)}.`,
             )
           }
-          onRemover={(desde) =>
-            salvarTaxa({ remover_cotacao_desde: desde }, { desde, ate: hojeIso() }, `Câmbio de ${formatData(desde)} removido.`)
+          onRemover={(desde, em) =>
+            salvarTaxa(
+              { remover_cotacao_desde: desde, ...(em ? { remover_cotacao_em: em } : {}) },
+              { desde, ate: hojeIso() },
+              `Alteração de ${formatData(desde)} removida.`,
+            )
           }
         />
         <div className="px-3.5 lg:px-5 pb-4 grid gap-4 lg:grid-cols-2">
@@ -1113,14 +1117,27 @@ function CambioDolar(p: {
   ocupado: boolean;
   desabilitado: boolean;
   onSalvar: (qual: 'spread' | 'iof', valor: number, desde: string) => void;
-  onRemover: (desde: string) => void;
+  onRemover: (desde: string, em?: string) => void;
 }) {
   const regraHoje = regraDoDia(p.hoje, p.regras);
   const ptaxHoje = ehPtax(regraHoje) ? regraHoje : null;
   const vigente = p.cambio?.vigente ?? null;
   const ultima = p.cambio?.ultima ?? null;
-  // A PTAX publicada hoje à tarde só vale a partir de amanhã.
-  const novaParaAmanha = ultima && vigente && ultima.data > vigente.data ? ultima : null;
+  // A PTAX publicada hoje à tarde só vale a partir de amanhã (só diz isso se
+  // o gasto de hoje é pela PTAX).
+  const novaParaAmanha = ptaxHoje && ultima && vigente && ultima.data > vigente.data ? ultima : null;
+  /** Desde quando vale o spread (ou o IOF) de hoje: volta enquanto o dia de
+   *  antes tinha o mesmo valor — mudar só o IOF não muda a data do spread. */
+  const desdeDe = (qual: 'spread' | 'iof'): string | undefined => {
+    if (!ptaxHoje) return undefined;
+    let desde = ptaxHoje.desde;
+    for (;;) {
+      const antes = regraDoDia(addDias(desde, -1), p.regras);
+      if (!ehPtax(antes) || antes[qual] !== ptaxHoje[qual] || antes.desde >= desde) break;
+      desde = antes.desde;
+    }
+    return desde;
+  };
   // O que mudou em cada alteração: a regra que valia naquele dia antes dela.
   // Histórico: a alteração mais recente primeiro; as fixas antigas (sem data) no fim.
   const historico = [...p.regras].sort((a, b) => (b.em ?? '').localeCompare(a.em ?? '') || ordemDasRegras(a, b));
@@ -1140,13 +1157,6 @@ function CambioDolar(p: {
     ].filter(Boolean);
     return partes.length ? partes.join(' · ') : `spread ${numBR(r.spread)}% · IOF ${numBR(r.iof)}%`;
   };
-  // O X tira a regra do dia (todas as daquele "desde"): só na mais recente de cada dia.
-  const primeiraDoDia = new Set<RegraDolar>();
-  const vistos = new Set<string>();
-  for (const r of [...p.regras].sort(ordemDasRegras)) {
-    if (!vistos.has(r.desde)) primeiraDoDia.add(r);
-    vistos.add(r.desde);
-  }
 
   return (
     <div className="mx-3.5 lg:mx-5 mt-4 mb-4">
@@ -1171,7 +1181,7 @@ function CambioDolar(p: {
           <LinhaCambio
             rotulo="Spread do banco"
             valor={ptaxHoje ? pctBR(ptaxHoje.spread) : '—'}
-            desde={ptaxHoje?.desde}
+            desde={desdeDe('spread')}
             qual="spread"
             atual={ptaxHoje?.spread}
             hoje={p.hoje}
@@ -1182,7 +1192,7 @@ function CambioDolar(p: {
           <LinhaCambio
             rotulo="IOF"
             valor={ptaxHoje ? pctBR(ptaxHoje.iof) : '—'}
-            desde={ptaxHoje?.desde}
+            desde={desdeDe('iof')}
             qual="iof"
             atual={ptaxHoje?.iof}
             hoje={p.hoje}
@@ -1197,7 +1207,7 @@ function CambioDolar(p: {
             {p.cambio?.hoje != null ? `R$ ${numBR(p.cambio.hoje, 4)}` : '—'}
           </span>
         </div>
-        {(!ptaxHoje || novaParaAmanha) && (
+        {((regraHoje && !ehPtax(regraHoje)) || novaParaAmanha) && (
           <div className="py-2.5 text-[11.5px] text-dim2 leading-relaxed">
             {!ptaxHoje && regraHoje && !ehPtax(regraHoje) && (
               <>
@@ -1234,11 +1244,11 @@ function CambioDolar(p: {
                     {deAte(r)} ·{' '}
                     {r.desde === SEMPRE ? 'antes de tudo' : `vale a partir de ${formatData(r.desde)}`}
                   </span>
-                  {r.desde !== SEMPRE && primeiraDoDia.has(r) ? (
+                  {r.desde !== SEMPRE ? (
                     <button
-                      onClick={() => p.onRemover(r.desde)}
+                      onClick={() => p.onRemover(r.desde, r.em)}
                       disabled={p.ocupado || p.desabilitado}
-                      title="Tirar o câmbio deste dia (os dias voltam para o de antes)"
+                      title="Desfazer esta alteração (os dias voltam para o câmbio de antes)"
                       className="grid place-items-center w-6 h-6 shrink-0 rounded-md text-dim2 hover:text-red hover:bg-red/10 disabled:opacity-40"
                     >
                       <X size={13} />

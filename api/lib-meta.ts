@@ -672,7 +672,9 @@ export async function gastoMetaPorDia(cfg: ConfigMeta): Promise<GastoDoDia[]> {
   }
 
   const dias = diasEntre(cfg.desde, cfg.ate);
-  const precisaDolar = gastos.some((g) => g.moeda.toUpperCase() === 'USD' && g.valor > 0);
+  // Conta em dólar com gasto zero também passa pela cotação (consolidar pede
+  // a taxa de toda linha que não é em real): sem a PTAX o dia de PTAX travaria.
+  const precisaDolar = gastos.some((g) => g.moeda.toUpperCase() === 'USD');
   const faltaTaxa = cfg.precisaPtax || (!cfg.cotacaoFixa && dias.some((d) => (cfg.cotacaoDoDia?.(d, []) ?? null) == null));
   const ptax = precisaDolar && faltaTaxa ? await buscarPtax({ fetch: cfg.fetchPtax ?? cfg.fetch, desde: cfg.desde, ate: cfg.ate }) : [];
   const fator = 1 + (cfg.acrescimoPct ?? 0) / 100;
